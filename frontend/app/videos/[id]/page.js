@@ -23,7 +23,7 @@ export default async function VideoDetailPage({ params }) {
   } catch (error) {
     return (
       <section className="player-page">
-        <Link className="back-link" href="/">← 返回首页</Link>
+        <a className="back-link" href="/">← 返回首页</a>
         <p className="error-text">{error.message}</p>
       </section>
     );

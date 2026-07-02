@@ -1,0 +1,14 @@
+{
+  "name": "video-player-learning-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node.js 全栈视频播放器学习项目：前后端分离、PostgreSQL、S3/MinIO 存储桶。",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "db:init": "psql \"postgresql://postgres:postgres@localhost:5432/video_player\" -f database/schema.sql"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

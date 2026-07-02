@@ -1,0 +1,24 @@
+{
+  "name": "video-player-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "storage:clean": "node scripts/clean-orphan-objects.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.731.1",
+    "@aws-sdk/s3-request-presigner": "^3.731.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^2.0.2",
+    "pg": "^8.13.1",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

@@ -81,13 +81,15 @@ http://服务器IP:3002
 
 ### Docker
 
-当前 [docker-compose.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.yml) 负责启动：
+当前 [docker-compose.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.yml) 是生产部署配置，负责启动：
 
 - PostgreSQL
 - Express 后端
 - Next.js 前端
 
-当前版本已经移除 MinIO 服务。服务器部署时只需要配置根目录 `.env`，填写服务器地址和腾讯云 COS 密钥即可。
+本地 MinIO 调试配置放在 [docker-compose.local.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.local.yml)，只在本地叠加使用。生产服务器部署腾讯云 COS 时不启动 MinIO。
+
+服务器部署时只需要配置根目录 `.env`，填写服务器地址和腾讯云 COS 密钥即可。
 
 ## 3. 项目目录结构
 
@@ -112,7 +114,8 @@ http://服务器IP:3002
 │   └── package-lock.json
 ├── memory/                  # 项目长期记忆和学习复盘
 ├── .env.example             # 服务器 Docker 部署环境变量模板
-├── docker-compose.yml       # PostgreSQL + 后端 + 前端容器配置
+├── docker-compose.yml       # 生产 Docker 配置：PostgreSQL + 后端 + 前端
+├── docker-compose.local.yml # 本地 Docker 叠加配置：MinIO + bucket 初始化
 ├── package.json             # 根目录快捷命令
 ├── package-lock.json
 ├── .gitignore
@@ -211,6 +214,7 @@ nano .env
 ```env
 FRONTEND_URL=http://服务器公网IP:3001
 NEXT_PUBLIC_API_BASE_URL=http://服务器公网IP:3002/api
+JWT_SECRET=请改成一段长随机字符串
 
 S3_ENDPOINT=https://cos.ap-nanjing.myqcloud.com
 S3_REGION=ap-nanjing
@@ -218,6 +222,7 @@ S3_BUCKET=你的存储桶名称
 S3_ACCESS_KEY_ID=你的SecretId
 S3_SECRET_ACCESS_KEY=你的SecretKey
 S3_FORCE_PATH_STYLE=false
+S3_PUBLIC_ENDPOINT=
 PUBLIC_BUCKET_BASE_URL=https://你的存储桶名称.cos.ap-nanjing.myqcloud.com
 ```
 
@@ -225,9 +230,11 @@ PUBLIC_BUCKET_BASE_URL=https://你的存储桶名称.cos.ap-nanjing.myqcloud.com
 
 - `FRONTEND_URL`：后端 CORS 允许的前端地址
 - `NEXT_PUBLIC_API_BASE_URL`：浏览器访问后端 API 的地址，会在前端镜像构建时写入前端包
+- `JWT_SECRET`：管理员登录 JWT 签名密钥，生产环境必须改成一段长随机字符串
 - `S3_ENDPOINT` / `S3_REGION` / `S3_BUCKET`：腾讯云 COS 的 S3 兼容配置
 - `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`：腾讯云访问密钥，不要提交到 Git
 - `S3_FORCE_PATH_STYLE=false`：腾讯云 COS 使用虚拟主机风格访问
+- `S3_PUBLIC_ENDPOINT`：本地 MinIO 直传时才需要，生产腾讯云 COS 一般留空
 - `PUBLIC_BUCKET_BASE_URL`：浏览器访问视频和封面时使用的公开 COS 地址
 
 腾讯云 COS 存储桶需要配置 CORS，允许前端页面直传：
@@ -244,8 +251,8 @@ ExposeHeader: ETag
 ### 6.3 启动或重建容器
 
 ```bash
-docker compose down
-docker compose up -d --build
+docker compose -p video_player --env-file .env down
+docker compose -p video_player --env-file .env up -d --build
 ```
 
 查看容器：
@@ -257,8 +264,8 @@ docker ps
 查看日志：
 
 ```bash
-docker compose logs --tail=100 backend
-docker compose logs --tail=100 frontend
+docker compose -p video_player --env-file .env logs --tail=100 backend
+docker compose -p video_player --env-file .env logs --tail=100 frontend
 ```
 
 ### 6.4 验证服务
@@ -306,26 +313,75 @@ POST http://服务器公网IP:3002/api/videos
 
 ## 7. 本地开发说明
 
-本地主要用于代码开发和提交，不要求一定完整跑通腾讯云 COS。
+本地调试分两种：Docker 完整环境和 Node.js 代码开发。
 
-如果本地也要启动 Docker 版本，需要在根目录创建 `.env`，并填写可用的 COS 配置：
+### 7.1 本地 Docker 调试
 
-```bash
-cp .env.example .env
-```
+本地 Docker 调试使用 MinIO 模拟 S3 存储桶。生产环境的 [docker-compose.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.yml) 不包含 MinIO，本地需要叠加 [docker-compose.local.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.local.yml)。
 
-然后按需修改：
+根目录创建 `.env.local`：
 
 ```env
 FRONTEND_URL=http://localhost:3001
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3002/api
+JWT_SECRET=dev-local-secret
+
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
+
+S3_ENDPOINT=http://minio:9000
+S3_REGION=us-east-1
+S3_BUCKET=videos
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_FORCE_PATH_STYLE=true
+S3_PUBLIC_ENDPOINT=http://localhost:9000
+PUBLIC_BUCKET_BASE_URL=http://localhost:9000/videos
 ```
 
-再启动：
+说明：
+
+- `S3_ENDPOINT=http://minio:9000`：后端容器访问 MinIO 的内部地址
+- `S3_PUBLIC_ENDPOINT=http://localhost:9000`：浏览器直传分片使用的宿主机地址
+- `PUBLIC_BUCKET_BASE_URL=http://localhost:9000/videos`：浏览器播放视频和显示封面使用的公开地址
+- `.env.local` 已加入 [.gitignore](file:///c:/Users/user/Desktop/播放器/.gitignore)，不会提交到 Git
+
+本地启动：
 
 ```bash
-docker compose up -d --build
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml --env-file .env.local up -d --build
 ```
+
+本地停止：
+
+```bash
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml --env-file .env.local down
+```
+
+本地访问：
+
+```txt
+前端：http://localhost:3001
+后端：http://localhost:3002/api/health
+管理员：http://localhost:3001/admin/login
+MinIO 控制台：http://localhost:9001
+```
+
+MinIO 登录：
+
+```txt
+username: minioadmin
+password: minioadmin
+```
+
+管理员登录：
+
+```txt
+username: admin
+password: 123456
+```
+
+### 7.2 Node.js 代码开发
 
 如果只做代码开发，可分别安装依赖：
 
@@ -334,7 +390,7 @@ npm install
 npm run install:all
 ```
 
-再按项目脚本启动开发服务。
+后端直接运行时使用 [backend/.env](file:///c:/Users/user/Desktop/播放器/backend/.env.example) 这一类配置；Docker 部署使用根目录 `.env` 或 `.env.local`。
 
 ## 8. 当前已实现的重要逻辑
 

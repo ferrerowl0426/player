@@ -43,9 +43,17 @@ a {
   color: #00a1d6;
 }
 
-.nav-text {
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   color: #6b7280;
   font-size: 14px;
+  font-weight: 700;
+}
+
+.site-nav a:hover {
+  color: #00a1d6;
 }
 
 main {
@@ -77,7 +85,8 @@ main {
 
 .upload-panel,
 .video-section,
-.player-page {
+.player-page,
+.login-panel {
   padding: 24px;
   margin-bottom: 24px;
   background: white;
@@ -123,6 +132,8 @@ main {
 }
 
 .upload-form button,
+.filter-actions button,
+.hero-button,
 .section-title button {
   width: fit-content;
   padding: 10px 18px;
@@ -139,9 +150,82 @@ main {
   opacity: 0.65;
 }
 
+.filter-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(150px, 200px)) auto;
+  gap: 14px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.filter-form label {
+  display: grid;
+  gap: 8px;
+  color: #374151;
+  font-weight: 700;
+}
+
+.filter-form input {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  outline: none;
+}
+
+.filter-form input:focus {
+  border-color: #00a1d6;
+  box-shadow: 0 0 0 3px rgba(0, 161, 214, 0.15);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-actions .secondary-button {
+  color: #374151;
+  background: #eef2f7;
+}
+
+.hero-button {
+  color: #00a1d6;
+  background: white;
+}
+
+.login-panel {
+  max-width: 480px;
+  margin: 60px auto;
+}
+
+.login-panel h1 {
+  margin: 0 0 10px;
+}
+
+.login-panel p {
+  color: #6b7280;
+}
+
 .status-text {
   margin: 0;
   color: #00a1d6;
+}
+
+.upload-progress-list {
+  display: grid;
+  gap: 12px;
+}
+
+.upload-progress-list label {
+  gap: 6px;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.upload-progress-list progress {
+  width: 100%;
+  height: 12px;
 }
 
 .section-title {
@@ -291,9 +375,18 @@ main {
   .hero,
   .upload-panel,
   .video-section,
-  .player-page {
+  .player-page,
+  .login-panel {
     padding: 18px;
     border-radius: 14px;
+  }
+
+  .filter-form {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    flex-wrap: wrap;
   }
 
   .hero h1 {

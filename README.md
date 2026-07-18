@@ -23,10 +23,10 @@ Next.js 前端页面 -> Express 后端 API -> PostgreSQL 数据库 -> 腾讯云 
 当前上传方式：
 
 ```txt
-浏览器 -> 后端 Express -> 腾讯云 COS
+浏览器 -> 后端 Express 创建 Multipart 上传任务 -> 浏览器分片直传腾讯云 COS -> 后端合并分片并保存数据库记录
 ```
 
-也就是说，前端不再直传 COS，而是把 `FormData` 提交给后端，由后端上传到对象存储并保存数据库记录。
+也就是说，前端不再把视频文件提交给后端中转，而是先向后端创建腾讯云 COS Multipart 上传任务，再把视频切成多个分片直接 PUT 到对象存储，最后由后端通知 COS 合并分片并写入数据库。真实 COS 密钥只保存在后端。
 
 ## 2. 当前技术栈
 
@@ -54,7 +54,6 @@ http://localhost:3001
 
 - Node.js
 - Express
-- multer
 - pg
 - dotenv
 - AWS S3 SDK
@@ -129,9 +128,8 @@ http://服务器IP:3002
 | [config.js](file:///c:/Users/user/Desktop/播放器/backend/src/config.js) | 读取环境变量，集中管理端口、数据库、S3/COS 配置 |
 | [server.js](file:///c:/Users/user/Desktop/播放器/backend/src/server.js) | Express 服务入口，配置 CORS、JSON、健康检查和视频路由 |
 | [db.js](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) | PostgreSQL 连接池 |
-| [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) | 上传、删除、列出 S3/COS 对象 |
-| [upload.js](file:///c:/Users/user/Desktop/播放器/backend/src/upload.js) | multer 上传配置、文件大小、MIME 和扩展名限制 |
-| [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js) | 视频列表、详情、上传、删除 API |
+| [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) | 生成预签名上传地址，删除、检查、列出 S3/COS 对象 |
+| [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js) | 视频列表、详情、上传地址生成、完成上传、删除 API |
 | [clean-orphan-objects.js](file:///c:/Users/user/Desktop/播放器/backend/scripts/clean-orphan-objects.js) | 清理存储桶孤儿文件脚本 |
 
 ### 前端关键文件
@@ -232,6 +230,17 @@ PUBLIC_BUCKET_BASE_URL=https://你的存储桶名称.cos.ap-nanjing.myqcloud.com
 - `S3_FORCE_PATH_STYLE=false`：腾讯云 COS 使用虚拟主机风格访问
 - `PUBLIC_BUCKET_BASE_URL`：浏览器访问视频和封面时使用的公开 COS 地址
 
+腾讯云 COS 存储桶需要配置 CORS，允许前端页面直传：
+
+```txt
+AllowedOrigin: http://服务器公网IP:3001
+AllowedMethod: PUT, GET, HEAD
+AllowedHeader: *
+ExposeHeader: ETag
+```
+
+如果后续使用域名和 HTTPS，要把 `AllowedOrigin` 改成实际前端域名。
+
 ### 6.3 启动或重建容器
 
 ```bash
@@ -281,15 +290,18 @@ http://服务器公网IP:3001
 上传成功后，浏览器 Network 中应看到：
 
 ```txt
-POST http://服务器公网IP:3002/api/videos
+POST http://服务器公网IP:3002/api/videos/multipart/create
+POST http://服务器公网IP:3002/api/videos/multipart/part-url
+PUT https://你的存储桶名称.cos.ap-nanjing.myqcloud.com/videos/...
+POST http://服务器公网IP:3002/api/videos/multipart/complete
+PUT https://你的存储桶名称.cos.ap-nanjing.myqcloud.com/covers/...
+POST http://服务器公网IP:3002/api/videos/complete
 ```
 
 不应再看到：
 
 ```txt
-upload-url
-videos/complete
-.mp4?...签名参数
+POST http://服务器公网IP:3002/api/videos
 ```
 
 ## 7. 本地开发说明
@@ -355,15 +367,19 @@ npm run install:all
 
 ```txt
 1. 前端校验表单
-2. 前端把 FormData POST 到 /api/videos
-3. 后端 multer 接收视频和封面到临时目录
-4. 后端上传视频到 COS 的 videos/ 前缀
-5. 后端上传封面到 COS 的 covers/ 前缀
-6. 后端把 video_url / cover_url 保存到 PostgreSQL
-7. 前端刷新列表
+2. 前端把标题、介绍、视频文件信息、封面文件信息 POST 到 /api/videos/multipart/create
+3. 后端校验元数据，创建视频 Multipart Upload，并返回 uploadId、videoKey、封面上传地址
+4. 前端把视频按 8MB 切片，每个分片向 /api/videos/multipart/part-url 申请预签名 PUT 地址
+5. 前端并发把视频分片直接 PUT 到 COS，并记录每个分片返回的 ETag
+6. 前端把 uploadId、videoKey、PartNumber + ETag 列表 POST 到 /api/videos/multipart/complete
+7. 后端通知 COS 合并视频分片，并确认最终视频对象存在
+8. 前端把封面直接 PUT 到 COS
+9. 前端把 title / description / videoKey / coverKey POST 到 /api/videos/complete
+10. 后端确认视频和封面对象存在后，把 video_url / cover_url 保存到 PostgreSQL
+11. 前端刷新列表
 ```
 
-这个方案比浏览器直传慢，因为文件会经过服务器中转，但部署和权限配置更简单。
+这个方案比后端中转更快，也适合大文件上传；如果上传中途失败，前端会调用 abort 接口取消未完成的 Multipart Upload，避免 COS 里长期残留未合并分片。
 
 ### 8.3 视频播放叠音修复
 
@@ -493,19 +509,105 @@ curl http://localhost:3002/api/health
 curl -I http://localhost:3001
 ```
 
-## 12. 后续建议任务
+## 12. 当前实施计划：管理员、普通用户、搜索筛选
+
+本阶段要把项目拆成普通用户前台和管理员后台。
+
+### 12.1 页面规划
+
+```txt
+/                    普通用户首页，不需要登录，只能浏览、搜索、筛选、播放
+/admin               管理员后台，需要登录，可以浏览、搜索、筛选、上传、删除
+/admin/login         管理员登录页
+/videos/[id]         视频播放页，公开访问
+```
+
+现有首页的上传和删除能力迁移到管理员后台。普通用户首页不显示上传表单和删除按钮。
+
+### 12.2 管理员账号
+
+管理员只有一个：
+
+```txt
+username: admin
+password: 123456
+```
+
+账号初始化写入 PostgreSQL。数据库中不保存明文密码，而保存 `123456` 的 bcrypt hash。
+
+### 12.3 鉴权方案
+
+管理员登录使用 HttpOnly Cookie 保存服务端签发的 JWT：
+
+```txt
+POST /api/admin/login    登录，设置 HttpOnly Cookie
+GET /api/admin/me        检查当前管理员登录状态
+POST /api/admin/logout   退出登录，清除 Cookie
+```
+
+Cookie 设置原则：
+
+- `httpOnly: true`，避免前端 JavaScript 读取 token
+- `sameSite: 'lax'`，降低 CSRF 风险
+- 生产环境 HTTPS 下使用 `secure: true`
+- token 有过期时间
+
+后端必须保护管理员接口，不能只靠前端隐藏按钮。
+
+### 12.4 权限边界
+
+公开接口：
+
+```txt
+GET /api/videos
+GET /api/videos/:id
+```
+
+仅管理员可用：
+
+```txt
+POST /api/videos/multipart/create
+POST /api/videos/multipart/part-url
+POST /api/videos/multipart/complete
+POST /api/videos/multipart/abort
+POST /api/videos/complete
+DELETE /api/videos/:id
+```
+
+上传仍然保持前端直传腾讯云 COS：
+
+```txt
+管理员浏览器 -> 后端获取预签名分片 URL -> 管理员浏览器分片 PUT 到 COS -> 后端 Complete Multipart -> 后端写数据库
+```
+
+文件内容不经过后端中转。
+
+### 12.5 搜索和日期筛选
+
+视频列表接口支持 query 参数：
+
+```txt
+GET /api/videos?keyword=关键词&startDate=2026-01-01&endDate=2026-01-31
+```
+
+筛选规则：
+
+- `keyword` 同时匹配标题和简介
+- `startDate` 按 `created_at >= startDate`
+- `endDate` 包含结束日期当天
+- 前后端都做基础边界校验，最终以后端校验为准
+
+## 13. 后续建议任务
 
 建议按这个顺序继续：
 
 1. 为服务器配置域名
 2. 使用 Nginx 反向代理前端和后端
 3. 配置 HTTPS
-4. 优化大文件上传体验，例如进度条、上传中提示、超时提示
-5. 如需提升上传速度，再重新研究浏览器直传 COS，并正确配置 COS CORS
-6. 增加鉴权，避免任何人都能上传或删除视频
-7. 增加分页、搜索、编辑视频信息等功能
+4. 按实际域名收紧 COS CORS 配置
+5. 增加分页、编辑视频信息等功能
 
-## 13. 新对话接手提示
+## 14. 新对话接手提示
 
 如果后续开新对话，可以先让助手阅读：
 
@@ -517,5 +619,5 @@ curl -I http://localhost:3001
 一句话交接：
 
 ```txt
-这是一个 Next.js + Express + PostgreSQL + 腾讯云 COS 的视频播放器教学项目；当前部署方式是服务器 git pull 后填写根目录 .env，再用 docker compose up -d --build 启动，上传采用后端中转到 COS，不走浏览器直传。
+这是一个 Next.js + Express + PostgreSQL + 腾讯云 COS 的视频播放器教学项目；当前部署方式是服务器 git pull 后填写根目录 .env，再用 docker compose up -d --build 启动，上传采用后端创建 COS Multipart 任务、浏览器分片直传、后端合并分片、完成后后端入库的流程。
 ```

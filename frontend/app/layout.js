@@ -11,7 +11,10 @@ export default function RootLayout({ children }) {
       <body>
         <header className="site-header">
           <a className="logo" href="/">学习播放器</a>
-          <nav className="nav-text">Next.js + Express + PostgreSQL + 存储桶</nav>
+          <nav className="site-nav">
+            <a href="/">普通用户</a>
+            <a href="/admin">管理员</a>
+          </nav>
         </header>
         <main>{children}</main>
       </body>

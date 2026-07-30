@@ -10,21 +10,6 @@ CREATE TABLE IF NOT EXISTS videos (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 管理员表。当前项目只需要一个管理员，不提供注册功能。
--- password_hash 保存 bcrypt hash，不保存明文密码。
-CREATE TABLE IF NOT EXISTS admins (
-  id SERIAL PRIMARY KEY,
-  username VARCHAR(50) UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- 初始化唯一管理员：admin / 123456。
--- ON CONFLICT 可以避免容器重复初始化或手动重复执行 SQL 时报错。
-INSERT INTO admins (username, password_hash)
-VALUES ('admin', '$2b$10$v0HS5uGTB5l7JmMqO3kAnuok42ML/Yo.jo8F01/7LFvYreJhhKBfG')
-ON CONFLICT (username) DO NOTHING;
-
 -- 按创建时间建索引，首页列表通常按最新视频排序。
 CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos (created_at DESC);
 

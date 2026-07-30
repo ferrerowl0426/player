@@ -38,6 +38,42 @@ function buildVideoQuery(filters = {}) {
   return query ? `?${query}` : '';
 }
 
+function uploadBlobWithProgress({ uploadUrl, body, contentType, onProgress, errorMessage, resolveValue }) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.open('PUT', uploadUrl);
+
+    if (contentType) {
+      xhr.setRequestHeader('Content-Type', contentType);
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || !onProgress) {
+        return;
+      }
+
+      onProgress(Math.round((event.loaded / event.total) * 100));
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100);
+        resolve(resolveValue ? resolveValue(xhr) : undefined);
+        return;
+      }
+
+      reject(new Error(errorMessage));
+    };
+
+    xhr.onerror = () => {
+      reject(new Error(errorMessage));
+    };
+
+    xhr.send(body);
+  });
+}
+
 // 获取视频列表，支持关键词和日期区间筛选。
 export async function fetchVideos(filters = {}) {
   const response = await fetch(`${getApiBaseUrl()}/videos${buildVideoQuery(filters)}`, {
@@ -137,38 +173,13 @@ export async function createMultipartPartUploadUrl({ uploadId, key, partNumber }
 
 // 浏览器用分片临时地址直接 PUT 分片到对象存储，并返回对象存储生成的 ETag。
 export async function uploadMultipartPartToBucket({ uploadUrl, blob, contentType, onProgress }) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    xhr.open('PUT', uploadUrl);
-
-    if (contentType) {
-      xhr.setRequestHeader('Content-Type', contentType);
-    }
-
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable || !onProgress) {
-        return;
-      }
-
-      onProgress(Math.round((event.loaded / event.total) * 100));
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress?.(100);
-        resolve(xhr.getResponseHeader('ETag') || '');
-        return;
-      }
-
-      reject(new Error('直传分片到存储桶失败'));
-    };
-
-    xhr.onerror = () => {
-      reject(new Error('直传分片到存储桶失败'));
-    };
-
-    xhr.send(blob);
+  return uploadBlobWithProgress({
+    uploadUrl,
+    body: blob,
+    contentType,
+    onProgress,
+    errorMessage: '直传分片到存储桶失败',
+    resolveValue: (xhr) => xhr.getResponseHeader('ETag') || ''
   });
 }
 
@@ -210,35 +221,12 @@ export async function abortMultipartVideoUpload({ uploadId, key }) {
 // 浏览器用后端给的临时地址，直接 PUT 文件到对象存储。
 // 这里使用 XMLHttpRequest，因为 fetch 目前不能直接读取上传进度。
 export async function uploadFileToBucket({ uploadUrl, file, onProgress }) {
-  await new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    xhr.open('PUT', uploadUrl);
-    xhr.setRequestHeader('Content-Type', file.type);
-
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable || !onProgress) {
-        return;
-      }
-
-      onProgress(Math.round((event.loaded / event.total) * 100));
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress?.(100);
-        resolve();
-        return;
-      }
-
-      reject(new Error('直传文件到存储桶失败'));
-    };
-
-    xhr.onerror = () => {
-      reject(new Error('直传文件到存储桶失败'));
-    };
-
-    xhr.send(file);
+  await uploadBlobWithProgress({
+    uploadUrl,
+    body: file,
+    contentType: file.type,
+    onProgress,
+    errorMessage: '直传文件到存储桶失败'
   });
 }
 

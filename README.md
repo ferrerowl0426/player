@@ -128,9 +128,10 @@ http://服务器IP:3002
 
 | 文件 | 作用 |
 |---|---|
-| [config.js](file:///c:/Users/user/Desktop/播放器/backend/src/config.js) | 读取环境变量，集中管理端口、数据库、S3/COS 配置 |
-| [server.js](file:///c:/Users/user/Desktop/播放器/backend/src/server.js) | Express 服务入口，配置 CORS、JSON、健康检查和视频路由 |
-| [db.js](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) | PostgreSQL 连接池 |
+| [config.js](file:///c:/Users/user/Desktop/播放器/backend/src/config.js) | 读取环境变量，集中管理端口、数据库、S3/COS、JWT 有效期配置 |
+| [server.js](file:///c:/Users/user/Desktop/播放器/backend/src/server.js) | Express 服务入口，配置 CORS、JSON、健康检查、管理员路由和视频路由 |
+| [db.js](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) | PostgreSQL 连接池；后端启动时兜底创建管理员表并初始化默认管理员 |
+| [auth.js](file:///c:/Users/user/Desktop/播放器/backend/src/auth.js) | 管理员 JWT 签发、HttpOnly Cookie 配置、管理员接口鉴权中间件 |
 | [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) | 生成预签名上传地址，删除、检查、列出 S3/COS 对象 |
 | [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js) | 视频列表、详情、上传地址生成、完成上传、删除 API |
 | [clean-orphan-objects.js](file:///c:/Users/user/Desktop/播放器/backend/scripts/clean-orphan-objects.js) | 清理存储桶孤儿文件脚本 |
@@ -139,17 +140,25 @@ http://服务器IP:3002
 
 | 文件 | 作用 |
 |---|---|
-| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/page.js) | 首页，包含上传表单和视频列表 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/page.js) | 普通用户首页，只浏览、搜索、筛选和播放视频 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/page.js) | 管理员后台，登录后可搜索、筛选、上传和删除视频 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/login/page.js) | 管理员登录页 |
 | [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/videos/[id]/page.js) | 视频详情播放页 |
 | [VideoPlayer.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoPlayer.js) | 客户端视频播放器组件，处理播放清理和避免叠音 |
-| [api.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/api.js) | 前端请求后端 API 的封装 |
+| [AdminUploadForm.js](file:///c:/Users/user/Desktop/播放器/frontend/components/AdminUploadForm.js) | 管理员上传表单和直传流程入口 |
+| [VideoFilters.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoFilters.js) | 视频关键词和日期筛选表单 |
+| [VideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoList.js) | 视频列表展示组件 |
+| [api.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/api.js) | 前端请求后端 API、直传对象存储和上传进度封装 |
+| [useVideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/useVideoList.js) | 首页和管理员页共用的视频列表加载、搜索、重置逻辑 |
 | [globals.css](file:///c:/Users/user/Desktop/播放器/frontend/app/globals.css) | 全局样式 |
 
 ### 数据库文件
 
 | 文件 | 作用 |
 |---|---|
-| [schema.sql](file:///c:/Users/user/Desktop/播放器/database/schema.sql) | 创建 `videos` 表和 `created_at` 索引 |
+| [schema.sql](file:///c:/Users/user/Desktop/播放器/database/schema.sql) | 创建 `videos` 表和视频列表相关索引 |
+
+`schema.sql` 只维护视频基础表结构。管理员表和默认管理员账号由后端启动时的 [ensureAdminSchema](file:///c:/Users/user/Desktop/播放器/backend/src/db.js#L13-L29) 统一创建和初始化，避免 Docker 数据卷已存在时初始化 SQL 不再执行导致旧环境缺表。
 
 `videos` 表保存：
 
@@ -267,6 +276,8 @@ docker ps
 docker compose -p video_player --env-file .env logs --tail=100 backend
 docker compose -p video_player --env-file .env logs --tail=100 frontend
 ```
+
+说明：生产 [docker-compose.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.yml) 会给后端设置 `NODE_ENV=production`，使管理员 Cookie 在生产模式下按配置启用 `secure`；本地 [docker-compose.local.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.local.yml) 会覆盖为 `NODE_ENV=development`，避免本地 HTTP 调试时 Secure Cookie 导致登录状态无法保存。
 
 ### 6.4 验证服务
 
@@ -565,9 +576,9 @@ curl http://localhost:3002/api/health
 curl -I http://localhost:3001
 ```
 
-## 12. 当前实施计划：管理员、普通用户、搜索筛选
+## 12. 当前已实现：管理员、普通用户、搜索筛选
 
-本阶段要把项目拆成普通用户前台和管理员后台。
+项目已拆成普通用户前台和管理员后台。
 
 ### 12.1 页面规划
 
@@ -589,7 +600,7 @@ username: admin
 password: 123456
 ```
 
-账号初始化写入 PostgreSQL。数据库中不保存明文密码，而保存 `123456` 的 bcrypt hash。
+账号由后端启动时写入 PostgreSQL。数据库中不保存明文密码，而保存 `123456` 的 bcrypt hash；初始化入口统一在 [db.js](file:///c:/Users/user/Desktop/播放器/backend/src/db.js)，不是依赖一次性的 `schema.sql`。
 
 ### 12.3 鉴权方案
 

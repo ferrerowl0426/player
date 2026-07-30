@@ -459,7 +459,179 @@ function getApiBaseUrl() {
 
 异常分支里的 `Link` 改为普通 `a`。
 
-## 8. 调试命令记录
+## 8. 问题六：配置和初始化入口重复维护
+
+### 8.1 现象
+
+这次继续检查时发现几类重复维护问题：
+
+```txt
+1. schema.sql 和 db.js 都维护管理员表结构和默认密码 hash
+2. config.js 维护 JWT 有效期，auth.js 又单独维护 Cookie maxAge
+3. 首页和管理员页重复维护视频列表加载、搜索、重置逻辑
+4. api.js 里分片 PUT 和封面 PUT 有两套 XMLHttpRequest 错误处理
+5. videos.routes.js 里创建上传和完成上传重复校验标题、简介
+```
+
+### 8.2 管理员表初始化为什么要单一入口
+
+[database/schema.sql](file:///c:/Users/user/Desktop/播放器/database/schema.sql) 只应该负责数据库基础表结构，例如 `videos` 表和索引。
+
+管理员表和默认管理员账号更适合由后端启动时统一初始化。
+
+原因是 Docker 命名卷已经存在时，`/docker-entrypoint-initdb.d/schema.sql` 不会再次执行。
+
+如果旧环境没有 `admins` 表，只改 `schema.sql` 不一定生效。
+
+所以当前统一为：
+
+```txt
+后端启动 -> ensureAdminSchema() -> 创建 admins 表 -> 初始化 admin 账号
+```
+
+这样旧环境升级、新环境初始化都走同一个入口。
+
+### 8.3 登录有效期为什么统一用秒
+
+[config.js](file:///c:/Users/user/Desktop/播放器/backend/src/config.js#L17-L21) 中统一维护：
+
+```js
+tokenExpiresInSeconds: 7 * 24 * 60 * 60
+```
+
+[auth.js](file:///c:/Users/user/Desktop/播放器/backend/src/auth.js#L4-L26) 中 JWT 和 Cookie 都使用这个值：
+
+```txt
+JWT expiresIn：秒
+Cookie maxAge：秒 * 1000 转成毫秒
+```
+
+这样避免一边是 `7d`、另一边是 `7 * 24 * 60 * 60 * 1000`，以后修改登录有效期时漏改其中一处。
+
+### 8.4 前后端重复逻辑处理
+
+前端视频列表加载逻辑抽到 [useVideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/useVideoList.js)：
+
+```txt
+列表状态
+筛选条件
+加载视频
+搜索
+重置
+日期范围校验
+```
+
+首页 [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/page.js) 和管理员页 [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/page.js) 共用它。
+
+上传 PUT 进度和错误处理抽到 [api.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/api.js#L41-L75) 的统一函数，避免分片上传和封面上传各维护一套 `XMLHttpRequest` 成功/失败逻辑。
+
+后端标题、简介校验抽到 [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js#L42-L71) 的 `validateVideoText`，创建上传和完成入库都复用。
+
+### 8.5 学到的知识点
+
+重复维护最容易出现在：
+
+```txt
+配置值
+初始化脚本
+前后台相似页面
+同类请求封装
+接口的前置校验
+```
+
+原则：
+
+```txt
+一个事实只保留一个维护入口。
+配置值统一放 config。
+启动初始化优先放后端入口，避免依赖一次性 SQL。
+相同交互流程优先抽 hook。
+相同底层请求优先抽小函数。
+```
+
+## 9. 问题七：生产容器没有设置 NODE_ENV
+
+### 9.1 现象
+
+后端管理员登录 Cookie 的配置在 [auth.js](file:///c:/Users/user/Desktop/播放器/backend/src/auth.js#L19-L26) 中：
+
+```js
+secure: config.isProduction
+```
+
+而 `config.isProduction` 来自 [config.js](file:///c:/Users/user/Desktop/播放器/backend/src/config.js#L12-L17)：
+
+```js
+isProduction: process.env.NODE_ENV === 'production'
+```
+
+如果 Docker Compose 没有给后端容器设置 `NODE_ENV=production`，那么生产服务器上 `config.isProduction` 仍然是 `false`。
+
+结果是生产环境管理员 Cookie 不会带 `Secure` 属性。
+
+### 9.2 根本原因
+
+Docker 容器不会自动等于 Node.js 生产环境。
+
+即使使用 Docker 部署，只要没有显式设置：
+
+```yaml
+environment:
+  NODE_ENV: production
+```
+
+Node.js 进程里的：
+
+```js
+process.env.NODE_ENV
+```
+
+就可能是 `undefined`。
+
+所以代码里的生产判断不会生效。
+
+### 9.3 修复方式
+
+在生产 [docker-compose.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.yml#L23-L36) 的后端环境变量中加入：
+
+```yaml
+backend:
+  environment:
+    NODE_ENV: production
+```
+
+同时，本地 Docker 调试使用 HTTP，如果也继承 `production`，管理员登录 Cookie 会变成 `Secure` Cookie。
+
+浏览器在普通 HTTP 页面下不会保存或发送 `Secure` Cookie，可能导致本地登录失败。
+
+所以在本地叠加配置 [docker-compose.local.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.local.yml#L33-L39) 中覆盖为：
+
+```yaml
+backend:
+  environment:
+    NODE_ENV: development
+```
+
+最终效果：
+
+```txt
+生产 docker-compose.yml：NODE_ENV=production，Cookie secure=true
+本地 docker-compose.local.yml：NODE_ENV=development，Cookie secure=false
+```
+
+### 9.4 学到的知识点
+
+环境判断必须由部署配置明确提供，不能因为“用了 Docker”就默认以为是生产环境。
+
+记住：
+
+```txt
+Docker 是运行方式，不等于 NODE_ENV=production。
+生产安全开关必须在 Compose / 环境变量里显式打开。
+本地 HTTP 调试要避免 Secure Cookie，否则登录状态可能无法保持。
+```
+
+## 10. 调试命令记录
 
 查看容器：
 
@@ -503,7 +675,7 @@ docker exec video_player_frontend node -e "fetch('http://backend:3000/api/health
 docker compose -p video-player up -d --build frontend
 ```
 
-## 9. 重要总结
+## 11. 重要总结
 
 这次 Docker 调试最重要的经验：
 
@@ -515,6 +687,7 @@ docker compose -p video-player up -d --build frontend
 5. Next.js 页面有客户端请求，也有服务端请求。
 6. Docker 容器内部访问服务，不要用宿主机 localhost，要用 Compose 服务名。
 7. 生产环境错误要看容器日志，页面上的 digest 只是错误编号。
+8. Docker 部署不等于 NODE_ENV=production，生产环境变量必须显式配置。
 ```
 
 一句话记忆：

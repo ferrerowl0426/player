@@ -17,7 +17,7 @@ export const config = {
   auth: {
     jwtSecret: process.env.JWT_SECRET || 'change-this-secret-in-production',
     cookieName: process.env.ADMIN_COOKIE_NAME || 'admin_token',
-    tokenExpiresIn: '7d'
+    tokenExpiresInSeconds: 7 * 24 * 60 * 60
   },
   s3: {
     endpoint: process.env.S3_ENDPOINT,

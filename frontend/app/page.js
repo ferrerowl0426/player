@@ -1,49 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import VideoFilters from '../components/VideoFilters.js';
 import VideoList from '../components/VideoList.js';
-import { fetchVideos } from '../lib/api.js';
-
-const EMPTY_FILTERS = { keyword: '', startDate: '', endDate: '' };
+import { useVideoList } from '../lib/useVideoList.js';
 
 export default function HomePage() {
-  const [videos, setVideos] = useState([]);
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [listStatus, setListStatus] = useState('正在加载视频...');
-
-  async function loadVideos(nextFilters = filters) {
-    if (nextFilters.startDate && nextFilters.endDate && nextFilters.startDate > nextFilters.endDate) {
-      setVideos([]);
-      setListStatus('开始日期不能晚于结束日期');
-      return;
-    }
-
-    setListStatus('正在加载视频...');
-
-    try {
-      const result = await fetchVideos(nextFilters);
-      setVideos(result.data);
-      setListStatus(result.data.length === 0 ? '没有找到符合条件的视频。' : '');
-    } catch (error) {
-      setVideos([]);
-      setListStatus(error.message);
-    }
-  }
-
-  useEffect(() => {
-    loadVideos(EMPTY_FILTERS);
-  }, []);
-
-  function handleSearch(event) {
-    event.preventDefault();
-    loadVideos(filters);
-  }
-
-  function handleReset() {
-    setFilters(EMPTY_FILTERS);
-    loadVideos(EMPTY_FILTERS);
-  }
+  const {
+    videos,
+    filters,
+    setFilters,
+    listStatus,
+    loadVideos,
+    handleSearch,
+    handleReset
+  } = useVideoList();
 
   return (
     <>

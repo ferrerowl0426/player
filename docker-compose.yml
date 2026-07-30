@@ -21,6 +21,7 @@ services:
     depends_on:
       - postgres
     environment:
+      NODE_ENV: production
       PORT: 3000
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3001}
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/video_player

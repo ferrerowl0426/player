@@ -5,42 +5,28 @@ import { useRouter } from 'next/navigation';
 import AdminUploadForm from '../../components/AdminUploadForm.js';
 import VideoFilters from '../../components/VideoFilters.js';
 import VideoList from '../../components/VideoList.js';
-import { deleteVideo, fetchAdminMe, fetchVideos, logoutAdmin } from '../../lib/api.js';
-
-const EMPTY_FILTERS = { keyword: '', startDate: '', endDate: '' };
+import { deleteVideo, fetchAdminMe, logoutAdmin } from '../../lib/api.js';
+import { EMPTY_VIDEO_FILTERS, useVideoList } from '../../lib/useVideoList.js';
 
 export default function AdminPage() {
   const router = useRouter();
   const [admin, setAdmin] = useState(null);
-  const [videos, setVideos] = useState([]);
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [listStatus, setListStatus] = useState('正在加载视频...');
-
-  async function loadVideos(nextFilters = filters) {
-    if (nextFilters.startDate && nextFilters.endDate && nextFilters.startDate > nextFilters.endDate) {
-      setVideos([]);
-      setListStatus('开始日期不能晚于结束日期');
-      return;
-    }
-
-    setListStatus('正在加载视频...');
-
-    try {
-      const result = await fetchVideos(nextFilters);
-      setVideos(result.data);
-      setListStatus(result.data.length === 0 ? '没有找到符合条件的视频。' : '');
-    } catch (error) {
-      setVideos([]);
-      setListStatus(error.message);
-    }
-  }
+  const {
+    videos,
+    filters,
+    setFilters,
+    listStatus,
+    loadVideos,
+    handleSearch,
+    handleReset
+  } = useVideoList({ autoLoad: false });
 
   useEffect(() => {
     async function initAdminPage() {
       try {
         const result = await fetchAdminMe();
         setAdmin(result.data);
-        await loadVideos(EMPTY_FILTERS);
+        await loadVideos(EMPTY_VIDEO_FILTERS);
       } catch (error) {
         router.replace('/admin/login');
       }
@@ -48,16 +34,6 @@ export default function AdminPage() {
 
     initAdminPage();
   }, [router]);
-
-  function handleSearch(event) {
-    event.preventDefault();
-    loadVideos(filters);
-  }
-
-  function handleReset() {
-    setFilters(EMPTY_FILTERS);
-    loadVideos(EMPTY_FILTERS);
-  }
 
   async function handleDelete(videoId) {
     const confirmed = window.confirm('确定要删除这个视频吗？删除后数据库记录、视频文件和封面都会被删除。');

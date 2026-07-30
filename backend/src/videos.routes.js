@@ -39,7 +39,7 @@ function getExtension(fileName) {
   return path.extname(String(fileName || '')).toLowerCase();
 }
 
-function validateUploadInput({ title, description, videoFile, coverFile }) {
+function validateVideoText({ title, description }) {
   if (!title) {
     return '请填写视频标题';
   }
@@ -58,6 +58,16 @@ function validateUploadInput({ title, description, videoFile, coverFile }) {
 
   if (description.length > DESCRIPTION_MAX_LENGTH) {
     return `视频介绍最多 ${DESCRIPTION_MAX_LENGTH} 个字`;
+  }
+
+  return '';
+}
+
+function validateUploadInput({ title, description, videoFile, coverFile }) {
+  const textValidationMessage = validateVideoText({ title, description });
+
+  if (textValidationMessage) {
+    return textValidationMessage;
   }
 
   if (!videoFile) {
@@ -302,28 +312,10 @@ videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
     const videoKey = req.body.videoKey;
     const coverKey = req.body.coverKey;
 
-    if (!title) {
-      res.status(400).json({ message: '请填写视频标题' });
-      return;
-    }
+    const validationMessage = validateVideoText({ title, description });
 
-    if (isInvalidTextValue(title)) {
-      res.status(400).json({ message: '视频标题不能是 null、undefined、NaN 这类无意义内容' });
-      return;
-    }
-
-    if (title.length > TITLE_MAX_LENGTH) {
-      res.status(400).json({ message: `视频标题最多 ${TITLE_MAX_LENGTH} 个字` });
-      return;
-    }
-
-    if (description && isInvalidTextValue(description)) {
-      res.status(400).json({ message: '视频介绍不能是 null、undefined、NaN 这类无意义内容' });
-      return;
-    }
-
-    if (description.length > DESCRIPTION_MAX_LENGTH) {
-      res.status(400).json({ message: `视频介绍最多 ${DESCRIPTION_MAX_LENGTH} 个字` });
+    if (validationMessage) {
+      res.status(400).json({ message: validationMessage });
       return;
     }
 

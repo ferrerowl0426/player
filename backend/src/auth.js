@@ -1,6 +1,10 @@
 import jwt from 'jsonwebtoken';
 import { config } from './config.js';
 
+function getAdminTokenMaxAgeMs() {
+  return config.auth.tokenExpiresInSeconds * 1000;
+}
+
 export function signAdminToken(admin) {
   return jwt.sign(
     {
@@ -8,7 +12,7 @@ export function signAdminToken(admin) {
       username: admin.username
     },
     config.auth.jwtSecret,
-    { expiresIn: config.auth.tokenExpiresIn }
+    { expiresIn: config.auth.tokenExpiresInSeconds }
   );
 }
 
@@ -18,7 +22,7 @@ export function getAdminCookieOptions() {
     sameSite: 'lax',
     secure: config.isProduction,
     path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000
+    maxAge: getAdminTokenMaxAgeMs()
   };
 }
 

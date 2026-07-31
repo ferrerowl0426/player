@@ -183,7 +183,7 @@ export default function UserAssignmentsPage() {
                 <span>推送时间：{formatDate(video.created_at)}</span>
               </div>
               <div className="row-actions">
-                <a href={`/videos/${video.id}?returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`}>查看视频</a>
+                <a href={`/videos/${video.id}?from=admin&returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`}>查看视频</a>
                 <button type="button" onClick={() => handleCancelAssignment(video.assignment_id)}>取消推送</button>
               </div>
             </article>
@@ -199,7 +199,7 @@ export default function UserAssignmentsPage() {
           <button type="button" onClick={() => loadVideos(filters)}>刷新视频</button>
         </div>
         <VideoFilters filters={filters} onChange={setFilters} onSubmit={handleSearch} onReset={handleReset} />
-        <VideoList videos={videos} status={listStatus} canSelect selectedIds={selectedVideoIds} onSelect={handleToggleVideo} detailQuery={`?returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`} />
+        <VideoList videos={videos} status={listStatus} canSelect selectedIds={selectedVideoIds} onSelect={handleToggleVideo} detailQuery={`?from=admin&returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`} />
       </section>
 
       <section className="upload-panel">
@@ -245,7 +245,7 @@ export default function UserAssignmentsPage() {
                 {assignment.is_deleted ? <span>已删除：{assignment.delete_reason}</span> : null}
               </div>
               <div className="row-actions">
-                {assignment.video_id ? <a href={`/videos/${assignment.video_id}?returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`}>查看视频</a> : null}
+                {assignment.video_id ? <a href={`/videos/${assignment.video_id}?from=admin&returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`}>查看视频</a> : null}
                 {assignment.is_deleted ? null : (
                   <button type="button" onClick={() => handleSoftDeleteAssignment(assignment)}>删除记录</button>
                 )}

@@ -9,7 +9,7 @@ function getCookieOptions() {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: config.isProduction,
+    secure: config.cookieSecure,
     path: '/',
     maxAge: getTokenMaxAgeMs()
   };

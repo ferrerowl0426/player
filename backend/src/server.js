@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { config } from './config.js';
-import { ensureAdminSchema } from './db.js';
+import { ensureAppSchema } from './db.js';
 import { adminRouter } from './admin.routes.js';
+import { userAuthRouter } from './user-auth.routes.js';
 import { videoRouter } from './videos.routes.js';
 
 const app = express();
@@ -33,6 +34,9 @@ app.get('/api/health', (req, res) => {
 // 管理员登录、退出和登录状态检查接口。
 app.use('/api/admin', adminRouter);
 
+// 普通用户登录、退出和登录状态检查接口。
+app.use('/api/user', userAuthRouter);
+
 // 视频相关接口统一挂载到 /api/videos。
 app.use('/api/videos', videoRouter);
 
@@ -46,7 +50,7 @@ app.use((error, req, res, next) => {
   });
 });
 
-ensureAdminSchema()
+ensureAppSchema()
   .then(() => {
     app.listen(config.port, () => {
       console.log(`后端服务已启动：http://localhost:${config.port}`);

@@ -12,10 +12,13 @@ export const TITLE_MAX_LENGTH = 120;
 export const DESCRIPTION_MAX_LENGTH = 1000;
 export const MAX_VIDEO_SIZE = 500 * 1024 * 1024;
 export const MAX_COVER_SIZE = 5 * 1024 * 1024;
+export const MAX_ATTACHMENT_SIZE = 100 * 1024 * 1024;
+export const MAX_ATTACHMENT_COUNT = 10;
 
 const VIDEO_PART_SIZE = 8 * 1024 * 1024;
 const VIDEO_UPLOAD_CONCURRENCY = 3;
 const INVALID_TEXT_VALUES = ['null', 'undefined', 'nan'];
+const ALLOWED_ATTACHMENT_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.zip', '.mp4'];
 
 export function formatFileSize(bytes) {
   return `${Math.round(bytes / 1024 / 1024)}MB`;
@@ -25,11 +28,44 @@ function isInvalidTextValue(value) {
   return INVALID_TEXT_VALUES.includes(value.trim().toLowerCase());
 }
 
+function getExtension(fileName) {
+  const text = String(fileName || '').toLowerCase();
+  const dotIndex = text.lastIndexOf('.');
+  return dotIndex >= 0 ? text.slice(dotIndex) : '';
+}
+
+function getAttachments(formData) {
+  return formData.getAll('attachments').filter((file) => file && file.size > 0);
+}
+
+function validateAttachments(attachments) {
+  if (attachments.length > MAX_ATTACHMENT_COUNT) {
+    return `资料文件最多上传 ${MAX_ATTACHMENT_COUNT} 个`;
+  }
+
+  for (const file of attachments) {
+    if (file.name.length > 180) {
+      return '资料文件名最多 180 个字';
+    }
+
+    if (!ALLOWED_ATTACHMENT_EXTENSIONS.includes(getExtension(file.name))) {
+      return '资料文件只支持 pdf、doc、docx、ppt、pptx、xls、xlsx、zip、mp4';
+    }
+
+    if (file.size > MAX_ATTACHMENT_SIZE) {
+      return `单个资料文件不能超过 ${formatFileSize(MAX_ATTACHMENT_SIZE)}`;
+    }
+  }
+
+  return '';
+}
+
 export function validateUploadForm(formData) {
   const title = String(formData.get('title') || '').trim();
   const description = String(formData.get('description') || '').trim();
   const video = formData.get('video');
   const cover = formData.get('cover');
+  const attachments = getAttachments(formData);
 
   if (!title) {
     return '请填写视频标题';
@@ -75,7 +111,7 @@ export function validateUploadForm(formData) {
     return `封面图片不能超过 ${formatFileSize(MAX_COVER_SIZE)}`;
   }
 
-  return '';
+  return validateAttachments(attachments);
 }
 
 function buildVideoParts(file) {
@@ -148,9 +184,10 @@ export async function uploadVideoFromForm({ formData, onStatus, onProgress }) {
   const description = String(formData.get('description') || '').trim();
   const video = formData.get('video');
   const cover = formData.get('cover');
+  const attachments = getAttachments(formData);
 
   onStatus('正在获取上传地址...');
-  const multipartUpload = await createMultipartVideoUpload({ title, description, video, cover });
+  const multipartUpload = await createMultipartVideoUpload({ title, description, video, cover, attachments });
   const uploadInfo = multipartUpload.data;
 
   try {
@@ -183,11 +220,31 @@ export async function uploadVideoFromForm({ formData, onStatus, onProgress }) {
     onProgress: (progress) => onProgress((current) => ({ ...current, cover: progress }))
   });
 
+  const completedAttachments = [];
+
+  for (const [index, file] of attachments.entries()) {
+    const attachmentInfo = uploadInfo.attachments[index];
+
+    onStatus(`正在直传资料 ${index + 1}/${attachments.length} 到存储桶...`);
+    await uploadFileToBucket({
+      uploadUrl: attachmentInfo.uploadUrl,
+      file,
+      onProgress: (progress) => onProgress((current) => ({ ...current, attachments: progress }))
+    });
+
+    completedAttachments.push({
+      key: attachmentInfo.key,
+      fileName: attachmentInfo.fileName,
+      fileType: attachmentInfo.fileType
+    });
+  }
+
   onStatus('正在保存视频信息...');
   await completeVideoUpload({
     title,
     description,
     videoKey: uploadInfo.video.key,
-    coverKey: uploadInfo.cover.key
+    coverKey: uploadInfo.cover.key,
+    attachments: completedAttachments
   });
 }

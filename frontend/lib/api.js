@@ -77,6 +77,7 @@ function uploadBlobWithProgress({ uploadUrl, body, contentType, onProgress, erro
 // 获取视频列表，支持关键词和日期区间筛选。
 export async function fetchVideos(filters = {}) {
   const response = await fetch(`${getApiBaseUrl()}/videos${buildVideoQuery(filters)}`, {
+    credentials: 'include',
     cache: 'no-store'
   });
 
@@ -86,10 +87,55 @@ export async function fetchVideos(filters = {}) {
 // 获取单个视频详情。
 export async function fetchVideoById(id) {
   const response = await fetch(`${getApiBaseUrl()}/videos/${id}`, {
+    credentials: 'include',
     cache: 'no-store'
   });
 
   return parseJsonResponse(response, '获取视频详情失败');
+}
+
+// 普通用户登录。后端会设置独立的 HttpOnly Cookie。
+export async function loginUser({ username, password }) {
+  const response = await fetch(`${getApiBaseUrl()}/user/login`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, password })
+  });
+
+  return parseJsonResponse(response, '用户登录失败');
+}
+
+// 检查普通用户是否已登录。
+export async function fetchUserMe() {
+  const response = await fetch(`${getApiBaseUrl()}/user/me`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '请先登录用户账号');
+}
+
+// 普通用户退出登录。
+export async function logoutUser() {
+  const response = await fetch(`${getApiBaseUrl()}/user/logout`, {
+    method: 'POST',
+    credentials: 'include'
+  });
+
+  return parseJsonResponse(response, '退出登录失败');
+}
+
+// 获取普通用户自己的今日作业。
+export async function fetchTodayAssignments() {
+  const response = await fetch(`${getApiBaseUrl()}/user/assignments/today`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取今日作业失败');
 }
 
 // 管理员登录。后端会设置 HttpOnly Cookie，前端不直接保存 token。
@@ -126,8 +172,170 @@ export async function logoutAdmin() {
   return parseJsonResponse(response, '退出登录失败');
 }
 
-// 向后端申请 Multipart 上传任务和封面的临时上传地址。
-export async function createMultipartVideoUpload({ title, description, video, cover }) {
+// 管理员查看普通用户列表。
+export async function fetchManagedUsers() {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取普通用户列表失败');
+}
+
+// 管理员创建普通用户。
+export async function createManagedUser({ username, password }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, password })
+  });
+
+  return parseJsonResponse(response, '创建普通用户失败');
+}
+
+// 管理员重置普通用户密码。
+export async function resetManagedUserPassword({ id, password }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}/reset-password`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ password })
+  });
+
+  return parseJsonResponse(response, '重置普通用户密码失败');
+}
+
+// 管理员启用或禁用普通用户。
+export async function updateManagedUserStatus({ id, isActive }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}/status`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ isActive })
+  });
+
+  return parseJsonResponse(response, '更新普通用户状态失败');
+}
+
+// 管理员查看管理员账号列表。
+export async function fetchManagedAdmins() {
+  const response = await fetch(`${getApiBaseUrl()}/admin/admins`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取管理员列表失败');
+}
+
+// 管理员创建其他管理员。
+export async function createManagedAdmin({ username, password }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/admins`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, password })
+  });
+
+  return parseJsonResponse(response, '创建管理员失败');
+}
+
+// 管理员重置其他管理员密码。
+export async function resetManagedAdminPassword({ id, password }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/admins/${id}/reset-password`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ password })
+  });
+
+  return parseJsonResponse(response, '重置管理员密码失败');
+}
+
+// 删除管理员时后端会保证至少还剩一个管理员。
+export async function deleteManagedAdmin(id) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/admins/${id}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  });
+
+  return parseJsonResponse(response, '删除管理员失败');
+}
+
+// 管理员查看指定普通用户的历史推送。
+export async function fetchUserAssignments(userId) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${userId}/assignments`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取推送记录失败');
+}
+
+// 管理员给指定普通用户批量推送视频。
+export async function createUserAssignment({ userId, videoIds }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${userId}/assignments`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ videoIds })
+  });
+
+  return parseJsonResponse(response, '创建推送失败');
+}
+
+// 留言板独立更新，不和视频推送绑定。
+export async function updateUserAssignmentMessage({ userId, message }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${userId}/message`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ message })
+  });
+
+  return parseJsonResponse(response, '更新留言失败');
+}
+
+// 取消正在推送的视频，历史记录仍会保留。
+export async function cancelUserAssignment(id) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/assignments/${id}/cancel`, {
+    method: 'PATCH',
+    credentials: 'include'
+  });
+
+  return parseJsonResponse(response, '取消推送失败');
+}
+
+// 删除推送记录时只做软删除，后端会要求填写原因。
+export async function softDeleteAssignment({ id, reason }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/assignments/${id}/delete`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ reason })
+  });
+
+  return parseJsonResponse(response, '删除推送记录失败');
+}
+
+// 向后端申请 Multipart 上传任务、封面和资料附件的临时上传地址。
+export async function createMultipartVideoUpload({ title, description, video, cover, attachments = [] }) {
   const response = await fetch(`${getApiBaseUrl()}/videos/multipart/create`, {
     method: 'POST',
     credentials: 'include',
@@ -146,7 +354,12 @@ export async function createMultipartVideoUpload({ title, description, video, co
         name: cover.name,
         size: cover.size,
         type: cover.type
-      }
+      },
+      attachments: attachments.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type
+      }))
     })
   });
 
@@ -231,7 +444,7 @@ export async function uploadFileToBucket({ uploadUrl, file, onProgress }) {
 }
 
 // 直传完成后，通知后端写入数据库。
-export async function completeVideoUpload({ title, description, videoKey, coverKey }) {
+export async function completeVideoUpload({ title, description, videoKey, coverKey, attachments = [] }) {
   const response = await fetch(`${getApiBaseUrl()}/videos/complete`, {
     method: 'POST',
     credentials: 'include',
@@ -242,7 +455,8 @@ export async function completeVideoUpload({ title, description, videoKey, coverK
       title,
       description,
       videoKey,
-      coverKey
+      coverKey,
+      attachments
     })
   });
 

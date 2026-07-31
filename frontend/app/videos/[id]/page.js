@@ -1,31 +1,93 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import VideoPlayer from '../../../components/VideoPlayer.js';
-import { fetchVideoById } from '../../../lib/api.js';
+import { fetchAdminMe, fetchUserMe, fetchVideoById } from '../../../lib/api.js';
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleString('zh-CN');
 }
 
-export default async function VideoDetailPage({ params }) {
-  try {
-    const { id } = await params;
-    const result = await fetchVideoById(id);
-    const video = result.data;
+function formatFileSize(bytes) {
+  const value = Number(bytes || 0);
 
+  if (value < 1024 * 1024) {
+    return `${Math.max(1, Math.round(value / 1024))}KB`;
+  }
+
+  return `${Math.round(value / 1024 / 1024)}MB`;
+}
+
+export default function VideoDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const isFromAdmin = searchParams.get('from') === 'admin';
+  const returnTo = searchParams.get('returnTo');
+  const backHref = returnTo || (isFromAdmin ? '/admin' : '/');
+  const [video, setVideo] = useState(null);
+  const [status, setStatus] = useState('正在检查登录状态...');
+
+  useEffect(() => {
+    async function loadVideoDetail() {
+      try {
+        if (isFromAdmin) {
+          await fetchAdminMe();
+        } else {
+          await fetchUserMe();
+        }
+
+        setStatus('正在加载视频...');
+
+        const result = await fetchVideoById(params.id);
+        setVideo(result.data);
+        setStatus('');
+      } catch (error) {
+        if (error.message.includes('登录')) {
+          router.replace(isFromAdmin ? '/admin/login' : '/login');
+          return;
+        }
+
+        setStatus(error.message);
+      }
+    }
+
+    loadVideoDetail();
+  }, [isFromAdmin, params.id, router]);
+
+  if (status) {
     return (
       <section className="player-page">
-        <a className="back-link" href="/">← 返回首页</a>
-        <VideoPlayer src={video.video_url} poster={video.cover_url} />
-        <h1>{video.title}</h1>
-        <p className="detail-time">发布时间：{formatDate(video.created_at)}</p>
-        <p className="detail-desc">{video.description || '暂无介绍'}</p>
-      </section>
-    );
-  } catch (error) {
-    return (
-      <section className="player-page">
-        <a className="back-link" href="/">← 返回首页</a>
-        <p className="error-text">{error.message}</p>
+        <a className="back-link" href={backHref}>← 返回首页</a>
+        <p className={status.includes('失败') ? 'error-text' : 'empty-text'}>{status}</p>
       </section>
     );
   }
+
+  return (
+    <section className="player-page">
+      <a className="back-link" href={backHref}>← 返回首页</a>
+      <VideoPlayer src={video.video_url} poster={video.cover_url} />
+      <h1>{video.title}</h1>
+      <p className="detail-time">发布时间：{formatDate(video.created_at)}</p>
+      <p className="detail-desc">{video.description || '暂无介绍'}</p>
+
+      <div className="attachment-section">
+        <h2>资料下载</h2>
+        {video.attachments?.length > 0 ? (
+          <div className="attachment-list">
+            {video.attachments.map((attachment) => (
+              <a className="attachment-item" href={attachment.file_url} target="_blank" rel="noreferrer" key={attachment.id}>
+                <strong>{attachment.file_name}</strong>
+                <span>{formatFileSize(attachment.file_size)}</span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-text">这个视频还没有资料附件。</p>
+        )}
+      </div>
+    </section>
+  );
 }

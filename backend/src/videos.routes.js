@@ -2,7 +2,7 @@ import path from 'node:path';
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { pool } from './db.js';
-import { requireAdmin } from './auth.js';
+import { requireAdmin, requireUserOrAdmin } from './auth.js';
 import {
   abortMultipartUpload,
   completeMultipartUpload,
@@ -19,9 +19,12 @@ const TITLE_MAX_LENGTH = 120;
 const DESCRIPTION_MAX_LENGTH = 1000;
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024;
 const MAX_COVER_SIZE = 5 * 1024 * 1024;
+const MAX_ATTACHMENT_SIZE = 100 * 1024 * 1024;
+const MAX_ATTACHMENT_COUNT = 10;
 const INVALID_TEXT_VALUES = ['null', 'undefined', 'nan'];
 const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov'];
 const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+const ALLOWED_ATTACHMENT_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.zip', '.mp4'];
 
 function normalizeText(value) {
   return String(value ?? '').trim();
@@ -105,6 +108,47 @@ function validateUploadInput({ title, description, videoFile, coverFile }) {
   return '';
 }
 
+function normalizeAttachments(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function validateAttachmentInput(attachments) {
+  if (attachments.length > MAX_ATTACHMENT_COUNT) {
+    return `资料文件最多上传 ${MAX_ATTACHMENT_COUNT} 个`;
+  }
+
+  for (const attachment of attachments) {
+    const fileName = normalizeText(attachment?.name);
+    const extension = getExtension(fileName);
+
+    if (!fileName) {
+      return '资料文件名不能为空';
+    }
+
+    if (fileName.length > 180) {
+      return '资料文件名最多 180 个字';
+    }
+
+    if (!ALLOWED_ATTACHMENT_EXTENSIONS.includes(extension)) {
+      return '资料文件只支持 pdf、doc、docx、ppt、pptx、xls、xlsx、zip、mp4';
+    }
+
+    if (Number(attachment?.size) > MAX_ATTACHMENT_SIZE) {
+      return `单个资料文件不能超过 ${formatFileSize(MAX_ATTACHMENT_SIZE)}`;
+    }
+  }
+
+  return '';
+}
+
+function normalizeCompletedAttachments(value) {
+  return normalizeAttachments(value).map((attachment) => ({
+    key: String(attachment?.key || '').trim(),
+    fileName: normalizeText(attachment?.fileName),
+    fileType: normalizeText(attachment?.fileType)
+  }));
+}
+
 function isExpectedUploadKey(key, prefix) {
   return typeof key === 'string' && key.startsWith(prefix) && !key.includes('..');
 }
@@ -143,7 +187,7 @@ export const videoRouter = Router();
 // GET /api/videos
 // 获取首页视频列表。
 // 前端、小程序以后都可以调用这个接口。
-videoRouter.get('/', async (req, res, next) => {
+videoRouter.get('/', requireUserOrAdmin, async (req, res, next) => {
   try {
     const keyword = normalizeText(req.query.keyword).slice(0, 120);
     const startDate = normalizeDate(req.query.startDate);
@@ -197,12 +241,13 @@ videoRouter.get('/', async (req, res, next) => {
 videoRouter.post('/multipart/create', requireAdmin, async (req, res, next) => {
   try {
     const videoFile = req.body.video;
+    const attachments = normalizeAttachments(req.body.attachments);
     const validationMessage = validateUploadInput({
       title: normalizeText(req.body.title),
       description: normalizeText(req.body.description),
       videoFile,
       coverFile: req.body.cover
-    });
+    }) || validateAttachmentInput(attachments);
 
     if (validationMessage) {
       res.status(400).json({ message: validationMessage });
@@ -211,7 +256,18 @@ videoRouter.post('/multipart/create', requireAdmin, async (req, res, next) => {
 
     const videoKey = `videos/${uuid()}${getExtension(videoFile.name)}`;
     const coverKey = `covers/${uuid()}${getExtension(req.body.cover.name)}`;
-    const [uploadId, coverUploadUrl] = await Promise.all([
+    const attachmentItems = attachments.map((attachment) => {
+      const fileName = normalizeText(attachment.name);
+      const key = `attachments/${uuid()}${getExtension(fileName)}`;
+
+      return {
+        key,
+        fileName,
+        fileType: normalizeText(attachment.type),
+        size: Number(attachment.size) || 0
+      };
+    });
+    const [uploadId, coverUploadUrl, attachmentUploadUrls] = await Promise.all([
       createMultipartUpload({
         key: videoKey,
         contentType: videoFile.type
@@ -219,7 +275,11 @@ videoRouter.post('/multipart/create', requireAdmin, async (req, res, next) => {
       createUploadUrl({
         key: coverKey,
         contentType: req.body.cover.type
-      })
+      }),
+      Promise.all(attachmentItems.map((attachment) => createUploadUrl({
+        key: attachment.key,
+        contentType: attachment.fileType || 'application/octet-stream'
+      })))
     ]);
 
     res.json({
@@ -233,7 +293,15 @@ videoRouter.post('/multipart/create', requireAdmin, async (req, res, next) => {
           key: coverKey,
           uploadUrl: coverUploadUrl,
           publicUrl: getPublicUrl(coverKey)
-        }
+        },
+        attachments: attachmentItems.map((attachment, index) => ({
+          key: attachment.key,
+          uploadUrl: attachmentUploadUrls[index],
+          publicUrl: getPublicUrl(attachment.key),
+          fileName: attachment.fileName,
+          fileType: attachment.fileType,
+          size: attachment.size
+        }))
       }
     });
   } catch (error) {
@@ -311,6 +379,7 @@ videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
     const description = normalizeText(req.body.description);
     const videoKey = req.body.videoKey;
     const coverKey = req.body.coverKey;
+    const attachments = normalizeCompletedAttachments(req.body.attachments);
 
     const validationMessage = validateVideoText({ title, description });
 
@@ -324,21 +393,89 @@ videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
       return;
     }
 
-    await Promise.all([
+    const completedAttachmentValidation = validateAttachmentInput(attachments.map((attachment) => ({
+      name: attachment.fileName,
+      type: attachment.fileType,
+      size: 0
+    })));
+
+    if (completedAttachmentValidation) {
+      res.status(400).json({ message: completedAttachmentValidation });
+      return;
+    }
+
+    for (const attachment of attachments) {
+      if (!isExpectedUploadKey(attachment.key, 'attachments/')) {
+        res.status(400).json({ message: '资料文件地址无效' });
+        return;
+      }
+    }
+
+    const [videoHead, coverHead, attachmentHeads] = await Promise.all([
       ensureObjectExists(videoKey),
-      ensureObjectExists(coverKey)
+      ensureObjectExists(coverKey),
+      Promise.all(attachments.map((attachment) => ensureObjectExists(attachment.key)))
     ]);
+
+    if (Number(videoHead.ContentLength || 0) > MAX_VIDEO_SIZE) {
+      await deleteFromBucket(videoKey).catch(() => {});
+      res.status(400).json({ message: `视频文件不能超过 ${formatFileSize(MAX_VIDEO_SIZE)}` });
+      return;
+    }
+
+    if (Number(coverHead.ContentLength || 0) > MAX_COVER_SIZE) {
+      await deleteFromBucket(coverKey).catch(() => {});
+      res.status(400).json({ message: `封面图片不能超过 ${formatFileSize(MAX_COVER_SIZE)}` });
+      return;
+    }
+
+    for (const [index, head] of attachmentHeads.entries()) {
+      if (Number(head.ContentLength || 0) > MAX_ATTACHMENT_SIZE) {
+        await deleteFromBucket(attachments[index].key).catch(() => {});
+        res.status(400).json({ message: `单个资料文件不能超过 ${formatFileSize(MAX_ATTACHMENT_SIZE)}` });
+        return;
+      }
+    }
 
     const videoUrl = getPublicUrl(videoKey);
     const coverUrl = getPublicUrl(coverKey);
-    const result = await pool.query(
-      `INSERT INTO videos (title, description, video_url, cover_url)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, title, description, video_url, cover_url, created_at`,
-      [title, description, videoUrl, coverUrl]
-    );
+    const client = await pool.connect();
 
-    res.status(201).json({ data: result.rows[0] });
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query(
+        `INSERT INTO videos (title, description, video_url, cover_url)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, title, description, video_url, cover_url, created_at`,
+        [title, description, videoUrl, coverUrl]
+      );
+
+      const video = result.rows[0];
+
+      for (const [index, attachment] of attachments.entries()) {
+        await client.query(
+          `INSERT INTO video_attachments (video_id, file_name, file_url, file_key, file_type, file_size)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            video.id,
+            attachment.fileName,
+            getPublicUrl(attachment.key),
+            attachment.key,
+            attachment.fileType,
+            Number(attachmentHeads[index].ContentLength || 0)
+          ]
+        );
+      }
+
+      await client.query('COMMIT');
+      res.status(201).json({ data: video });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     next(error);
   }
@@ -346,7 +483,7 @@ videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
 
 // GET /api/videos/:id
 // 获取单个视频详情，播放页会用到。
-videoRouter.get('/:id', async (req, res, next) => {
+videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT id, title, description, video_url, cover_url, created_at
@@ -360,7 +497,20 @@ videoRouter.get('/:id', async (req, res, next) => {
       return;
     }
 
-    res.json({ data: result.rows[0] });
+    const attachmentsResult = await pool.query(
+      `SELECT id, file_name, file_url, file_type, file_size, created_at
+       FROM video_attachments
+       WHERE video_id = $1
+       ORDER BY created_at ASC`,
+      [req.params.id]
+    );
+
+    res.json({
+      data: {
+        ...result.rows[0],
+        attachments: attachmentsResult.rows
+      }
+    });
   } catch (error) {
     next(error);
   }
@@ -384,11 +534,21 @@ videoRouter.delete('/:id', requireAdmin, async (req, res, next) => {
       return;
     }
 
+    const attachmentsResult = await pool.query(
+      `SELECT file_key
+       FROM video_attachments
+       WHERE video_id = $1`,
+      [req.params.id]
+    );
+
     const video = findResult.rows[0];
-    await Promise.all([
-      deleteFromBucket(getKeyFromPublicUrl(video.video_url)),
-      deleteFromBucket(getKeyFromPublicUrl(video.cover_url))
-    ]);
+    const objectKeys = [
+      getKeyFromPublicUrl(video.video_url),
+      getKeyFromPublicUrl(video.cover_url),
+      ...attachmentsResult.rows.map((attachment) => attachment.file_key)
+    ];
+
+    await Promise.all(objectKeys.map((key) => deleteFromBucket(key)));
 
     await pool.query('DELETE FROM videos WHERE id = $1', [video.id]);
 

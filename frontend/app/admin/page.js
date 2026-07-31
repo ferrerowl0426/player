@@ -69,6 +69,16 @@ export default function AdminPage() {
         <button className="hero-button" type="button" onClick={handleLogout}>退出登录</button>
       </section>
 
+      <section className="video-section">
+        <div className="section-title">
+          <h2>后台管理</h2>
+        </div>
+        <div className="admin-link-grid">
+          <a href="/admin/users">普通用户管理</a>
+          <a href="/admin/admins">管理员账号管理</a>
+        </div>
+      </section>
+
       <AdminUploadForm onUploaded={() => loadVideos(filters)} />
 
       <section className="video-section">
@@ -78,7 +88,7 @@ export default function AdminPage() {
         </div>
 
         <VideoFilters filters={filters} onChange={setFilters} onSubmit={handleSearch} onReset={handleReset} />
-        <VideoList videos={videos} status={listStatus} canDelete onDelete={handleDelete} />
+        <VideoList videos={videos} status={listStatus} canDelete onDelete={handleDelete} detailQuery="?from=admin" />
       </section>
     </>
   );

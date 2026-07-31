@@ -4,6 +4,8 @@ import { useState } from 'react';
 import {
   DESCRIPTION_MAX_LENGTH,
   formatFileSize,
+  MAX_ATTACHMENT_COUNT,
+  MAX_ATTACHMENT_SIZE,
   MAX_COVER_SIZE,
   MAX_VIDEO_SIZE,
   TITLE_MAX_LENGTH,
@@ -13,7 +15,7 @@ import {
 
 export default function AdminUploadForm({ onUploaded }) {
   const [uploadStatus, setUploadStatus] = useState('');
-  const [uploadProgress, setUploadProgress] = useState({ video: 0, cover: 0 });
+  const [uploadProgress, setUploadProgress] = useState({ video: 0, cover: 0, attachments: 0 });
   const [isUploading, setIsUploading] = useState(false);
 
   async function handleUpload(event) {
@@ -29,7 +31,7 @@ export default function AdminUploadForm({ onUploaded }) {
     }
 
     setIsUploading(true);
-    setUploadProgress({ video: 0, cover: 0 });
+    setUploadProgress({ video: 0, cover: 0, attachments: 0 });
 
     try {
       await uploadVideoFromForm({
@@ -76,6 +78,12 @@ export default function AdminUploadForm({ onUploaded }) {
           <small>封面必须上传，支持 jpg、jpeg、png、webp，最大 {formatFileSize(MAX_COVER_SIZE)}。</small>
         </label>
 
+        <label>
+          <span>资料附件</span>
+          <input name="attachments" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.mp4" multiple />
+          <small>资料可选，最多 {MAX_ATTACHMENT_COUNT} 个，单个最大 {formatFileSize(MAX_ATTACHMENT_SIZE)}，会直传对象存储。</small>
+        </label>
+
         <button type="submit" disabled={isUploading}>{isUploading ? '上传中...' : '开始上传'}</button>
         {isUploading ? (
           <div className="upload-progress-list">
@@ -86,6 +94,10 @@ export default function AdminUploadForm({ onUploaded }) {
             <label>
               <span>封面上传 {uploadProgress.cover}%</span>
               <progress max="100" value={uploadProgress.cover} />
+            </label>
+            <label>
+              <span>资料上传 {uploadProgress.attachments}%</span>
+              <progress max="100" value={uploadProgress.attachments} />
             </label>
           </div>
         ) : null}

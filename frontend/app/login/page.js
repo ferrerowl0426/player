@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginAdmin } from '../../../lib/api.js';
+import { loginUser } from '../../lib/api.js';
 
-export default function AdminLoginPage() {
+export default function UserLoginPage() {
   const router = useRouter();
   const [status, setStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -17,7 +17,7 @@ export default function AdminLoginPage() {
     const password = String(formData.get('password') || '');
 
     if (!username || !password) {
-      setStatus('请填写管理员账号和密码');
+      setStatus('请填写用户账号和密码');
       return;
     }
 
@@ -25,8 +25,8 @@ export default function AdminLoginPage() {
     setStatus('正在登录...');
 
     try {
-      await loginAdmin({ username, password });
-      router.replace('/admin');
+      await loginUser({ username, password });
+      router.replace('/');
       router.refresh();
     } catch (error) {
       setStatus(error.message);
@@ -37,13 +37,13 @@ export default function AdminLoginPage() {
 
   return (
     <section className="login-panel">
-      <h1>管理员登录</h1>
-      <p>管理员可以上传和删除视频，后续还会管理普通用户和今日作业。</p>
+      <h1>用户登录</h1>
+      <p>普通用户登录后可以浏览视频列表，并查看管理员单独推送的今日作业。</p>
 
       <form className="upload-form" onSubmit={handleLogin}>
         <label>
           <span>账号</span>
-          <input name="username" type="text" autoComplete="username" placeholder="admin" required />
+          <input name="username" type="text" autoComplete="username" placeholder="demo" required />
         </label>
 
         <label>

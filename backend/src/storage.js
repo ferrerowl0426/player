@@ -110,12 +110,14 @@ export async function abortMultipartUpload({ key, uploadId }) {
 }
 
 export async function ensureObjectExists(key) {
-  await s3Client.send(
+  const result = await s3Client.send(
     new HeadObjectCommand({
       Bucket: config.s3.bucket,
       Key: key
     })
   );
+
+  return result;
 }
 
 // 从存储桶里删除一个对象。

@@ -263,9 +263,11 @@ export default function UserAssignmentsPage() {
                           title={video.title}
                         >
                           {video.cover_url ? (
-                            <img src={video.cover_url} alt={video.title} width={120} height={68} />
+                            <div className="operation-video-thumb">
+                              <img src={video.cover_url} alt={video.title} />
+                            </div>
                           ) : (
-                            <div className="operation-video-placeholder">无封面</div>
+                            <div className="operation-video-thumb operation-video-placeholder">无封面</div>
                           )}
                           <span className="operation-video-title">{video.title}</span>
                           {video.is_deleted ? <span className="operation-video-reason">已删除</span> : null}

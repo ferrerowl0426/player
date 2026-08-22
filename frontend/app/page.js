@@ -99,7 +99,9 @@ export default function HomePage() {
             <div className="assignment-video-grid">
               {assignmentsWithVideo.map((assignment) => (
                 <Link className="assignment-video-card" href={`/videos/${assignment.video_id}`} key={assignment.id}>
-                  <Image src={assignment.video_cover_url} alt={assignment.video_title} width={240} height={135} unoptimized />
+                  <div className="cover-wrap">
+                    <Image src={assignment.video_cover_url} alt={assignment.video_title} fill unoptimized style={{ objectFit: 'cover' }} />
+                  </div>
                   <strong>{assignment.video_title}</strong>
                   <span>{assignment.video_description || '暂无介绍'}</span>
                 </Link>

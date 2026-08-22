@@ -4,7 +4,7 @@
 
 ## 1. 项目当前定位
 
-项目目标不是做复杂业务，而是通过一个完整的视频上传和播放项目，练习全栈开发链路：
+项目目标不是做复杂业务，而是通过一个完整的视频上传、管理和推送项目，练习全栈开发链路：
 
 ```txt
 Next.js 前端页面 -> Express 后端 API -> PostgreSQL 数据库 -> 腾讯云 COS / S3 兼容对象存储
@@ -18,6 +18,9 @@ Next.js 前端页面 -> Express 后端 API -> PostgreSQL 数据库 -> 腾讯云 
 - 删除视频
 - 删除时同步删除数据库记录和存储桶文件
 - 使用清理脚本排查和删除孤儿文件
+- 管理员和普通用户双账号体系
+- 管理员给指定普通用户推送视频并留言
+- 推送记录按操作（operation）聚合展示
 - 后端提供 REST API，后续可继续接入小程序或其他客户端
 
 当前上传方式：
@@ -58,6 +61,7 @@ http://localhost:3001
 - dotenv
 - AWS S3 SDK
 - uuid
+- bcrypt
 
 Docker 部署时后端 API 对外端口：
 
@@ -73,7 +77,7 @@ http://服务器IP:3002
 
 ### 数据库和存储
 
-- PostgreSQL：保存视频元数据
+- PostgreSQL：保存视频元数据、用户、管理员、推送记录
 - 腾讯云 COS：保存视频文件和封面图片
 - AWS S3 SDK：后端通过 S3 兼容协议上传、删除、列出对象
 
@@ -128,10 +132,11 @@ http://服务器IP:3002
 
 | 文件 | 作用 |
 |---|---|
-| [config.js](file:///c:/Users/user/Desktop/播放器/backend/src/config.js) | 读取环境变量，集中管理端口、数据库、S3/COS、JWT 有效期配置 |
+| [config.js](file:///c:/Users/user/Desktop/播放器/backend/src/config.js) | 读取环境变量，集中管理端口、数据库、S3/COS、JWT、Cookie 配置 |
 | [server.js](file:///c:/Users/user/Desktop/播放器/backend/src/server.js) | Express 服务入口，配置 CORS、JSON、健康检查、管理员路由和视频路由 |
-| [db.js](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) | PostgreSQL 连接池；后端启动时兜底创建管理员表并初始化默认管理员 |
+| [db.js](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) | PostgreSQL 连接池；后端启动时兜底创建表并初始化默认管理员和普通用户 |
 | [auth.js](file:///c:/Users/user/Desktop/播放器/backend/src/auth.js) | 管理员 JWT 签发、HttpOnly Cookie 配置、管理员接口鉴权中间件 |
+| [admin.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/admin.routes.js) | 管理员用户管理、推送视频、留言、推送记录聚合查询 API |
 | [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) | 生成预签名上传地址，删除、检查、列出 S3/COS 对象 |
 | [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js) | 视频列表、详情、上传地址生成、完成上传、删除 API |
 | [clean-orphan-objects.js](file:///c:/Users/user/Desktop/播放器/backend/scripts/clean-orphan-objects.js) | 清理存储桶孤儿文件脚本 |
@@ -140,14 +145,17 @@ http://服务器IP:3002
 
 | 文件 | 作用 |
 |---|---|
-| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/page.js) | 普通用户首页，只浏览、搜索、筛选和播放视频 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/page.js) | 普通用户首页，登录后显示今日作业和推荐视频 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/login/page.js) | 普通用户 PIN 登录页 |
 | [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/page.js) | 管理员后台，登录后可搜索、筛选、上传和删除视频 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/users/page.js) | 管理员管理普通用户列表 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/users/[id]/assignments/page.js) | 管理员给指定用户推送视频、留言、查看历史操作 |
 | [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/login/page.js) | 管理员登录页 |
 | [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/videos/[id]/page.js) | 视频详情播放页 |
 | [VideoPlayer.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoPlayer.js) | 客户端视频播放器组件，处理播放清理和避免叠音 |
 | [AdminUploadForm.js](file:///c:/Users/user/Desktop/播放器/frontend/components/AdminUploadForm.js) | 管理员上传表单和直传流程入口 |
 | [VideoFilters.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoFilters.js) | 视频关键词和日期筛选表单 |
-| [VideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoList.js) | 视频列表展示组件 |
+| [VideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoList.js) | 视频列表展示组件，支持选择模式 |
 | [api.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/api.js) | 前端请求后端 API、直传对象存储和上传进度封装 |
 | [useVideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/useVideoList.js) | 首页和管理员页共用的视频列表加载、搜索、重置逻辑 |
 | [globals.css](file:///c:/Users/user/Desktop/播放器/frontend/app/globals.css) | 全局样式 |
@@ -158,16 +166,14 @@ http://服务器IP:3002
 |---|---|
 | [schema.sql](file:///c:/Users/user/Desktop/播放器/database/schema.sql) | 创建 `videos` 表和视频列表相关索引 |
 
-`schema.sql` 只维护视频基础表结构。管理员表和默认管理员账号由后端启动时的 [ensureAdminSchema](file:///c:/Users/user/Desktop/播放器/backend/src/db.js#L13-L29) 统一创建和初始化，避免 Docker 数据卷已存在时初始化 SQL 不再执行导致旧环境缺表。
+`schema.sql` 只维护视频基础表结构。管理员表、普通用户表、推送记录表由后端启动时的 [ensureAppSchema](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) 统一创建和更新，避免 Docker 数据卷已存在时初始化 SQL 不再执行导致旧环境缺表。
 
-`videos` 表保存：
+主要表：
 
-- `id`
-- `title`
-- `description`
-- `video_url`
-- `cover_url`
-- `created_at`
+- `videos`：视频元数据
+- `admins`：管理员账号
+- `users`：普通用户账号和 6 位 PIN 登录码
+- `user_assignments`：管理员给普通用户的推送记录，按 `operation_id` 聚合
 
 注意：视频文件和封面图片不进数据库，只保存到对象存储桶。
 
@@ -224,6 +230,7 @@ nano .env
 FRONTEND_URL=http://服务器公网IP:3001
 NEXT_PUBLIC_API_BASE_URL=http://服务器公网IP:3002/api
 JWT_SECRET=请改成一段长随机字符串
+COOKIE_SECURE=false
 
 S3_ENDPOINT=https://cos.ap-nanjing.myqcloud.com
 S3_REGION=ap-nanjing
@@ -237,9 +244,10 @@ PUBLIC_BUCKET_BASE_URL=https://你的存储桶名称.cos.ap-nanjing.myqcloud.com
 
 说明：
 
-- `FRONTEND_URL`：后端 CORS 允许的前端地址
+- `FRONTEND_URL`：后端 CORS 允许的前端地址，也用于判断 Cookie 是否启用 `Secure`
 - `NEXT_PUBLIC_API_BASE_URL`：浏览器访问后端 API 的地址，会在前端镜像构建时写入前端包
-- `JWT_SECRET`：管理员登录 JWT 签名密钥，生产环境必须改成一段长随机字符串
+- `JWT_SECRET`：登录 JWT 签名密钥，生产环境必须改成一段长随机字符串
+- `COOKIE_SECURE`：可选，强制控制登录 Cookie 是否启用 `Secure`。`true` 仅适合 HTTPS；`false` 适合 HTTP 临时调试。默认会根据 `FRONTEND_URL` 是否以 `https://` 开头自动判断
 - `S3_ENDPOINT` / `S3_REGION` / `S3_BUCKET`：腾讯云 COS 的 S3 兼容配置
 - `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`：腾讯云访问密钥，不要提交到 Git
 - `S3_FORCE_PATH_STYLE=false`：腾讯云 COS 使用虚拟主机风格访问
@@ -277,7 +285,11 @@ docker compose -p video_player --env-file .env logs --tail=100 backend
 docker compose -p video_player --env-file .env logs --tail=100 frontend
 ```
 
-说明：生产 [docker-compose.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.yml) 会给后端设置 `NODE_ENV=production`，使管理员 Cookie 在生产模式下按配置启用 `secure`；本地 [docker-compose.local.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.local.yml) 会覆盖为 `NODE_ENV=development`，避免本地 HTTP 调试时 Secure Cookie 导致登录状态无法保存。
+说明：
+
+- 生产 [docker-compose.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.yml) 会给后端设置 `NODE_ENV=production`
+- Cookie 的 `Secure` 标志不再只由 `NODE_ENV` 控制，而是优先看 `COOKIE_SECURE` 环境变量；没有显式配置时根据 `FRONTEND_URL` 是否以 `https://` 开头自动判断
+- 本地 [docker-compose.local.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.local.yml) 会覆盖为 `NODE_ENV=development`，避免本地 HTTP 调试时 Secure Cookie 导致登录状态无法保存
 
 ### 6.4 验证服务
 
@@ -374,6 +386,7 @@ docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml
 ```txt
 前端：http://localhost:3001
 后端：http://localhost:3002/api/health
+普通用户登录：http://localhost:3001/login
 管理员：http://localhost:3001/admin/login
 MinIO 控制台：http://localhost:9001
 ```
@@ -390,6 +403,19 @@ password: minioadmin
 ```txt
 username: admin
 password: 123456
+```
+
+普通用户登录：
+
+```txt
+6 位数字 PIN 码
+```
+
+普通用户默认由后端启动时创建，当前默认：
+
+```txt
+用户名: demo
+PIN: 123456
 ```
 
 ### 7.2 Node.js 代码开发
@@ -496,6 +522,59 @@ npm run storage:clean --prefix backend -- --delete
 
 详见：[storage-sync-notes.md](file:///c:/Users/user/Desktop/播放器/memory/storage-sync-notes.md)
 
+### 8.5 管理员推送视频和留言
+
+管理员可以在 `/admin/users` 查看普通用户列表，进入某个用户的推送管理页 `/admin/users/[id]/assignments`：
+
+- 查看当前正在推送的视频
+- 从视频库中选择推荐视频
+- 填写留言
+- 一次「保存推送」同时提交视频和留言
+- 取消正在推送的视频
+- 删除历史推送记录（软删除，需要填写原因）
+
+每次「保存推送」后端会生成一个 `operation_id`，同一次操作里的视频记录和留言记录共享这个 ID。历史操作区按 `operation_id` 聚合显示为以下三种情况之一：
+
+1. 管理员 admin 给用户 demo 把推送更新为以下 N 个视频：…，并留言：…
+2. 管理员 admin 单独修改了留言为：…
+3. 管理员 admin 单独更新了视频推送为以下 N 个视频：…
+
+业务规则：
+
+- 同一个用户最多同时存在 5 个正在推送的视频
+- 已经推送过的视频不会重复推送
+- 取消推送只做软删除，历史记录仍可查看
+- 删除历史记录需要填写原因
+
+### 8.6 普通用户登录和首页
+
+普通用户使用 6 位数字 PIN 码登录：
+
+```txt
+POST /api/users/login    登录，设置 HttpOnly Cookie
+GET  /api/users/me       检查当前普通用户登录状态
+POST /api/users/logout   退出登录，清除 Cookie
+```
+
+登录后首页显示：
+
+- 今日作业：管理员当前推送的视频 + 留言
+- 推荐视频：全部视频列表，支持搜索和日期筛选
+
+视频播放页 `/videos/[id]` 公开访问，但会通过 `from` 参数区分管理员和普通用户身份校验。
+
+### 8.7 Cookie 策略
+
+登录 Cookie 设置原则：
+
+- `httpOnly: true`，避免前端 JavaScript 读取 token
+- `sameSite: 'lax'`，降低 CSRF 风险
+- `secure` 根据 `FRONTEND_URL` 协议自动判断，HTTPS 时启用，HTTP 时关闭
+- 可通过环境变量 `COOKIE_SECURE=true/false` 强制覆盖
+- token 有过期时间
+
+这样生产环境用 `http://IP:3001` 临时访问时也不会因为 Secure Cookie 被浏览器拒绝而导致登录无反应。
+
 ## 9. 当前部署上下文
 
 当前服务器部署目标：腾讯云 CVM + Docker Compose + PostgreSQL 容器 + 腾讯云 COS。
@@ -565,8 +644,8 @@ cat .env
 然后重建并启动：
 
 ```bash
-docker compose down
-docker compose up -d --build
+docker compose -p video_player --env-file .env down
+docker compose -p video_player --env-file .env up -d --build
 ```
 
 验证：
@@ -576,47 +655,65 @@ curl http://localhost:3002/api/health
 curl -I http://localhost:3001
 ```
 
-## 12. 当前已实现：管理员、普通用户、搜索筛选
+## 12. 当前已实现：管理员、普通用户、推送系统
 
 项目已拆成普通用户前台和管理员后台。
 
 ### 12.1 页面规划
 
 ```txt
-/                    普通用户首页，不需要登录，只能浏览、搜索、筛选、播放
-/admin               管理员后台，需要登录，可以浏览、搜索、筛选、上传、删除
-/admin/login         管理员登录页
-/videos/[id]         视频播放页，公开访问
+/                              普通用户首页，登录后显示今日作业和推荐视频
+/login                         普通用户 PIN 登录页
+/admin                         管理员后台，登录后可浏览、搜索、筛选、上传、删除
+/admin/login                   管理员登录页
+/admin/users                   管理员管理普通用户
+/admin/users/[id]/assignments  管理员给用户推送视频、留言、查看历史操作
+/videos/[id]                   视频播放页，公开访问
 ```
 
-现有首页的上传和删除能力迁移到管理员后台。普通用户首页不显示上传表单和删除按钮。
+### 12.2 账号体系
 
-### 12.2 管理员账号
-
-管理员只有一个：
+管理员默认账号：
 
 ```txt
 username: admin
 password: 123456
 ```
 
-账号由后端启动时写入 PostgreSQL。数据库中不保存明文密码，而保存 `123456` 的 bcrypt hash；初始化入口统一在 [db.js](file:///c:/Users/user/Desktop/播放器/backend/src/db.js)，不是依赖一次性的 `schema.sql`。
+普通用户默认账号：
+
+```txt
+username: demo
+PIN: 123456
+```
+
+账号由后端启动时写入 PostgreSQL。数据库中不保存明文密码，管理员密码保存 bcrypt hash，普通用户保存 6 位 PIN。
 
 ### 12.3 鉴权方案
 
-管理员登录使用 HttpOnly Cookie 保存服务端签发的 JWT：
+管理员和普通用户分别使用独立的 HttpOnly Cookie：
+
+管理员：
 
 ```txt
 POST /api/admin/login    登录，设置 HttpOnly Cookie
-GET /api/admin/me        检查当前管理员登录状态
+GET  /api/admin/me       检查当前管理员登录状态
 POST /api/admin/logout   退出登录，清除 Cookie
+```
+
+普通用户：
+
+```txt
+POST /api/users/login    登录，设置 HttpOnly Cookie
+GET  /api/users/me       检查当前普通用户登录状态
+POST /api/users/logout   退出登录，清除 Cookie
 ```
 
 Cookie 设置原则：
 
-- `httpOnly: true`，避免前端 JavaScript 读取 token
-- `sameSite: 'lax'`，降低 CSRF 风险
-- 生产环境 HTTPS 下使用 `secure: true`
+- `httpOnly: true`
+- `sameSite: 'lax'`
+- `secure` 根据 `FRONTEND_URL` 自动判断或 `COOKIE_SECURE` 强制覆盖
 - token 有过期时间
 
 后端必须保护管理员接口，不能只靠前端隐藏按钮。
@@ -630,9 +727,25 @@ GET /api/videos
 GET /api/videos/:id
 ```
 
+普通用户接口（需要 user_token Cookie）：
+
+```txt
+GET  /api/users/me
+POST /api/users/logout
+```
+
 仅管理员可用：
 
 ```txt
+POST /api/admin/login
+POST /api/admin/logout
+GET  /api/admin/me
+GET  /api/admin/users
+POST /api/admin/users
+POST /api/admin/users/:userId/assignments
+POST /api/admin/users/:userId/message
+PATCH /api/admin/assignments/:id/cancel
+PATCH /api/admin/assignments/:id/delete
 POST /api/videos/multipart/create
 POST /api/videos/multipart/part-url
 POST /api/videos/multipart/complete
@@ -670,9 +783,10 @@ GET /api/videos?keyword=关键词&startDate=2026-01-01&endDate=2026-01-31
 
 1. 为服务器配置域名
 2. 使用 Nginx 反向代理前端和后端
-3. 配置 HTTPS
+3. 配置 HTTPS，并把 `FRONTEND_URL` / `NEXT_PUBLIC_API_BASE_URL` 改为 https://域名
 4. 按实际域名收紧 COS CORS 配置
 5. 增加分页、编辑视频信息等功能
+6. 增加推送到期时间、用户观看进度等
 
 ## 14. 新对话接手提示
 
@@ -686,5 +800,5 @@ GET /api/videos?keyword=关键词&startDate=2026-01-01&endDate=2026-01-31
 一句话交接：
 
 ```txt
-这是一个 Next.js + Express + PostgreSQL + 腾讯云 COS 的视频播放器教学项目；当前部署方式是服务器 git pull 后填写根目录 .env，再用 docker compose up -d --build 启动，上传采用后端创建 COS Multipart 任务、浏览器分片直传、后端合并分片、完成后后端入库的流程。
+这是一个 Next.js + Express + PostgreSQL + 腾讯云 COS 的视频播放器教学项目；当前包含管理员和普通用户双账号、管理员给普通用户推送视频并留言、推送记录按 operation 聚合；部署方式是服务器 git pull 后填写根目录 .env，再用 docker compose up -d --build 启动，上传采用后端创建 COS Multipart 任务、浏览器分片直传、后端合并分片、完成后后端入库的流程。
 ```

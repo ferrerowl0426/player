@@ -8,6 +8,7 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [identity, setIdentity] = useState('checking');
+  const isAdminPage = pathname.startsWith('/admin');
 
   useEffect(() => {
     let active = true;
@@ -60,24 +61,29 @@ export default function SiteHeader() {
 
   return (
     <header className="site-header">
-      <a className="logo" href="/">学习播放器</a>
+      <a className="logo" href={isAdminPage ? '/admin' : '/'}>学习播放器</a>
       <nav className="site-nav">
-        {identity === 'checking' ? null : identity === 'admin' ? (
-          <>
-            <a href="/admin">管理员首页</a>
-            <button type="button" onClick={handleLogout}>管理员退出</button>
-          </>
-        ) : identity === 'user' ? (
-          <>
-            <a href="/">用户首页</a>
-            <button type="button" onClick={handleLogout}>用户退出</button>
-          </>
-        ) : (
-          <>
-            <a href="/login">用户登录</a>
+        {identity === 'checking' ? null : isAdminPage ? (
+          identity === 'admin' ? (
+            <>
+              <a href="/admin">管理员首页</a>
+              <button type="button" onClick={handleLogout}>退出登录</button>
+            </>
+          ) : (
             <a href="/admin/login">管理员登录</a>
-            <a href="/">首页</a>
-          </>
+          )
+        ) : (
+          identity === 'user' || identity === 'admin' ? (
+            <>
+              <a href="/">首页</a>
+              <button type="button" onClick={handleLogout}>退出登录</button>
+            </>
+          ) : (
+            <>
+              <a href="/login">用户登录</a>
+              <a href="/admin/login">管理员入口</a>
+            </>
+          )
         )}
       </nav>
     </header>

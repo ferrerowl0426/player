@@ -408,23 +408,53 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
       return;
     }
 
-    const assignmentsResult = await pool.query(
-      `SELECT
-         ua.id,
-         ua.message,
-         ua.is_deleted,
-         ua.delete_reason,
-         ua.deleted_at,
-         ua.created_at,
-         v.id AS video_id,
-         v.title AS video_title,
-         v.cover_url AS video_cover_url,
-         a.username AS admin_username
-       FROM user_assignments ua
-       LEFT JOIN videos v ON v.id = ua.video_id
-       LEFT JOIN admins a ON a.id = ua.assigned_by_admin_id
-       WHERE ua.user_id = $1
-       ORDER BY ua.created_at DESC`,
+    const operationsResult = await pool.query(
+      `WITH user_operations AS (
+         SELECT
+           ua.operation_id,
+           MIN(ua.created_at) AS created_at,
+           MIN(a.username) AS admin_username
+         FROM user_assignments ua
+         LEFT JOIN admins a ON a.id = ua.assigned_by_admin_id
+         WHERE ua.user_id = $1
+         GROUP BY ua.operation_id
+       ),
+       operation_videos AS (
+         SELECT
+           ua.operation_id,
+           COALESCE(json_agg(
+             json_build_object(
+               'id', v.id,
+               'title', v.title,
+               'cover_url', v.cover_url,
+               'assignment_id', ua.id,
+               'is_deleted', ua.is_deleted,
+               'delete_reason', ua.delete_reason
+             ) ORDER BY ua.created_at DESC
+           ) FILTER (WHERE v.id IS NOT NULL), '[]'::json) AS videos
+         FROM user_assignments ua
+         LEFT JOIN videos v ON v.id = ua.video_id
+         WHERE ua.user_id = $1 AND ua.video_id IS NOT NULL
+         GROUP BY ua.operation_id
+       ),
+       operation_messages AS (
+         SELECT
+           ua.operation_id,
+           MAX(ua.message) AS message
+         FROM user_assignments ua
+         WHERE ua.user_id = $1 AND ua.video_id IS NULL AND ua.message <> ''
+         GROUP BY ua.operation_id
+       )
+       SELECT
+         o.operation_id,
+         o.created_at,
+         o.admin_username,
+         COALESCE(ov.videos, '[]'::json) AS videos,
+         COALESCE(om.message, '') AS message
+       FROM user_operations o
+       LEFT JOIN operation_videos ov ON ov.operation_id = o.operation_id
+       LEFT JOIN operation_messages om ON om.operation_id = o.operation_id
+       ORDER BY o.created_at DESC`,
       [userId]
     );
 
@@ -459,7 +489,7 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
     res.json({
       data: {
         user,
-        assignments: assignmentsResult.rows,
+        operations: operationsResult.rows,
         activeVideos: activeVideosResult.rows,
         message: latestMessageResult.rows[0]?.message || ''
       }
@@ -470,20 +500,27 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
 });
 
 // POST /api/admin/users/:userId/assignments
-// 管理员可以一次给用户推送多个视频，但同一个用户最多同时保留 5 个有效视频推送。
+// 管理员一次操作可以同时更新推送视频和留言，所有相关记录共享同一个 operation_id。
 adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, next) => {
   try {
     const userId = normalizeId(req.params.userId);
     const rawVideoIds = Array.isArray(req.body.videoIds) ? req.body.videoIds : [req.body.videoId];
     const videoIds = [...new Set(rawVideoIds.map(normalizeId).filter(Boolean))];
+    const message = normalizeLoginText(req.body.message);
+    const messageError = message ? validateMessage(message) : '';
 
     if (!userId) {
       sendValidationError(res, '用户 id 无效');
       return;
     }
 
-    if (videoIds.length === 0) {
-      sendValidationError(res, '请选择要推送的视频');
+    if (videoIds.length === 0 && !message) {
+      sendValidationError(res, '请选择要推送的视频或填写留言');
+      return;
+    }
+
+    if (messageError) {
+      sendValidationError(res, messageError);
       return;
     }
 
@@ -494,7 +531,7 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
       return;
     }
 
-    if (!(await ensureVideosExist(videoIds))) {
+    if (videoIds.length > 0 && !(await ensureVideosExist(videoIds))) {
       res.status(404).json({ message: '部分视频不存在' });
       return;
     }
@@ -510,24 +547,38 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
     const activeVideoIds = new Set(activeResult.rows.map((row) => row.video_id));
     const newVideoIds = videoIds.filter((videoId) => !activeVideoIds.has(videoId));
 
-    if (activeVideoIds.size + newVideoIds.length > MAX_ACTIVE_VIDEO_ASSIGNMENTS) {
+    if (newVideoIds.length > 0 && activeVideoIds.size + newVideoIds.length > MAX_ACTIVE_VIDEO_ASSIGNMENTS) {
       sendValidationError(res, `同一个用户最多只能同时推送 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个视频`);
       return;
     }
 
-    if (newVideoIds.length === 0) {
-      res.json({ data: [] });
-      return;
+    const operationResult = await pool.query(
+      `SELECT nextval('user_assignments_operation_id_seq') AS operation_id`
+    );
+    const operationId = operationResult.rows[0].operation_id;
+    const insertedRows = [];
+
+    if (newVideoIds.length > 0) {
+      const videoResult = await pool.query(
+        `INSERT INTO user_assignments (operation_id, user_id, video_id, message, assigned_by_admin_id)
+         SELECT $1, $2, unnest($3::int[]), '', $4
+         RETURNING id, operation_id, user_id, video_id, message, is_deleted, delete_reason, deleted_at, created_at`,
+        [operationId, userId, newVideoIds, req.admin.adminId]
+      );
+      insertedRows.push(...videoResult.rows);
     }
 
-    const result = await pool.query(
-      `INSERT INTO user_assignments (user_id, video_id, message, assigned_by_admin_id)
-       SELECT $1, unnest($2::int[]), '', $3
-       RETURNING id, user_id, video_id, message, is_deleted, delete_reason, deleted_at, created_at`,
-      [userId, newVideoIds, req.admin.adminId]
-    );
+    if (message) {
+      const messageResult = await pool.query(
+        `INSERT INTO user_assignments (operation_id, user_id, video_id, message, assigned_by_admin_id)
+         VALUES ($1, $2, NULL, $3, $4)
+         RETURNING id, operation_id, user_id, video_id, message, is_deleted, delete_reason, deleted_at, created_at`,
+        [operationId, userId, message, req.admin.adminId]
+      );
+      insertedRows.push(...messageResult.rows);
+    }
 
-    res.status(201).json({ data: result.rows });
+    res.status(201).json({ data: { operationId, rows: insertedRows } });
   } catch (error) {
     next(error);
   }

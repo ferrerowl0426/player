@@ -37,6 +37,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_assignments (
       id SERIAL PRIMARY KEY,
+      operation_id INTEGER NOT NULL,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       video_id INTEGER REFERENCES videos(id) ON DELETE SET NULL,
       message TEXT NOT NULL DEFAULT '',
@@ -46,6 +47,19 @@ export async function ensureAppSchema() {
       deleted_at TIMESTAMP,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
+  `);
+
+  await pool.query('CREATE SEQUENCE IF NOT EXISTS user_assignments_operation_id_seq');
+
+  await pool.query(`
+    ALTER TABLE user_assignments
+    ALTER COLUMN operation_id SET DEFAULT nextval('user_assignments_operation_id_seq')
+  `);
+
+  await pool.query(`
+    UPDATE user_assignments
+    SET operation_id = nextval('user_assignments_operation_id_seq')
+    WHERE operation_id IS NULL
   `);
 
   await pool.query('CREATE INDEX IF NOT EXISTS idx_user_assignments_user_id_created_at ON user_assignments (user_id, created_at DESC)');

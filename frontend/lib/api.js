@@ -282,15 +282,15 @@ export async function fetchUserAssignments(userId) {
   return parseJsonResponse(response, '获取推送记录失败');
 }
 
-// 管理员给指定普通用户批量推送视频。
-export async function createUserAssignment({ userId, videoIds }) {
+// 管理员给指定普通用户保存一次推送操作，可以同时包含视频和留言。
+export async function createUserAssignment({ userId, videoIds, message = '' }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${userId}/assignments`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ videoIds })
+    body: JSON.stringify({ videoIds, message })
   });
 
   return parseJsonResponse(response, '创建推送失败');

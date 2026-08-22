@@ -413,7 +413,9 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
          SELECT
            ua.operation_id,
            MIN(ua.created_at) AS created_at,
-           MIN(a.username) AS admin_username
+           MIN(a.username) AS admin_username,
+           BOOL_AND(ua.is_deleted) AS is_deleted,
+           MAX(ua.delete_reason) FILTER (WHERE ua.delete_reason <> '') AS delete_reason
          FROM user_assignments ua
          LEFT JOIN admins a ON a.id = ua.assigned_by_admin_id
          WHERE ua.user_id = $1
@@ -449,6 +451,8 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
          o.operation_id,
          o.created_at,
          o.admin_username,
+         o.is_deleted,
+         o.delete_reason,
          COALESCE(ov.videos, '[]'::json) AS videos,
          COALESCE(om.message, '') AS message
        FROM user_operations o
@@ -690,6 +694,46 @@ adminRouter.patch('/assignments/:id/delete', requireAdmin, async (req, res, next
     }
 
     res.json({ data: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/operations/:operationId/delete
+// 删除整个操作聚合：把该 operation_id 下所有未删除的记录软删除。
+adminRouter.patch('/operations/:operationId/delete', requireAdmin, async (req, res, next) => {
+  try {
+    const operationId = normalizeId(req.params.operationId);
+    const reason = normalizeLoginText(req.body.reason);
+    const reasonError = validateDeleteReason(reason);
+
+    if (!operationId) {
+      sendValidationError(res, '操作 id 无效');
+      return;
+    }
+
+    if (reasonError) {
+      sendValidationError(res, reasonError);
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE user_assignments
+       SET is_deleted = TRUE,
+           delete_reason = $1,
+           deleted_at = CURRENT_TIMESTAMP
+       WHERE operation_id = $2
+         AND is_deleted = FALSE
+       RETURNING id, user_id, video_id, message, is_deleted, delete_reason, deleted_at, created_at`,
+      [reason, operationId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: '该操作下没有可删除的记录' });
+      return;
+    }
+
+    res.json({ data: result.rows });
   } catch (error) {
     next(error);
   }

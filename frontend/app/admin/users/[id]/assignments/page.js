@@ -7,9 +7,9 @@ import VideoList from '../../../../../components/VideoList.js';
 import {
   cancelUserAssignment,
   createUserAssignment,
+  deleteOperation,
   fetchAdminMe,
-  fetchUserAssignments,
-  softDeleteAssignment
+  fetchUserAssignments
 } from '../../../../../lib/api.js';
 import { EMPTY_VIDEO_FILTERS, useVideoList } from '../../../../../lib/useVideoList.js';
 
@@ -127,15 +127,16 @@ export default function UserAssignmentsPage() {
     }
   }
 
-  async function handleSoftDeleteAssignment(video) {
+  async function handleDeleteOperation(operationId) {
     const reason = window.prompt('请输入删除原因，例如：手误');
 
-    if (reason === null) {
+    if (reason === null || reason.trim() === '') {
       return;
     }
 
     try {
-      await softDeleteAssignment({ id: video.assignment_id, reason });
+      setStatus('正在删除操作记录...');
+      await deleteOperation({ operationId, reason: reason.trim() });
       await loadAssignments();
     } catch (error) {
       setStatus(error.message);
@@ -216,43 +217,63 @@ export default function UserAssignmentsPage() {
           <button type="button" onClick={loadAssignments}>刷新</button>
         </div>
 
-        <div className="admin-table">
+        <div className="operations-list">
           {operations.map((operation) => {
             const hasVideos = operation.videos && operation.videos.length > 0;
             const hasMessage = operation.message && operation.message.trim();
-            const allVideosDeleted = hasVideos && operation.videos.every((video) => video.is_deleted);
+            const isDeleted = operation.is_deleted;
+
+            let description;
+            if (hasVideos && hasMessage) {
+              description = `管理员${operation.admin_username}给用户${user.username}把推送更新为以下 ${operation.videos.length} 个视频，并留言：`;
+            } else if (!hasVideos && hasMessage) {
+              description = `管理员${operation.admin_username}单独修改了留言：`;
+            } else {
+              description = `管理员${operation.admin_username}单独更新了视频推送为以下 ${operation.videos.length} 个视频：`;
+            }
 
             return (
-              <article className={`admin-row ${allVideosDeleted ? 'assignment-deleted' : ''}`} key={operation.operation_id}>
-                <div>
-                  {hasVideos && hasMessage ? (
-                    <strong>管理员{operation.admin_username}给用户{user.username}把推送更新为以下{operation.videos.length}个视频，并留言：{operation.message}</strong>
-                  ) : !hasVideos && hasMessage ? (
-                    <strong>管理员{operation.admin_username}单独修改了留言为：{operation.message}</strong>
+              <article className={`operation-card ${isDeleted ? 'operation-deleted' : ''}`} key={operation.operation_id}>
+                <div className="operation-header">
+                  <div className="operation-meta">
+                    <span className="operation-id">#{operation.operation_id}</span>
+                    <span className="operation-time">{formatDate(operation.created_at)}</span>
+                  </div>
+                  {!isDeleted ? (
+                    <button type="button" className="operation-delete-button" onClick={() => handleDeleteOperation(operation.operation_id)}>删除记录</button>
                   ) : (
-                    <strong>管理员{operation.admin_username}单独更新了视频推送为以下{operation.videos.length}个视频</strong>
+                    <span className="operation-delete-reason">已删除：{operation.delete_reason || '记录已删除'}</span>
                   )}
-                  <span>操作时间：{formatDate(operation.created_at)}</span>
                 </div>
 
-                {hasVideos ? (
-                  <div className="assignment-video-grid">
-                    {operation.videos.map((video) => (
-                      <div className={`assignment-video-card ${video.is_deleted ? 'assignment-deleted' : ''}`} key={video.assignment_id}>
-                        {video.cover_url ? (
-                          <img src={video.cover_url} alt={video.title} width={240} height={135} />
-                        ) : null}
-                        <strong>{video.title}</strong>
-                        {video.is_deleted ? <span>已删除：{video.delete_reason}</span> : (
-                          <>
-                            <a href={`/videos/${video.id}?from=admin&returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`}>查看视频</a>
-                            <button type="button" onClick={() => handleSoftDeleteAssignment(video)}>删除记录</button>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                <div className="operation-body">
+                  <p className="operation-description">{description}</p>
+
+                  {hasMessage ? (
+                    <blockquote className="operation-message">{operation.message}</blockquote>
+                  ) : null}
+
+                  {hasVideos ? (
+                    <div className="operation-videos">
+                      {operation.videos.map((video) => (
+                        <a
+                          key={video.assignment_id}
+                          className={`operation-video-item ${video.is_deleted ? 'operation-video-deleted' : ''}`}
+                          href={video.is_deleted ? undefined : `/videos/${video.id}?from=admin&returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`}
+                          title={video.title}
+                        >
+                          {video.cover_url ? (
+                            <img src={video.cover_url} alt={video.title} width={120} height={68} />
+                          ) : (
+                            <div className="operation-video-placeholder">无封面</div>
+                          )}
+                          <span className="operation-video-title">{video.title}</span>
+                          {video.is_deleted ? <span className="operation-video-reason">已删除</span> : null}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </article>
             );
           })}

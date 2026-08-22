@@ -334,6 +334,20 @@ export async function softDeleteAssignment({ id, reason }) {
   return parseJsonResponse(response, '删除推送记录失败');
 }
 
+// 删除整个操作聚合：把该 operation_id 下所有未删除的记录软删除。
+export async function deleteOperation({ operationId, reason }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/operations/${operationId}/delete`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ reason })
+  });
+
+  return parseJsonResponse(response, '删除操作失败');
+}
+
 // 向后端申请 Multipart 上传任务、封面和资料附件的临时上传地址。
 export async function createMultipartVideoUpload({ title, description, video, cover, attachments = [] }) {
   const response = await fetch(`${getApiBaseUrl()}/videos/multipart/create`, {

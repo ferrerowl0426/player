@@ -183,14 +183,14 @@ export async function fetchManagedUsers() {
 }
 
 // 管理员创建普通用户。
-export async function createManagedUser({ username, password }) {
+export async function createManagedUser({ username, password, classId }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ username, password, classId })
   });
 
   return parseJsonResponse(response, '创建普通用户失败');
@@ -485,4 +485,66 @@ export async function deleteVideo(id) {
   });
 
   return parseJsonResponse(response, '删除视频失败');
+}
+
+// 获取班级列表，包含班级下的学生。
+export async function fetchClasses() {
+  const response = await fetch(`${getApiBaseUrl()}/admin/classes`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取班级列表失败');
+}
+
+// 超级管理员创建班级。
+export async function createClass({ name, teacherId }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/classes`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ name, teacherId })
+  });
+
+  return parseJsonResponse(response, '创建班级失败');
+}
+
+// 超级管理员修改班级信息。
+export async function updateClass({ id, name, teacherId }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/classes/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ name, teacherId })
+  });
+
+  return parseJsonResponse(response, '修改班级失败');
+}
+
+// 超级管理员删除班级。
+export async function deleteClass(id) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/classes/${id}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  });
+
+  return parseJsonResponse(response, '删除班级失败');
+}
+
+// 超级管理员给学生转班。
+export async function transferUserClass({ id, classId }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}/class`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ classId })
+  });
+
+  return parseJsonResponse(response, '转班失败');
 }

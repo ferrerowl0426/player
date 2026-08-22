@@ -18,6 +18,27 @@ export async function ensureAppSchema() {
       id SERIAL PRIMARY KEY,
       username VARCHAR(50) UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      role VARCHAR(20) NOT NULL DEFAULT 'teacher',
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE admins
+    ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'teacher'
+  `);
+
+  await pool.query(`
+    UPDATE admins
+    SET role = 'super_admin'
+    WHERE username = 'admin'
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS teaching_classes (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      teacher_id INTEGER REFERENCES admins(id) ON DELETE SET NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -27,12 +48,19 @@ export async function ensureAppSchema() {
       id SERIAL PRIMARY KEY,
       username VARCHAR(50) UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      class_id INTEGER REFERENCES teaching_classes(id) ON DELETE SET NULL,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS class_id INTEGER REFERENCES teaching_classes(id) ON DELETE SET NULL
+  `);
+
   await pool.query('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_users_class_id ON users (class_id)');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_assignments (
@@ -91,10 +119,18 @@ export async function ensureAppSchema() {
 
   // 管理员至少要有一个，否则后台无法再创建用户或修复数据。
   await pool.query(
-    `INSERT INTO admins (username, password_hash)
-     VALUES ($1, $2)
+    `INSERT INTO admins (username, password_hash, role)
+     VALUES ($1, $2, $3)
      ON CONFLICT (username) DO NOTHING`,
-    ['admin', DEFAULT_PASSWORD_HASH]
+    ['admin', DEFAULT_PASSWORD_HASH, 'super_admin']
+  );
+
+  // 确保存在一个默认班级，并把没有班级的用户放入默认班级。
+  await pool.query(
+    `INSERT INTO teaching_classes (name, teacher_id)
+     SELECT '默认班级', id FROM admins WHERE username = $1
+     ON CONFLICT DO NOTHING`,
+    ['admin']
   );
 
   // demo 是本地调试和教学用的普通用户，后续真实用户由管理员在后台创建。
@@ -104,4 +140,10 @@ export async function ensureAppSchema() {
      ON CONFLICT (username) DO NOTHING`,
     ['demo', DEFAULT_PASSWORD_HASH]
   );
+
+  await pool.query(`
+    UPDATE users
+    SET class_id = (SELECT id FROM teaching_classes ORDER BY id LIMIT 1)
+    WHERE class_id IS NULL
+  `);
 }

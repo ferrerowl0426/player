@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation';
 import AdminUploadForm from '../../components/AdminUploadForm.js';
 import VideoFilters from '../../components/VideoFilters.js';
 import VideoList from '../../components/VideoList.js';
-import { deleteVideo, fetchAdminMe, logoutAdmin } from '../../lib/api.js';
+import { deleteVideo, fetchAdminMe, fetchClasses, logoutAdmin } from '../../lib/api.js';
 import { EMPTY_VIDEO_FILTERS, useVideoList } from '../../lib/useVideoList.js';
 
 export default function AdminPage() {
   const router = useRouter();
   const [admin, setAdmin] = useState(null);
+  const [classes, setClasses] = useState([]);
   const {
     videos,
     filters,
@@ -27,6 +28,11 @@ export default function AdminPage() {
         const result = await fetchAdminMe();
         setAdmin(result.data);
         await loadVideos(EMPTY_VIDEO_FILTERS);
+
+        if (result.data.role === 'super_admin') {
+          const classesResult = await fetchClasses();
+          setClasses(classesResult.data);
+        }
       } catch (error) {
         router.replace('/admin/login');
       }
@@ -59,25 +65,49 @@ export default function AdminPage() {
     return <p className="empty-text">正在检查管理员登录状态...</p>;
   }
 
+  const isSuperAdmin = admin.role === 'super_admin';
+
   return (
     <>
       <section className="hero">
         <div>
-          <h1>管理员后台</h1>
-          <p>管理员可以浏览、搜索、上传和删除视频，视频文件仍由浏览器直传腾讯云 COS。</p>
+          <h1>{isSuperAdmin ? '超级管理员后台' : '老师后台'}</h1>
+          <p>
+            {isSuperAdmin
+              ? '超级管理员可以管理班级、老师账号、视频，并给每个学生推送内容。'
+              : '老师可以管理本班学生、上传视频，并给学生推送内容。'}
+          </p>
         </div>
         <button className="hero-button" type="button" onClick={handleLogout}>退出登录</button>
       </section>
 
       <section className="video-section">
         <div className="section-title">
-          <h2>后台管理</h2>
+          <h2>快捷入口</h2>
         </div>
         <div className="admin-link-grid">
-          <a href="/admin/users">普通用户管理</a>
-          <a href="/admin/admins">管理员账号管理</a>
+          {isSuperAdmin && <a href="/admin/classes">班级管理</a>}
+          <a href="/admin/users">{isSuperAdmin ? '用户管理' : '班级学生'}</a>
+          {isSuperAdmin && <a href="/admin/admins">管理员账号</a>}
         </div>
       </section>
+
+      {isSuperAdmin && classes.length > 0 && (
+        <section className="video-section">
+          <div className="section-title">
+            <h2>班级概览</h2>
+          </div>
+          <div className="class-overview-grid">
+            {classes.map((cls) => (
+              <a key={cls.id} className="class-overview-card" href="/admin/classes">
+                <strong>{cls.name}</strong>
+                <span>负责老师：{cls.teacher_name || '未分配'}</span>
+                <span>学生：{cls.students?.length || 0} 人</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       <AdminUploadForm onUploaded={() => loadVideos(filters)} />
 
@@ -88,7 +118,13 @@ export default function AdminPage() {
         </div>
 
         <VideoFilters filters={filters} onChange={setFilters} onSubmit={handleSearch} onReset={handleReset} />
-        <VideoList videos={videos} status={listStatus} canDelete onDelete={handleDelete} detailQuery="?from=admin" />
+        <VideoList
+          videos={videos}
+          status={listStatus}
+          canDelete={isSuperAdmin}
+          onDelete={isSuperAdmin ? handleDelete : undefined}
+          detailQuery="?from=admin"
+        />
       </section>
     </>
   );

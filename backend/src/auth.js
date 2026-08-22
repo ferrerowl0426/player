@@ -35,7 +35,8 @@ export function signAdminToken(admin) {
   return signToken({
     type: 'admin',
     adminId: admin.id,
-    username: admin.username
+    username: admin.username,
+    role: admin.role
   });
 }
 
@@ -76,6 +77,35 @@ export function requireAdmin(req, res, next) {
 
     if (payload.type !== 'admin') {
       res.status(401).json({ message: '管理员登录状态无效' });
+      return;
+    }
+
+    req.admin = payload;
+    next();
+  } catch (error) {
+    clearAdminCookie(res);
+    res.status(401).json({ message: '登录已过期，请重新登录' });
+  }
+}
+
+export function requireSuperAdmin(req, res, next) {
+  const token = readToken(req, config.auth.adminCookieName);
+
+  if (!token) {
+    res.status(401).json({ message: '请先登录管理员账号' });
+    return;
+  }
+
+  try {
+    const payload = jwt.verify(token, config.auth.jwtSecret);
+
+    if (payload.type !== 'admin') {
+      res.status(401).json({ message: '管理员登录状态无效' });
+      return;
+    }
+
+    if (payload.role !== 'super_admin') {
+      res.status(403).json({ message: '需要超级管理员权限' });
       return;
     }
 

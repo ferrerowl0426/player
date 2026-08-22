@@ -615,3 +615,144 @@ main {
     font-size: 26px;
   }
 }
+
+.class-list {
+  display: grid;
+  gap: 16px;
+}
+
+.class-item {
+  padding: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.class-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.class-header strong {
+  font-size: 18px;
+}
+
+.class-meta {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.class-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.class-actions button {
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  background: #eef2f7;
+  border: 0;
+  border-radius: 10px;
+}
+
+.class-actions button:last-child {
+  color: #dc2626;
+  background: #fff1f2;
+}
+
+.expand-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.class-students {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.class-students .row-actions {
+  gap: 8px;
+}
+
+.edit-form {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.class-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.class-overview-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  color: inherit;
+  text-decoration: none;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.class-overview-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+.class-overview-card strong {
+  font-size: 16px;
+}
+
+.class-overview-card span {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.data-table th {
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.form-row input,
+.form-row select {
+  padding: 10px 14px;
+  font: inherit;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}

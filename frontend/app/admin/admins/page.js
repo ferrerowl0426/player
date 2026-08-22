@@ -19,7 +19,8 @@ function readAccountForm(form) {
 
   return {
     username: String(formData.get('username') || '').trim(),
-    password: String(formData.get('password') || '')
+    password: String(formData.get('password') || ''),
+    role: String(formData.get('role') || 'teacher')
   };
 }
 
@@ -38,7 +39,13 @@ export default function AdminAdminsPage() {
   useEffect(() => {
     async function initPage() {
       try {
-        await fetchAdminMe();
+        const me = await fetchAdminMe();
+
+        if (me.data.role !== 'super_admin') {
+          router.replace('/admin');
+          return;
+        }
+
         await loadAdmins();
       } catch (error) {
         router.replace('/admin/login');
@@ -107,7 +114,7 @@ export default function AdminAdminsPage() {
       <section className="hero">
         <div>
           <h1>管理员账号管理</h1>
-          <p>管理员可以创建其他管理员，也可以重置密码；系统会阻止删除最后一个管理员。</p>
+          <p>超级管理员可以创建老师或超级管理员账号，也可以重置密码；系统会阻止删除最后一个管理员。</p>
         </div>
         <a className="hero-button" href="/admin">返回后台</a>
       </section>
@@ -127,6 +134,15 @@ export default function AdminAdminsPage() {
             <small>数据库只保存 bcrypt 哈希，不保存明文密码。</small>
           </label>
 
+          <label>
+            <span>角色</span>
+            <select name="role" required>
+              <option value="teacher">老师</option>
+              <option value="super_admin">超级管理员</option>
+            </select>
+            <small>老师只能管理自己班级；超级管理员可以管理所有班级和视频删除。</small>
+          </label>
+
           <button type="submit" disabled={isSubmitting}>{isSubmitting ? '创建中...' : '创建管理员'}</button>
         </form>
       </section>
@@ -142,7 +158,7 @@ export default function AdminAdminsPage() {
             <article className="admin-row" key={admin.id}>
               <div>
                 <strong>{admin.username}</strong>
-                <span>创建于 {formatDate(admin.created_at)}</span>
+                <span>{admin.role === 'super_admin' ? '超级管理员' : '老师'} · 创建于 {formatDate(admin.created_at)}</span>
               </div>
               <div className="row-actions">
                 <button type="button" onClick={() => handleResetPassword(admin)}>重置密码</button>

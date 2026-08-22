@@ -2,13 +2,14 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { pool } from './db.js';
 import { config } from './config.js';
-import { clearAdminCookie, getAdminCookieOptions, requireAdmin, signAdminToken } from './auth.js';
+import { clearAdminCookie, getAdminCookieOptions, requireAdmin, requireSuperAdmin, signAdminToken } from './auth.js';
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_]+$/;
 const USERNAME_MIN_LENGTH = 3;
 const USERNAME_MAX_LENGTH = 50;
 const PASSWORD_MIN_LENGTH = 6;
 const PASSWORD_MAX_LENGTH = 72;
+const CLASS_NAME_MAX_LENGTH = 100;
 const MESSAGE_MAX_LENGTH = 1000;
 const DELETE_REASON_MAX_LENGTH = 200;
 const MAX_ACTIVE_VIDEO_ASSIGNMENTS = 5;
@@ -54,8 +55,25 @@ function validatePassword(password) {
   return '';
 }
 
+function validateClassName(name) {
+  const value = normalizeLoginText(name);
+
+  if (!value) {
+    return '请填写班级名称';
+  }
+
+  if (isInvalidTextValue(value)) {
+    return '班级名称不能是 null、undefined、NaN 这类无意义内容';
+  }
+
+  if (value.length > CLASS_NAME_MAX_LENGTH) {
+    return `班级名称最多 ${CLASS_NAME_MAX_LENGTH} 个字`;
+  }
+
+  return '';
+}
+
 async function hashPassword(password) {
-  // bcrypt 会给密码加盐再哈希；数据库只保存哈希值，不保存明文密码。
   return bcrypt.hash(password, 10);
 }
 
@@ -96,9 +114,39 @@ function validateDeleteReason(reason) {
   return '';
 }
 
+function isSuperAdmin(req) {
+  return req.admin?.role === 'super_admin';
+}
+
+async function findAdminClassId(adminId) {
+  const result = await pool.query(
+    `SELECT id FROM teaching_classes WHERE teacher_id = $1 LIMIT 1`,
+    [adminId]
+  );
+  return result.rows[0]?.id || null;
+}
+
+async function ensureAdminCanManageUser(req, userId) {
+  if (isSuperAdmin(req)) {
+    return true;
+  }
+
+  const classId = await findAdminClassId(req.admin.adminId);
+
+  if (!classId) {
+    return false;
+  }
+
+  const result = await pool.query(
+    `SELECT id FROM users WHERE id = $1 AND class_id = $2`,
+    [userId, classId]
+  );
+  return result.rowCount > 0;
+}
+
 async function findUserById(userId) {
   const result = await pool.query(
-    `SELECT id, username, is_active, created_at
+    `SELECT id, username, class_id, is_active, created_at
      FROM users
      WHERE id = $1`,
     [userId]
@@ -123,8 +171,6 @@ async function ensureVideosExist(videoIds) {
 export const adminRouter = Router();
 
 // POST /api/admin/login
-// 管理员登录成功后，后端把 JWT 写入 HttpOnly Cookie。
-// 前端 JavaScript 不能读取这个 Cookie，但浏览器请求后端时会自动携带它。
 adminRouter.post('/login', async (req, res, next) => {
   try {
     const username = normalizeLoginText(req.body.username);
@@ -136,7 +182,7 @@ adminRouter.post('/login', async (req, res, next) => {
     }
 
     const result = await pool.query(
-      `SELECT id, username, password_hash
+      `SELECT id, username, password_hash, role
        FROM admins
        WHERE username = $1`,
       [username]
@@ -152,39 +198,49 @@ adminRouter.post('/login', async (req, res, next) => {
 
     const token = signAdminToken(admin);
     res.cookie(config.auth.adminCookieName, token, getAdminCookieOptions());
-    res.json({ data: { username: admin.username } });
+    res.json({ data: { username: admin.username, role: admin.role } });
   } catch (error) {
     next(error);
   }
 });
 
 // GET /api/admin/me
-// 管理员页面加载时用它确认是否已经登录。
 adminRouter.get('/me', requireAdmin, (req, res) => {
   res.json({
     data: {
-      username: req.admin.username
+      username: req.admin.username,
+      role: req.admin.role
     }
   });
 });
 
 // POST /api/admin/logout
-// 清除管理员 Cookie。
 adminRouter.post('/logout', (req, res) => {
   clearAdminCookie(res);
   res.json({ message: '已退出登录' });
 });
 
 // GET /api/admin/users
-// 管理员查看普通用户列表，用来创建账号、重置密码、启用或禁用用户。
 adminRouter.get('/users', requireAdmin, async (req, res, next) => {
   try {
-    const result = await pool.query(
-      `SELECT id, username, is_active, created_at
-       FROM users
-       ORDER BY created_at DESC`
-    );
+    let query = `SELECT id, username, class_id, is_active, created_at FROM users`;
+    const params = [];
 
+    if (!isSuperAdmin(req)) {
+      const classId = await findAdminClassId(req.admin.adminId);
+
+      if (!classId) {
+        res.json({ data: [] });
+        return;
+      }
+
+      query += ` WHERE class_id = $1`;
+      params.push(classId);
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    const result = await pool.query(query, params);
     res.json({ data: result.rows });
   } catch (error) {
     next(error);
@@ -192,7 +248,6 @@ adminRouter.get('/users', requireAdmin, async (req, res, next) => {
 });
 
 // POST /api/admin/users
-// 普通用户由管理员创建，密码线下分发给对应用户。
 adminRouter.post('/users', requireAdmin, async (req, res, next) => {
   try {
     const username = normalizeLoginText(req.body.username);
@@ -205,12 +260,38 @@ adminRouter.post('/users', requireAdmin, async (req, res, next) => {
       return;
     }
 
+    let classId = normalizeId(req.body.classId);
+
+    if (isSuperAdmin(req)) {
+      if (!classId) {
+        sendValidationError(res, '请选择班级');
+        return;
+      }
+
+      const classResult = await pool.query(
+        `SELECT id FROM teaching_classes WHERE id = $1`,
+        [classId]
+      );
+
+      if (classResult.rowCount === 0) {
+        sendValidationError(res, '班级不存在');
+        return;
+      }
+    } else {
+      classId = await findAdminClassId(req.admin.adminId);
+
+      if (!classId) {
+        res.status(403).json({ message: '您还没有被分配到班级，无法创建学生' });
+        return;
+      }
+    }
+
     const passwordHash = await hashPassword(password);
     const result = await pool.query(
-      `INSERT INTO users (username, password_hash)
-       VALUES ($1, $2)
-       RETURNING id, username, is_active, created_at`,
-      [username, passwordHash]
+      `INSERT INTO users (username, password_hash, class_id)
+       VALUES ($1, $2, $3)
+       RETURNING id, username, class_id, is_active, created_at`,
+      [username, passwordHash, classId]
     );
 
     res.status(201).json({ data: result.rows[0] });
@@ -225,9 +306,9 @@ adminRouter.post('/users', requireAdmin, async (req, res, next) => {
 });
 
 // POST /api/admin/users/:id/reset-password
-// 第一版不做用户自己改密码，统一由管理员重置后线下告知。
 adminRouter.post('/users/:id/reset-password', requireAdmin, async (req, res, next) => {
   try {
+    const userId = normalizeId(req.params.id);
     const password = String(req.body.password ?? '');
     const passwordError = validatePassword(password);
 
@@ -236,13 +317,18 @@ adminRouter.post('/users/:id/reset-password', requireAdmin, async (req, res, nex
       return;
     }
 
+    if (!(await ensureAdminCanManageUser(req, userId))) {
+      res.status(403).json({ message: '无权管理该学生' });
+      return;
+    }
+
     const passwordHash = await hashPassword(password);
     const result = await pool.query(
       `UPDATE users
        SET password_hash = $1
        WHERE id = $2
-       RETURNING id, username, is_active, created_at`,
-      [passwordHash, req.params.id]
+       RETURNING id, username, class_id, is_active, created_at`,
+      [passwordHash, userId]
     );
 
     if (result.rowCount === 0) {
@@ -257,16 +343,68 @@ adminRouter.post('/users/:id/reset-password', requireAdmin, async (req, res, nex
 });
 
 // PATCH /api/admin/users/:id/status
-// 禁用用户后，该用户不能再登录；历史数据仍然保留。
 adminRouter.patch('/users/:id/status', requireAdmin, async (req, res, next) => {
   try {
+    const userId = normalizeId(req.params.id);
     const isActive = Boolean(req.body.isActive);
+
+    if (!(await ensureAdminCanManageUser(req, userId))) {
+      res.status(403).json({ message: '无权管理该学生' });
+      return;
+    }
+
     const result = await pool.query(
       `UPDATE users
        SET is_active = $1
        WHERE id = $2
-       RETURNING id, username, is_active, created_at`,
-      [isActive, req.params.id]
+       RETURNING id, username, class_id, is_active, created_at`,
+      [isActive, userId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: '普通用户不存在' });
+      return;
+    }
+
+    res.json({ data: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/users/:id/class
+// 超级管理员给学生转班；老师不能转班。
+adminRouter.patch('/users/:id/class', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const userId = normalizeId(req.params.id);
+    const classId = normalizeId(req.body.classId);
+
+    if (!userId) {
+      sendValidationError(res, '用户 id 无效');
+      return;
+    }
+
+    if (!classId) {
+      sendValidationError(res, '请选择目标班级');
+      return;
+    }
+
+    const classResult = await pool.query(
+      `SELECT id FROM teaching_classes WHERE id = $1`,
+      [classId]
+    );
+
+    if (classResult.rowCount === 0) {
+      res.status(404).json({ message: '班级不存在' });
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET class_id = $1
+       WHERE id = $2
+       RETURNING id, username, class_id, is_active, created_at`,
+      [classId, userId]
     );
 
     if (result.rowCount === 0) {
@@ -281,11 +419,10 @@ adminRouter.patch('/users/:id/status', requireAdmin, async (req, res, next) => {
 });
 
 // GET /api/admin/admins
-// 管理员列表用于确认后台还有哪些管理员账号。
-adminRouter.get('/admins', requireAdmin, async (req, res, next) => {
+adminRouter.get('/admins', requireSuperAdmin, async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT id, username, created_at
+      `SELECT id, username, role, created_at
        FROM admins
        ORDER BY created_at DESC`
     );
@@ -297,11 +434,11 @@ adminRouter.get('/admins', requireAdmin, async (req, res, next) => {
 });
 
 // POST /api/admin/admins
-// 管理员可以创建其他管理员，方便多人维护后台。
-adminRouter.post('/admins', requireAdmin, async (req, res, next) => {
+adminRouter.post('/admins', requireSuperAdmin, async (req, res, next) => {
   try {
     const username = normalizeLoginText(req.body.username);
     const password = String(req.body.password ?? '');
+    const role = req.body.role === 'teacher' ? 'teacher' : 'super_admin';
     const usernameError = validateUsername(username);
     const passwordError = validatePassword(password);
 
@@ -312,10 +449,10 @@ adminRouter.post('/admins', requireAdmin, async (req, res, next) => {
 
     const passwordHash = await hashPassword(password);
     const result = await pool.query(
-      `INSERT INTO admins (username, password_hash)
-       VALUES ($1, $2)
-       RETURNING id, username, created_at`,
-      [username, passwordHash]
+      `INSERT INTO admins (username, password_hash, role)
+       VALUES ($1, $2, $3)
+       RETURNING id, username, role, created_at`,
+      [username, passwordHash, role]
     );
 
     res.status(201).json({ data: result.rows[0] });
@@ -330,8 +467,7 @@ adminRouter.post('/admins', requireAdmin, async (req, res, next) => {
 });
 
 // POST /api/admin/admins/:id/reset-password
-// 管理员忘记密码时，由另一个管理员重置密码。
-adminRouter.post('/admins/:id/reset-password', requireAdmin, async (req, res, next) => {
+adminRouter.post('/admins/:id/reset-password', requireSuperAdmin, async (req, res, next) => {
   try {
     const password = String(req.body.password ?? '');
     const passwordError = validatePassword(password);
@@ -346,7 +482,7 @@ adminRouter.post('/admins/:id/reset-password', requireAdmin, async (req, res, ne
       `UPDATE admins
        SET password_hash = $1
        WHERE id = $2
-       RETURNING id, username, created_at`,
+       RETURNING id, username, role, created_at`,
       [passwordHash, req.params.id]
     );
 
@@ -362,8 +498,7 @@ adminRouter.post('/admins/:id/reset-password', requireAdmin, async (req, res, ne
 });
 
 // DELETE /api/admin/admins/:id
-// 不允许删除最后一个管理员，否则后台会失去入口。
-adminRouter.delete('/admins/:id', requireAdmin, async (req, res, next) => {
+adminRouter.delete('/admins/:id', requireSuperAdmin, async (req, res, next) => {
   try {
     const countResult = await pool.query('SELECT COUNT(*)::int AS count FROM admins');
 
@@ -390,14 +525,210 @@ adminRouter.delete('/admins/:id', requireAdmin, async (req, res, next) => {
   }
 });
 
+// GET /api/admin/classes
+adminRouter.get('/classes', requireAdmin, async (req, res, next) => {
+  try {
+    let query;
+    const params = [];
+
+    if (isSuperAdmin(req)) {
+      query = `
+        SELECT
+          c.id,
+          c.name,
+          c.teacher_id,
+          a.username AS teacher_name,
+          c.created_at,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', u.id,
+                'username', u.username,
+                'is_active', u.is_active,
+                'created_at', u.created_at
+              ) ORDER BY u.created_at DESC
+            ) FILTER (WHERE u.id IS NOT NULL),
+            '[]'::json
+          ) AS students
+        FROM teaching_classes c
+        LEFT JOIN admins a ON a.id = c.teacher_id
+        LEFT JOIN users u ON u.class_id = c.id
+        GROUP BY c.id, c.name, c.teacher_id, a.username, c.created_at
+        ORDER BY c.created_at DESC
+      `;
+    } else {
+      query = `
+        SELECT
+          c.id,
+          c.name,
+          c.teacher_id,
+          a.username AS teacher_name,
+          c.created_at,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', u.id,
+                'username', u.username,
+                'is_active', u.is_active,
+                'created_at', u.created_at
+              ) ORDER BY u.created_at DESC
+            ) FILTER (WHERE u.id IS NOT NULL),
+            '[]'::json
+          ) AS students
+        FROM teaching_classes c
+        LEFT JOIN admins a ON a.id = c.teacher_id
+        LEFT JOIN users u ON u.class_id = c.id
+        WHERE c.teacher_id = $1
+        GROUP BY c.id, c.name, c.teacher_id, a.username, c.created_at
+        ORDER BY c.created_at DESC
+      `;
+      params.push(req.admin.adminId);
+    }
+
+    const result = await pool.query(query, params);
+    res.json({ data: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/admin/classes
+adminRouter.post('/classes', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const nameError = validateClassName(req.body.name);
+
+    if (nameError) {
+      sendValidationError(res, nameError);
+      return;
+    }
+
+    const name = normalizeLoginText(req.body.name);
+    const teacherId = normalizeId(req.body.teacherId);
+
+    if (!teacherId) {
+      sendValidationError(res, '请选择负责老师');
+      return;
+    }
+
+    const teacherResult = await pool.query(
+      `SELECT id FROM admins WHERE id = $1 AND role = 'teacher'`,
+      [teacherId]
+    );
+
+    if (teacherResult.rowCount === 0) {
+      sendValidationError(res, '负责老师不存在或不是老师角色');
+      return;
+    }
+
+    const result = await pool.query(
+      `INSERT INTO teaching_classes (name, teacher_id)
+       VALUES ($1, $2)
+       RETURNING id, name, teacher_id, created_at`,
+      [name, teacherId]
+    );
+
+    res.status(201).json({ data: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/classes/:id
+adminRouter.patch('/classes/:id', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const classId = normalizeId(req.params.id);
+    const nameError = validateClassName(req.body.name);
+
+    if (nameError) {
+      sendValidationError(res, nameError);
+      return;
+    }
+
+    const name = normalizeLoginText(req.body.name);
+    const teacherId = normalizeId(req.body.teacherId);
+    const updates = [];
+    const params = [];
+    let index = 1;
+
+    if (name) {
+      updates.push(`name = $${index++}`);
+      params.push(name);
+    }
+
+    if (teacherId) {
+      const teacherResult = await pool.query(
+        `SELECT id FROM admins WHERE id = $1 AND role = 'teacher'`,
+        [teacherId]
+      );
+
+      if (teacherResult.rowCount === 0) {
+        sendValidationError(res, '负责老师不存在或不是老师角色');
+        return;
+      }
+
+      updates.push(`teacher_id = $${index++}`);
+      params.push(teacherId);
+    }
+
+    if (updates.length === 0) {
+      sendValidationError(res, '请提供要修改的内容');
+      return;
+    }
+
+    params.push(classId);
+    const result = await pool.query(
+      `UPDATE teaching_classes
+       SET ${updates.join(', ')}
+       WHERE id = $${index}
+       RETURNING id, name, teacher_id, created_at`,
+      params
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: '班级不存在' });
+      return;
+    }
+
+    res.json({ data: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/classes/:id
+adminRouter.delete('/classes/:id', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const classId = normalizeId(req.params.id);
+    const result = await pool.query(
+      `DELETE FROM teaching_classes
+       WHERE id = $1
+       RETURNING id`,
+      [classId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: '班级不存在' });
+      return;
+    }
+
+    res.json({ message: '班级已删除' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/admin/users/:userId/assignments
-// 管理员查看某个用户的全部推送历史，包括已经软删除的记录。
 adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, next) => {
   try {
     const userId = normalizeId(req.params.userId);
 
     if (!userId) {
       sendValidationError(res, '用户 id 无效');
+      return;
+    }
+
+    if (!(await ensureAdminCanManageUser(req, userId))) {
+      res.status(403).json({ message: '无权查看该学生' });
       return;
     }
 
@@ -504,7 +835,6 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
 });
 
 // POST /api/admin/users/:userId/assignments
-// 管理员一次操作可以同时更新推送视频和留言，所有相关记录共享同一个 operation_id。
 adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, next) => {
   try {
     const userId = normalizeId(req.params.userId);
@@ -525,6 +855,11 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
 
     if (messageError) {
       sendValidationError(res, messageError);
+      return;
+    }
+
+    if (!(await ensureAdminCanManageUser(req, userId))) {
+      res.status(403).json({ message: '无权管理该学生' });
       return;
     }
 
@@ -589,7 +924,6 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
 });
 
 // POST /api/admin/users/:userId/message
-// 留言板是独立更新，不和视频推送绑定。
 adminRouter.post('/users/:userId/message', requireAdmin, async (req, res, next) => {
   try {
     const userId = normalizeId(req.params.userId);
@@ -603,6 +937,11 @@ adminRouter.post('/users/:userId/message', requireAdmin, async (req, res, next) 
 
     if (messageError) {
       sendValidationError(res, messageError);
+      return;
+    }
+
+    if (!(await ensureAdminCanManageUser(req, userId))) {
+      res.status(403).json({ message: '无权管理该学生' });
       return;
     }
 
@@ -627,13 +966,27 @@ adminRouter.post('/users/:userId/message', requireAdmin, async (req, res, next) 
 });
 
 // PATCH /api/admin/assignments/:id/cancel
-// 取消正在推送的视频：历史记录保留，但不再出现在用户的置顶视频区。
 adminRouter.patch('/assignments/:id/cancel', requireAdmin, async (req, res, next) => {
   try {
     const assignmentId = normalizeId(req.params.id);
 
     if (!assignmentId) {
       sendValidationError(res, '推送记录 id 无效');
+      return;
+    }
+
+    const assignmentResult = await pool.query(
+      `SELECT user_id FROM user_assignments WHERE id = $1`,
+      [assignmentId]
+    );
+
+    if (assignmentResult.rowCount === 0) {
+      res.status(404).json({ message: '推送记录不存在' });
+      return;
+    }
+
+    if (!(await ensureAdminCanManageUser(req, assignmentResult.rows[0].user_id))) {
+      res.status(403).json({ message: '无权管理该学生' });
       return;
     }
 
@@ -661,7 +1014,6 @@ adminRouter.patch('/assignments/:id/cancel', requireAdmin, async (req, res, next
 });
 
 // PATCH /api/admin/assignments/:id/delete
-// 推送历史是教学记录，删除时只做软删除，并强制记录原因。
 adminRouter.patch('/assignments/:id/delete', requireAdmin, async (req, res, next) => {
   try {
     const assignmentId = normalizeId(req.params.id);
@@ -678,6 +1030,21 @@ adminRouter.patch('/assignments/:id/delete', requireAdmin, async (req, res, next
       return;
     }
 
+    const assignmentResult = await pool.query(
+      `SELECT user_id FROM user_assignments WHERE id = $1`,
+      [assignmentId]
+    );
+
+    if (assignmentResult.rowCount === 0) {
+      res.status(404).json({ message: '推送记录不存在' });
+      return;
+    }
+
+    if (!(await ensureAdminCanManageUser(req, assignmentResult.rows[0].user_id))) {
+      res.status(403).json({ message: '无权管理该学生' });
+      return;
+    }
+
     const result = await pool.query(
       `UPDATE user_assignments
        SET is_deleted = TRUE,
@@ -688,11 +1055,6 @@ adminRouter.patch('/assignments/:id/delete', requireAdmin, async (req, res, next
       [reason, assignmentId]
     );
 
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: '推送记录不存在' });
-      return;
-    }
-
     res.json({ data: result.rows[0] });
   } catch (error) {
     next(error);
@@ -700,7 +1062,6 @@ adminRouter.patch('/assignments/:id/delete', requireAdmin, async (req, res, next
 });
 
 // PATCH /api/admin/operations/:operationId/delete
-// 删除整个操作聚合：把该 operation_id 下所有未删除的记录软删除。
 adminRouter.patch('/operations/:operationId/delete', requireAdmin, async (req, res, next) => {
   try {
     const operationId = normalizeId(req.params.operationId);
@@ -715,6 +1076,23 @@ adminRouter.patch('/operations/:operationId/delete', requireAdmin, async (req, r
     if (reasonError) {
       sendValidationError(res, reasonError);
       return;
+    }
+
+    const operationResult = await pool.query(
+      `SELECT DISTINCT user_id FROM user_assignments WHERE operation_id = $1`,
+      [operationId]
+    );
+
+    if (operationResult.rowCount === 0) {
+      res.status(404).json({ message: '操作不存在' });
+      return;
+    }
+
+    for (const row of operationResult.rows) {
+      if (!(await ensureAdminCanManageUser(req, row.user_id))) {
+        res.status(403).json({ message: '无权管理该学生' });
+        return;
+      }
     }
 
     const result = await pool.query(
@@ -738,4 +1116,3 @@ adminRouter.patch('/operations/:operationId/delete', requireAdmin, async (req, r
     next(error);
   }
 });
-

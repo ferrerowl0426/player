@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   createManagedUser,
   fetchAdminMe,
+  fetchClasses,
   fetchManagedUsers,
   resetManagedUserPassword,
   updateManagedUserStatus
@@ -19,13 +20,16 @@ function readAccountForm(form) {
 
   return {
     username: String(formData.get('username') || '').trim(),
-    password: String(formData.get('password') || '')
+    password: String(formData.get('password') || ''),
+    classId: String(formData.get('classId') || '')
   };
 }
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const [admin, setAdmin] = useState(null);
   const [users, setUsers] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [status, setStatus] = useState('正在检查管理员登录状态...');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,8 +42,14 @@ export default function AdminUsersPage() {
   useEffect(() => {
     async function initPage() {
       try {
-        await fetchAdminMe();
+        const me = await fetchAdminMe();
+        setAdmin(me.data);
         await loadUsers();
+
+        if (me.data.role === 'super_admin') {
+          const classesResult = await fetchClasses();
+          setClasses(classesResult.data);
+        }
       } catch (error) {
         router.replace('/admin/login');
       }
@@ -97,12 +107,22 @@ export default function AdminUsersPage() {
     }
   }
 
+  if (!admin) {
+    return <p className="empty-text">正在检查管理员登录状态...</p>;
+  }
+
+  const isSuperAdmin = admin.role === 'super_admin';
+
   return (
     <>
       <section className="hero">
         <div>
-          <h1>普通用户管理</h1>
-          <p>管理员创建普通用户并线下分发密码，普通用户只能登录前台。</p>
+          <h1>{isSuperAdmin ? '用户管理' : '班级学生'}</h1>
+          <p>
+            {isSuperAdmin
+              ? '超级管理员可以创建学生并分配到任意班级。'
+              : '老师只能查看和管理自己班级的学生。'}
+          </p>
         </div>
         <a className="hero-button" href="/admin">返回后台</a>
       </section>
@@ -122,13 +142,26 @@ export default function AdminUsersPage() {
             <small>密码只在创建或重置时填写，数据库保存的是 bcrypt 哈希。</small>
           </label>
 
+          {isSuperAdmin && (
+            <label>
+              <span>所属班级</span>
+              <select name="classId" required>
+                <option value="">选择班级</option>
+                {classes.map((cls) => (
+                  <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
+              </select>
+              <small>超级管理员创建学生时必须选择班级。</small>
+            </label>
+          )}
+
           <button type="submit" disabled={isSubmitting}>{isSubmitting ? '创建中...' : '创建用户'}</button>
         </form>
       </section>
 
       <section className="video-section">
         <div className="section-title">
-          <h2>普通用户列表</h2>
+          <h2>{isSuperAdmin ? '普通用户列表' : '班级学生列表'}</h2>
           <button type="button" onClick={loadUsers}>刷新</button>
         </div>
 
@@ -140,7 +173,7 @@ export default function AdminUsersPage() {
                 <span>{user.is_active ? '已启用' : '已禁用'} · 创建于 {formatDate(user.created_at)}</span>
               </div>
               <div className="row-actions">
-                <a href={`/admin/users/${user.id}/assignments`}>推送记录</a>
+                <a href={`/admin/users/${user.id}/assignments`}>推送/留言</a>
                 <button type="button" onClick={() => handleResetPassword(user)}>重置密码</button>
                 <button type="button" onClick={() => handleToggleStatus(user)}>{user.is_active ? '禁用' : '启用'}</button>
               </div>

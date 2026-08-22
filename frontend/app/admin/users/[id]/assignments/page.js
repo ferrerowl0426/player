@@ -24,6 +24,7 @@ export default function UserAssignmentsPage() {
   const params = useParams();
   const router = useRouter();
   const userId = params.id;
+  const [admin, setAdmin] = useState(null);
   const [user, setUser] = useState(null);
   const [operations, setOperations] = useState([]);
   const [activeVideos, setActiveVideos] = useState([]);
@@ -52,7 +53,8 @@ export default function UserAssignmentsPage() {
   useEffect(() => {
     async function initPage() {
       try {
-        await fetchAdminMe();
+        const me = await fetchAdminMe();
+        setAdmin(me.data);
         await Promise.all([
           loadAssignments(),
           loadVideos(EMPTY_VIDEO_FILTERS)
@@ -154,7 +156,7 @@ export default function UserAssignmentsPage() {
           <h1>{user.username} 的推送记录</h1>
           <p>管理员选择推荐视频并填写留言后，一次保存会生成一条操作记录。</p>
         </div>
-        <a className="hero-button" href="/admin/users">返回用户管理</a>
+        <a className="hero-button" href="/admin/users">{admin?.role === 'super_admin' ? '返回用户管理' : '返回班级学生'}</a>
       </section>
 
       <section className="video-section">

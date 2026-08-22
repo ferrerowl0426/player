@@ -2,7 +2,7 @@ import path from 'node:path';
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { pool } from './db.js';
-import { requireAdmin, requireUserOrAdmin } from './auth.js';
+import { requireAdmin, requireSuperAdmin, requireUserOrAdmin } from './auth.js';
 import {
   abortMultipartUpload,
   completeMultipartUpload,
@@ -520,7 +520,7 @@ videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
 // 删除视频接口。
 // 删除顺序：先查数据库拿到视频和封面 URL，再删除存储桶文件，最后删除数据库记录。
 // 这样可以减少“数据库记录已删除，但存储桶文件删除失败”的孤儿文件问题。
-videoRouter.delete('/:id', requireAdmin, async (req, res, next) => {
+videoRouter.delete('/:id', requireSuperAdmin, async (req, res, next) => {
   try {
     const findResult = await pool.query(
       `SELECT id, video_url, cover_url

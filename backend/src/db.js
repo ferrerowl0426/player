@@ -121,27 +121,62 @@ export async function ensureAppSchema() {
   await pool.query(
     `INSERT INTO admins (username, password_hash, role)
      VALUES ($1, $2, $3)
-     ON CONFLICT (username) DO NOTHING`,
+     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
     ['admin', DEFAULT_PASSWORD_HASH, 'super_admin']
   );
 
-  // 确保至少存在一个班级，并把没有班级的用户放入第一个班级。
+  // 初始化教导主任账号。
+  await pool.query(
+    `INSERT INTO admins (username, password_hash, role)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
+    ['director', DEFAULT_PASSWORD_HASH, 'super_admin']
+  );
+
+  // 初始化两位老师。
+  await pool.query(
+    `INSERT INTO admins (username, password_hash, role)
+     VALUES ($1, $2, $3), ($4, $5, $6)
+     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
+    ['teacher_a', DEFAULT_PASSWORD_HASH, 'teacher', 'teacher_b', DEFAULT_PASSWORD_HASH, 'teacher']
+  );
+
+  // 初始化两个班级（一班、二班），分别分配给两位老师。
   await pool.query(
     `INSERT INTO teaching_classes (name, teacher_id)
-     SELECT '默认班级', id FROM admins WHERE username = $1
-       AND NOT EXISTS (SELECT 1 FROM teaching_classes)
-     ON CONFLICT DO NOTHING`,
-    ['admin']
+     SELECT '一班', id FROM admins WHERE username = 'teacher_a'
+     ON CONFLICT DO NOTHING`
   );
 
-  // demo 是本地调试和教学用的普通用户，后续真实用户由管理员在后台创建。
   await pool.query(
-    `INSERT INTO users (username, password_hash)
-     VALUES ($1, $2)
-     ON CONFLICT (username) DO NOTHING`,
-    ['demo', DEFAULT_PASSWORD_HASH]
+    `INSERT INTO teaching_classes (name, teacher_id)
+     SELECT '二班', id FROM admins WHERE username = 'teacher_b'
+     ON CONFLICT DO NOTHING`
   );
 
+  // 初始化一班三位学员。
+  await pool.query(
+    `INSERT INTO users (username, password_hash, class_id)
+     VALUES
+       ('student_a1', $1, (SELECT id FROM teaching_classes WHERE name = '一班')),
+       ('student_a2', $1, (SELECT id FROM teaching_classes WHERE name = '一班')),
+       ('student_a3', $1, (SELECT id FROM teaching_classes WHERE name = '一班'))
+     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, class_id = EXCLUDED.class_id`,
+    [DEFAULT_PASSWORD_HASH]
+  );
+
+  // 初始化二班三位学员。
+  await pool.query(
+    `INSERT INTO users (username, password_hash, class_id)
+     VALUES
+       ('student_b1', $1, (SELECT id FROM teaching_classes WHERE name = '二班')),
+       ('student_b2', $1, (SELECT id FROM teaching_classes WHERE name = '二班')),
+       ('student_b3', $1, (SELECT id FROM teaching_classes WHERE name = '二班'))
+     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, class_id = EXCLUDED.class_id`,
+    [DEFAULT_PASSWORD_HASH]
+  );
+
+  // 确保所有没有班级的学员都被归入第一个班级，避免游离数据。
   await pool.query(`
     UPDATE users
     SET class_id = (SELECT id FROM teaching_classes ORDER BY id LIMIT 1)

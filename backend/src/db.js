@@ -125,10 +125,11 @@ export async function ensureAppSchema() {
     ['admin', DEFAULT_PASSWORD_HASH, 'super_admin']
   );
 
-  // 确保存在一个默认班级，并把没有班级的用户放入默认班级。
+  // 确保至少存在一个班级，并把没有班级的用户放入第一个班级。
   await pool.query(
     `INSERT INTO teaching_classes (name, teacher_id)
      SELECT '默认班级', id FROM admins WHERE username = $1
+       AND NOT EXISTS (SELECT 1 FROM teaching_classes)
      ON CONFLICT DO NOTHING`,
     ['admin']
   );

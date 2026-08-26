@@ -11,7 +11,7 @@ function normalizeLoginText(value) {
 export const userAuthRouter = Router();
 
 // POST /api/user/login
-// 普通用户登录成功后，后端把 JWT 写入 HttpOnly Cookie。
+// 学员登录成功后，后端把 JWT 写入 HttpOnly Cookie。
 // 这样前端不需要保存 token，浏览器后续请求会自动携带登录状态。
 userAuthRouter.post('/login', async (req, res, next) => {
   try {
@@ -19,7 +19,7 @@ userAuthRouter.post('/login', async (req, res, next) => {
     const password = String(req.body.password ?? '');
 
     if (!username || !password) {
-      res.status(400).json({ message: '请填写用户账号和密码' });
+      res.status(400).json({ message: '请填写学员账号和密码' });
       return;
     }
 
@@ -34,12 +34,12 @@ userAuthRouter.post('/login', async (req, res, next) => {
     const passwordMatched = user ? await bcrypt.compare(password, user.password_hash) : false;
 
     if (!passwordMatched) {
-      res.status(401).json({ message: '用户账号或密码错误' });
+      res.status(401).json({ message: '学员账号或密码错误' });
       return;
     }
 
     if (!user.is_active) {
-      res.status(403).json({ message: '这个用户已被禁用，请联系管理员' });
+      res.status(403).json({ message: '这个学员已被禁用，请联系老师' });
       return;
     }
 
@@ -62,14 +62,14 @@ userAuthRouter.get('/me', requireUser, (req, res) => {
 });
 
 // POST /api/user/logout
-// 清除普通用户 Cookie。
+// 清除学员 Cookie。
 userAuthRouter.post('/logout', (req, res) => {
   clearUserCookie(res);
   res.json({ message: '已退出登录' });
 });
 
 // GET /api/user/assignments/today
-// 用户首页的“今日的作业”分成两块：有效视频推送和最新留言。
+// 学员首页的“今日的作业”分成两块：有效视频推送和最新留言。
 userAuthRouter.get('/assignments/today', requireUser, async (req, res, next) => {
   try {
     const videosResult = await pool.query(

@@ -30,7 +30,7 @@ export default function UserAssignmentsPage() {
   const [activeVideos, setActiveVideos] = useState([]);
   const [selectedVideoIds, setSelectedVideoIds] = useState([]);
   const [message, setMessage] = useState('');
-  const [status, setStatus] = useState('正在检查管理员登录状态...');
+  const [status, setStatus] = useState('正在检查老师登录状态...');
   const {
     videos,
     filters,
@@ -81,7 +81,7 @@ export default function UserAssignmentsPage() {
       }
 
       if (activeVideos.length + current.length >= MAX_ACTIVE_VIDEO_ASSIGNMENTS) {
-        setStatus(`同一个用户最多只能同时推送 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个视频`);
+        setStatus(`同一个学员最多只能同时推送 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个视频`);
         return current;
       }
 
@@ -154,9 +154,9 @@ export default function UserAssignmentsPage() {
       <section className="hero">
         <div>
           <h1>{user.username} 的推送记录</h1>
-          <p>管理员选择推荐视频并填写留言后，一次保存会生成一条操作记录。</p>
+          <p>老师选择推荐视频并填写留言后，一次保存会生成一条操作记录。</p>
         </div>
-        <a className="hero-button" href="/admin/users">{admin?.role === 'super_admin' ? '返回用户管理' : '返回班级学生'}</a>
+        <a className="hero-button" href="/admin/users">{admin?.role === 'super_admin' ? '返回学员管理' : '返回班级学员'}</a>
       </section>
 
       <section className="video-section">
@@ -199,12 +199,12 @@ export default function UserAssignmentsPage() {
           <label>
             <span>已选视频数量</span>
             <input value={`${selectedVideoIds.length} 个`} readOnly />
-            <small>同一个用户最多只能同时存在 {MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个正在推送的视频。</small>
+            <small>同一个学员最多只能同时存在 {MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个正在推送的视频。</small>
           </label>
 
           <label>
             <span>留言</span>
-            <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows="4" maxLength={MESSAGE_MAX_LENGTH} placeholder="写给这个用户的留言" />
+            <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows="4" maxLength={MESSAGE_MAX_LENGTH} placeholder="写给这个学员的留言" />
             <small>留言最多 {MESSAGE_MAX_LENGTH} 个字。</small>
           </label>
 
@@ -227,11 +227,11 @@ export default function UserAssignmentsPage() {
 
             let description;
             if (hasVideos && hasMessage) {
-              description = `管理员${operation.admin_username}给用户${user.username}把推送更新为以下 ${operation.videos.length} 个视频，并留言：`;
+              description = `老师${operation.admin_username}给学员${user.username}把推送更新为以下 ${operation.videos.length} 个视频，并留言：`;
             } else if (!hasVideos && hasMessage) {
-              description = `管理员${operation.admin_username}单独修改了留言：`;
+              description = `老师${operation.admin_username}单独修改了留言：`;
             } else {
-              description = `管理员${operation.admin_username}单独更新了视频推送为以下 ${operation.videos.length} 个视频：`;
+              description = `老师${operation.admin_username}单独更新了视频推送为以下 ${operation.videos.length} 个视频：`;
             }
 
             return (

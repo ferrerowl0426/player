@@ -66,7 +66,7 @@ export default function HomePage() {
   }
 
   if (!user) {
-    return <p className="empty-text">正在检查用户登录状态...</p>;
+    return <p className="empty-text">正在检查学员登录状态...</p>;
   }
 
   const assignmentsWithVideo = todayAssignments.filter((assignment) => assignment.video_id);
@@ -77,7 +77,7 @@ export default function HomePage() {
       <section className="hero">
         <div>
           <h1>视频首页</h1>
-          <p>普通用户可以浏览完整视频列表，管理员推送的内容会额外显示在今日作业区域。</p>
+          <p>学员可以浏览完整视频列表，老师推送的内容会额外显示在今日作业区域。</p>
         </div>
         <button className="hero-button" type="button" onClick={handleLogout}>退出登录</button>
       </section>
@@ -94,7 +94,7 @@ export default function HomePage() {
         <div className="assignment-block">
           <h3>推荐视频</h3>
           {assignmentsWithVideo.length === 0 ? (
-            <p className="empty-text">管理员还没有推荐视频</p>
+            <p className="empty-text">老师还没有推荐视频</p>
           ) : (
             <div className="assignment-video-grid">
               {assignmentsWithVideo.map((assignment) => (
@@ -113,7 +113,7 @@ export default function HomePage() {
         <div className="assignment-block">
           <h3>留言板</h3>
           {assignmentsWithMessage.length === 0 ? (
-            <p className="empty-text">管理员没有给你留言</p>
+            <p className="empty-text">老师没有给你留言</p>
           ) : (
             <div className="message-list">
               {assignmentsWithMessage.map((assignment) => (

@@ -177,7 +177,7 @@ adminRouter.post('/login', async (req, res, next) => {
     const password = String(req.body.password ?? '');
 
     if (!username || !password) {
-      res.status(400).json({ message: '请填写管理员账号和密码' });
+      res.status(400).json({ message: '请填写老师账号和密码' });
       return;
     }
 
@@ -192,7 +192,7 @@ adminRouter.post('/login', async (req, res, next) => {
     const passwordMatched = admin ? await bcrypt.compare(password, admin.password_hash) : false;
 
     if (!passwordMatched) {
-      res.status(401).json({ message: '管理员账号或密码错误' });
+      res.status(401).json({ message: '老师账号或密码错误' });
       return;
     }
 
@@ -281,7 +281,7 @@ adminRouter.post('/users', requireAdmin, async (req, res, next) => {
       classId = await findAdminClassId(req.admin.adminId);
 
       if (!classId) {
-        res.status(403).json({ message: '您还没有被分配到班级，无法创建学生' });
+        res.status(403).json({ message: '您还没有被分配到班级，无法创建学员' });
         return;
       }
     }
@@ -297,7 +297,7 @@ adminRouter.post('/users', requireAdmin, async (req, res, next) => {
     res.status(201).json({ data: result.rows[0] });
   } catch (error) {
     if (error.code === '23505') {
-      res.status(409).json({ message: '这个普通用户账号已经存在' });
+      res.status(409).json({ message: '这个学员账号已经存在' });
       return;
     }
 
@@ -318,7 +318,7 @@ adminRouter.post('/users/:id/reset-password', requireAdmin, async (req, res, nex
     }
 
     if (!(await ensureAdminCanManageUser(req, userId))) {
-      res.status(403).json({ message: '无权管理该学生' });
+      res.status(403).json({ message: '无权管理该学员' });
       return;
     }
 
@@ -332,7 +332,7 @@ adminRouter.post('/users/:id/reset-password', requireAdmin, async (req, res, nex
     );
 
     if (result.rowCount === 0) {
-      res.status(404).json({ message: '普通用户不存在' });
+      res.status(404).json({ message: '学员不存在' });
       return;
     }
 
@@ -349,7 +349,7 @@ adminRouter.patch('/users/:id/status', requireAdmin, async (req, res, next) => {
     const isActive = Boolean(req.body.isActive);
 
     if (!(await ensureAdminCanManageUser(req, userId))) {
-      res.status(403).json({ message: '无权管理该学生' });
+      res.status(403).json({ message: '无权管理该学员' });
       return;
     }
 
@@ -362,7 +362,7 @@ adminRouter.patch('/users/:id/status', requireAdmin, async (req, res, next) => {
     );
 
     if (result.rowCount === 0) {
-      res.status(404).json({ message: '普通用户不存在' });
+      res.status(404).json({ message: '学员不存在' });
       return;
     }
 
@@ -373,14 +373,14 @@ adminRouter.patch('/users/:id/status', requireAdmin, async (req, res, next) => {
 });
 
 // PATCH /api/admin/users/:id/class
-// 超级管理员给学生转班；老师不能转班。
+// 教导主任给学员转班；老师不能转班。
 adminRouter.patch('/users/:id/class', requireSuperAdmin, async (req, res, next) => {
   try {
     const userId = normalizeId(req.params.id);
     const classId = normalizeId(req.body.classId);
 
     if (!userId) {
-      sendValidationError(res, '用户 id 无效');
+      sendValidationError(res, '学员 id 无效');
       return;
     }
 
@@ -408,7 +408,7 @@ adminRouter.patch('/users/:id/class', requireSuperAdmin, async (req, res, next) 
     );
 
     if (result.rowCount === 0) {
-      res.status(404).json({ message: '普通用户不存在' });
+      res.status(404).json({ message: '学员不存在' });
       return;
     }
 
@@ -458,7 +458,7 @@ adminRouter.post('/admins', requireSuperAdmin, async (req, res, next) => {
     res.status(201).json({ data: result.rows[0] });
   } catch (error) {
     if (error.code === '23505') {
-      res.status(409).json({ message: '这个管理员账号已经存在' });
+      res.status(409).json({ message: '这个老师账号已经存在' });
       return;
     }
 
@@ -487,7 +487,7 @@ adminRouter.post('/admins/:id/reset-password', requireSuperAdmin, async (req, re
     );
 
     if (result.rowCount === 0) {
-      res.status(404).json({ message: '管理员不存在' });
+      res.status(404).json({ message: '老师不存在' });
       return;
     }
 
@@ -503,7 +503,7 @@ adminRouter.delete('/admins/:id', requireSuperAdmin, async (req, res, next) => {
     const countResult = await pool.query('SELECT COUNT(*)::int AS count FROM admins');
 
     if (countResult.rows[0].count <= 1) {
-      res.status(400).json({ message: '至少需要保留一个管理员' });
+      res.status(400).json({ message: '至少需要保留一个老师' });
       return;
     }
 
@@ -515,11 +515,11 @@ adminRouter.delete('/admins/:id', requireSuperAdmin, async (req, res, next) => {
     );
 
     if (result.rowCount === 0) {
-      res.status(404).json({ message: '管理员不存在' });
+      res.status(404).json({ message: '老师不存在' });
       return;
     }
 
-    res.json({ message: '管理员已删除' });
+    res.json({ message: '老师已删除' });
   } catch (error) {
     next(error);
   }
@@ -723,19 +723,19 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
     const userId = normalizeId(req.params.userId);
 
     if (!userId) {
-      sendValidationError(res, '用户 id 无效');
+      sendValidationError(res, '学员 id 无效');
       return;
     }
 
     if (!(await ensureAdminCanManageUser(req, userId))) {
-      res.status(403).json({ message: '无权查看该学生' });
+      res.status(403).json({ message: '无权查看该学员' });
       return;
     }
 
     const user = await findUserById(userId);
 
     if (!user) {
-      res.status(404).json({ message: '普通用户不存在' });
+      res.status(404).json({ message: '学员不存在' });
       return;
     }
 
@@ -844,7 +844,7 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
     const messageError = message ? validateMessage(message) : '';
 
     if (!userId) {
-      sendValidationError(res, '用户 id 无效');
+      sendValidationError(res, '学员 id 无效');
       return;
     }
 
@@ -859,14 +859,14 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
     }
 
     if (!(await ensureAdminCanManageUser(req, userId))) {
-      res.status(403).json({ message: '无权管理该学生' });
+      res.status(403).json({ message: '无权管理该学员' });
       return;
     }
 
     const user = await findUserById(userId);
 
     if (!user) {
-      res.status(404).json({ message: '普通用户不存在' });
+      res.status(404).json({ message: '学员不存在' });
       return;
     }
 
@@ -887,7 +887,7 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
     const newVideoIds = videoIds.filter((videoId) => !activeVideoIds.has(videoId));
 
     if (newVideoIds.length > 0 && activeVideoIds.size + newVideoIds.length > MAX_ACTIVE_VIDEO_ASSIGNMENTS) {
-      sendValidationError(res, `同一个用户最多只能同时推送 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个视频`);
+      sendValidationError(res, `同一个学员最多只能同时推送 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个视频`);
       return;
     }
 
@@ -931,7 +931,7 @@ adminRouter.post('/users/:userId/message', requireAdmin, async (req, res, next) 
     const messageError = validateMessage(message);
 
     if (!userId) {
-      sendValidationError(res, '用户 id 无效');
+      sendValidationError(res, '学员 id 无效');
       return;
     }
 
@@ -941,14 +941,14 @@ adminRouter.post('/users/:userId/message', requireAdmin, async (req, res, next) 
     }
 
     if (!(await ensureAdminCanManageUser(req, userId))) {
-      res.status(403).json({ message: '无权管理该学生' });
+      res.status(403).json({ message: '无权管理该学员' });
       return;
     }
 
     const user = await findUserById(userId);
 
     if (!user) {
-      res.status(404).json({ message: '普通用户不存在' });
+      res.status(404).json({ message: '学员不存在' });
       return;
     }
 
@@ -986,7 +986,7 @@ adminRouter.patch('/assignments/:id/cancel', requireAdmin, async (req, res, next
     }
 
     if (!(await ensureAdminCanManageUser(req, assignmentResult.rows[0].user_id))) {
-      res.status(403).json({ message: '无权管理该学生' });
+      res.status(403).json({ message: '无权管理该学员' });
       return;
     }
 
@@ -1041,7 +1041,7 @@ adminRouter.patch('/assignments/:id/delete', requireAdmin, async (req, res, next
     }
 
     if (!(await ensureAdminCanManageUser(req, assignmentResult.rows[0].user_id))) {
-      res.status(403).json({ message: '无权管理该学生' });
+      res.status(403).json({ message: '无权管理该学员' });
       return;
     }
 
@@ -1090,7 +1090,7 @@ adminRouter.patch('/operations/:operationId/delete', requireAdmin, async (req, r
 
     for (const row of operationResult.rows) {
       if (!(await ensureAdminCanManageUser(req, row.user_id))) {
-        res.status(403).json({ message: '无权管理该学生' });
+        res.status(403).json({ message: '无权管理该学员' });
         return;
       }
     }

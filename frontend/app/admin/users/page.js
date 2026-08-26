@@ -30,13 +30,13 @@ export default function AdminUsersPage() {
   const [admin, setAdmin] = useState(null);
   const [users, setUsers] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [status, setStatus] = useState('正在检查管理员登录状态...');
+  const [status, setStatus] = useState('正在检查老师登录状态...');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function loadUsers() {
     const result = await fetchManagedUsers();
     setUsers(result.data);
-    setStatus(result.data.length === 0 ? '还没有普通用户。' : '');
+    setStatus(result.data.length === 0 ? '还没有学员。' : '');
   }
 
   useEffect(() => {
@@ -64,12 +64,12 @@ export default function AdminUsersPage() {
     const account = readAccountForm(event.currentTarget);
 
     if (!account.username || !account.password) {
-      setStatus('请填写普通用户账号和密码');
+      setStatus('请填写学员账号和密码');
       return;
     }
 
     setIsSubmitting(true);
-    setStatus('正在创建普通用户...');
+    setStatus('正在创建学员...');
 
     try {
       const result = await createManagedUser(account);
@@ -92,7 +92,7 @@ export default function AdminUsersPage() {
 
     try {
       await resetManagedUserPassword({ id: user.id, password });
-      setStatus(`已重置 ${user.username} 的密码，请线下告知用户。`);
+      setStatus(`已重置 ${user.username} 的密码，请线下告知学员。`);
     } catch (error) {
       setStatus(error.message);
     }
@@ -108,7 +108,7 @@ export default function AdminUsersPage() {
   }
 
   if (!admin) {
-    return <p className="empty-text">正在检查管理员登录状态...</p>;
+    return <p className="empty-text">正在检查老师登录状态...</p>;
   }
 
   const isSuperAdmin = admin.role === 'super_admin';
@@ -117,18 +117,18 @@ export default function AdminUsersPage() {
     <>
       <section className="hero">
         <div>
-          <h1>{isSuperAdmin ? '用户管理' : '班级学生'}</h1>
+          <h1>{isSuperAdmin ? '学员管理' : '班级学员'}</h1>
           <p>
             {isSuperAdmin
-              ? '超级管理员可以创建学生并分配到任意班级。'
-              : '老师只能查看和管理自己班级的学生。'}
+              ? '教导主任可以创建学员并分配到任意班级。'
+              : '老师只能查看和管理自己班级的学员。'}
           </p>
         </div>
         <a className="hero-button" href="/admin">返回后台</a>
       </section>
 
       <section className="upload-panel">
-        <h2>创建普通用户</h2>
+        <h2>创建学员</h2>
         <form className="upload-form" onSubmit={handleCreateUser}>
           <label>
             <span>账号</span>
@@ -151,17 +151,17 @@ export default function AdminUsersPage() {
                   <option key={cls.id} value={cls.id}>{cls.name}</option>
                 ))}
               </select>
-              <small>超级管理员创建学生时必须选择班级。</small>
+              <small>教导主任创建学员时必须选择班级。</small>
             </label>
           )}
 
-          <button type="submit" disabled={isSubmitting}>{isSubmitting ? '创建中...' : '创建用户'}</button>
+          <button type="submit" disabled={isSubmitting}>{isSubmitting ? '创建中...' : '创建学员'}</button>
         </form>
       </section>
 
       <section className="video-section">
         <div className="section-title">
-          <h2>{isSuperAdmin ? '普通用户列表' : '班级学生列表'}</h2>
+          <h2>{isSuperAdmin ? '学员列表' : '班级学员列表'}</h2>
           <button type="button" onClick={loadUsers}>刷新</button>
         </div>
 

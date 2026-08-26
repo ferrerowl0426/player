@@ -21,7 +21,7 @@ export default function SiteHeader() {
         }
         return;
       } catch {
-        // 没有管理员 Cookie 时继续检查普通用户 Cookie。
+        // 没有老师 Cookie 时继续检查学员 Cookie。
       }
 
       try {
@@ -66,11 +66,11 @@ export default function SiteHeader() {
         {identity === 'checking' ? null : isAdminPage ? (
           identity === 'admin' ? (
             <>
-              <a href="/admin">管理员首页</a>
+              <a href="/admin">老师首页</a>
               <button type="button" onClick={handleLogout}>退出登录</button>
             </>
           ) : (
-            <a href="/admin/login">管理员登录</a>
+            <a href="/admin/login">老师登录</a>
           )
         ) : (
           identity === 'user' || identity === 'admin' ? (
@@ -80,8 +80,8 @@ export default function SiteHeader() {
             </>
           ) : (
             <>
-              <a href="/login">用户登录</a>
-              <a href="/admin/login">管理员入口</a>
+              <a href="/login">学员登录</a>
+              <a href="/admin/login">老师入口</a>
             </>
           )
         )}

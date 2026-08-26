@@ -94,7 +94,7 @@ export async function fetchVideoById(id) {
   return parseJsonResponse(response, '获取视频详情失败');
 }
 
-// 普通用户登录。后端会设置独立的 HttpOnly Cookie。
+// 学员登录。后端会设置独立的 HttpOnly Cookie。
 export async function loginUser({ username, password }) {
   const response = await fetch(`${getApiBaseUrl()}/user/login`, {
     method: 'POST',
@@ -105,20 +105,20 @@ export async function loginUser({ username, password }) {
     body: JSON.stringify({ username, password })
   });
 
-  return parseJsonResponse(response, '用户登录失败');
+  return parseJsonResponse(response, '学员登录失败');
 }
 
-// 检查普通用户是否已登录。
+// 检查学员是否已登录。
 export async function fetchUserMe() {
   const response = await fetch(`${getApiBaseUrl()}/user/me`, {
     credentials: 'include',
     cache: 'no-store'
   });
 
-  return parseJsonResponse(response, '请先登录用户账号');
+  return parseJsonResponse(response, '请先登录学员账号');
 }
 
-// 普通用户退出登录。
+// 学员退出登录。
 export async function logoutUser() {
   const response = await fetch(`${getApiBaseUrl()}/user/logout`, {
     method: 'POST',
@@ -128,7 +128,7 @@ export async function logoutUser() {
   return parseJsonResponse(response, '退出登录失败');
 }
 
-// 获取普通用户自己的今日作业。
+// 获取学员自己的今日作业。
 export async function fetchTodayAssignments() {
   const response = await fetch(`${getApiBaseUrl()}/user/assignments/today`, {
     credentials: 'include',
@@ -138,7 +138,7 @@ export async function fetchTodayAssignments() {
   return parseJsonResponse(response, '获取今日作业失败');
 }
 
-// 管理员登录。后端会设置 HttpOnly Cookie，前端不直接保存 token。
+// 老师登录。后端会设置 HttpOnly Cookie，前端不直接保存 token。
 export async function loginAdmin({ username, password }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/login`, {
     method: 'POST',
@@ -149,20 +149,20 @@ export async function loginAdmin({ username, password }) {
     body: JSON.stringify({ username, password })
   });
 
-  return parseJsonResponse(response, '管理员登录失败');
+  return parseJsonResponse(response, '老师登录失败');
 }
 
-// 检查管理员是否已登录。
+// 检查老师是否已登录。
 export async function fetchAdminMe() {
   const response = await fetch(`${getApiBaseUrl()}/admin/me`, {
     credentials: 'include',
     cache: 'no-store'
   });
 
-  return parseJsonResponse(response, '请先登录管理员账号');
+  return parseJsonResponse(response, '请先登录老师账号');
 }
 
-// 管理员退出登录。
+// 老师退出登录。
 export async function logoutAdmin() {
   const response = await fetch(`${getApiBaseUrl()}/admin/logout`, {
     method: 'POST',
@@ -172,17 +172,17 @@ export async function logoutAdmin() {
   return parseJsonResponse(response, '退出登录失败');
 }
 
-// 管理员查看普通用户列表。
+// 老师查看学员列表。
 export async function fetchManagedUsers() {
   const response = await fetch(`${getApiBaseUrl()}/admin/users`, {
     credentials: 'include',
     cache: 'no-store'
   });
 
-  return parseJsonResponse(response, '获取普通用户列表失败');
+  return parseJsonResponse(response, '获取学员列表失败');
 }
 
-// 管理员创建普通用户。
+// 老师创建学员。
 export async function createManagedUser({ username, password, classId }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users`, {
     method: 'POST',
@@ -193,10 +193,10 @@ export async function createManagedUser({ username, password, classId }) {
     body: JSON.stringify({ username, password, classId })
   });
 
-  return parseJsonResponse(response, '创建普通用户失败');
+  return parseJsonResponse(response, '创建学员失败');
 }
 
-// 管理员重置普通用户密码。
+// 老师重置学员密码。
 export async function resetManagedUserPassword({ id, password }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}/reset-password`, {
     method: 'POST',
@@ -207,10 +207,10 @@ export async function resetManagedUserPassword({ id, password }) {
     body: JSON.stringify({ password })
   });
 
-  return parseJsonResponse(response, '重置普通用户密码失败');
+  return parseJsonResponse(response, '重置学员密码失败');
 }
 
-// 管理员启用或禁用普通用户。
+// 老师启用或禁用学员。
 export async function updateManagedUserStatus({ id, isActive }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}/status`, {
     method: 'PATCH',
@@ -221,20 +221,20 @@ export async function updateManagedUserStatus({ id, isActive }) {
     body: JSON.stringify({ isActive })
   });
 
-  return parseJsonResponse(response, '更新普通用户状态失败');
+  return parseJsonResponse(response, '更新学员状态失败');
 }
 
-// 管理员查看管理员账号列表。
+// 老师查看老师账号列表。
 export async function fetchManagedAdmins() {
   const response = await fetch(`${getApiBaseUrl()}/admin/admins`, {
     credentials: 'include',
     cache: 'no-store'
   });
 
-  return parseJsonResponse(response, '获取管理员列表失败');
+  return parseJsonResponse(response, '获取老师列表失败');
 }
 
-// 管理员创建其他管理员。
+// 老师创建其他老师。
 export async function createManagedAdmin({ username, password }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/admins`, {
     method: 'POST',
@@ -245,10 +245,10 @@ export async function createManagedAdmin({ username, password }) {
     body: JSON.stringify({ username, password })
   });
 
-  return parseJsonResponse(response, '创建管理员失败');
+  return parseJsonResponse(response, '创建老师失败');
 }
 
-// 管理员重置其他管理员密码。
+// 老师重置其他老师密码。
 export async function resetManagedAdminPassword({ id, password }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/admins/${id}/reset-password`, {
     method: 'POST',
@@ -259,20 +259,20 @@ export async function resetManagedAdminPassword({ id, password }) {
     body: JSON.stringify({ password })
   });
 
-  return parseJsonResponse(response, '重置管理员密码失败');
+  return parseJsonResponse(response, '重置老师密码失败');
 }
 
-// 删除管理员时后端会保证至少还剩一个管理员。
+// 删除老师时后端会保证至少还剩一个老师。
 export async function deleteManagedAdmin(id) {
   const response = await fetch(`${getApiBaseUrl()}/admin/admins/${id}`, {
     method: 'DELETE',
     credentials: 'include'
   });
 
-  return parseJsonResponse(response, '删除管理员失败');
+  return parseJsonResponse(response, '删除老师失败');
 }
 
-// 管理员查看指定普通用户的历史推送。
+// 老师查看指定学员的历史推送。
 export async function fetchUserAssignments(userId) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${userId}/assignments`, {
     credentials: 'include',
@@ -282,7 +282,7 @@ export async function fetchUserAssignments(userId) {
   return parseJsonResponse(response, '获取推送记录失败');
 }
 
-// 管理员给指定普通用户保存一次推送操作，可以同时包含视频和留言。
+// 老师给指定学员保存一次推送操作，可以同时包含视频和留言。
 export async function createUserAssignment({ userId, videoIds, message = '' }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${userId}/assignments`, {
     method: 'POST',
@@ -487,7 +487,7 @@ export async function deleteVideo(id) {
   return parseJsonResponse(response, '删除视频失败');
 }
 
-// 获取班级列表，包含班级下的学生。
+// 获取班级列表，包含班级下的学员。
 export async function fetchClasses() {
   const response = await fetch(`${getApiBaseUrl()}/admin/classes`, {
     credentials: 'include',
@@ -497,7 +497,7 @@ export async function fetchClasses() {
   return parseJsonResponse(response, '获取班级列表失败');
 }
 
-// 超级管理员创建班级。
+// 教导主任创建班级。
 export async function createClass({ name, teacherId }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/classes`, {
     method: 'POST',
@@ -511,7 +511,7 @@ export async function createClass({ name, teacherId }) {
   return parseJsonResponse(response, '创建班级失败');
 }
 
-// 超级管理员修改班级信息。
+// 教导主任修改班级信息。
 export async function updateClass({ id, name, teacherId }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/classes/${id}`, {
     method: 'PATCH',
@@ -525,7 +525,7 @@ export async function updateClass({ id, name, teacherId }) {
   return parseJsonResponse(response, '修改班级失败');
 }
 
-// 超级管理员删除班级。
+// 教导主任删除班级。
 export async function deleteClass(id) {
   const response = await fetch(`${getApiBaseUrl()}/admin/classes/${id}`, {
     method: 'DELETE',
@@ -535,7 +535,7 @@ export async function deleteClass(id) {
   return parseJsonResponse(response, '删除班级失败');
 }
 
-// 超级管理员给学生转班。
+// 教导主任给学员转班。
 export async function transferUserClass({ id, classId }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}/class`, {
     method: 'PATCH',

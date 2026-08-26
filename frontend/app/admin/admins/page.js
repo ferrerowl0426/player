@@ -27,13 +27,13 @@ function readAccountForm(form) {
 export default function AdminAdminsPage() {
   const router = useRouter();
   const [admins, setAdmins] = useState([]);
-  const [status, setStatus] = useState('正在检查管理员登录状态...');
+  const [status, setStatus] = useState('正在检查老师登录状态...');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function loadAdmins() {
     const result = await fetchManagedAdmins();
     setAdmins(result.data);
-    setStatus(result.data.length === 0 ? '还没有管理员。' : '');
+    setStatus(result.data.length === 0 ? '还没有老师。' : '');
   }
 
   useEffect(() => {
@@ -61,12 +61,12 @@ export default function AdminAdminsPage() {
     const account = readAccountForm(event.currentTarget);
 
     if (!account.username || !account.password) {
-      setStatus('请填写管理员账号和密码');
+      setStatus('请填写老师账号和密码');
       return;
     }
 
     setIsSubmitting(true);
-    setStatus('正在创建管理员...');
+    setStatus('正在创建老师...');
 
     try {
       await createManagedAdmin(account);
@@ -95,7 +95,7 @@ export default function AdminAdminsPage() {
   }
 
   async function handleDeleteAdmin(admin) {
-    const confirmed = window.confirm(`确定删除管理员 ${admin.username} 吗？系统至少会保留一个管理员。`);
+    const confirmed = window.confirm(`确定删除老师 ${admin.username} 吗？系统至少会保留一个老师。`);
 
     if (!confirmed) {
       return;
@@ -113,14 +113,14 @@ export default function AdminAdminsPage() {
     <>
       <section className="hero">
         <div>
-          <h1>管理员账号管理</h1>
-          <p>超级管理员可以创建老师或超级管理员账号，也可以重置密码；系统会阻止删除最后一个管理员。</p>
+          <h1>老师账号管理</h1>
+          <p>教导主任可以创建老师或教导主任账号，也可以重置密码；系统会阻止删除最后一个老师。</p>
         </div>
         <a className="hero-button" href="/admin">返回后台</a>
       </section>
 
       <section className="upload-panel">
-        <h2>创建管理员</h2>
+        <h2>创建老师</h2>
         <form className="upload-form" onSubmit={handleCreateAdmin}>
           <label>
             <span>账号</span>
@@ -138,18 +138,18 @@ export default function AdminAdminsPage() {
             <span>角色</span>
             <select name="role" required>
               <option value="teacher">老师</option>
-              <option value="super_admin">超级管理员</option>
+              <option value="super_admin">教导主任</option>
             </select>
-            <small>老师只能管理自己班级；超级管理员可以管理所有班级和视频删除。</small>
+            <small>老师只能管理自己班级；教导主任可以管理所有班级和视频删除。</small>
           </label>
 
-          <button type="submit" disabled={isSubmitting}>{isSubmitting ? '创建中...' : '创建管理员'}</button>
+          <button type="submit" disabled={isSubmitting}>{isSubmitting ? '创建中...' : '创建老师'}</button>
         </form>
       </section>
 
       <section className="video-section">
         <div className="section-title">
-          <h2>管理员列表</h2>
+          <h2>老师列表</h2>
           <button type="button" onClick={loadAdmins}>刷新</button>
         </div>
 
@@ -158,7 +158,7 @@ export default function AdminAdminsPage() {
             <article className="admin-row" key={admin.id}>
               <div>
                 <strong>{admin.username}</strong>
-                <span>{admin.role === 'super_admin' ? '超级管理员' : '老师'} · 创建于 {formatDate(admin.created_at)}</span>
+                <span>{admin.role === 'super_admin' ? '教导主任' : '老师'} · 创建于 {formatDate(admin.created_at)}</span>
               </div>
               <div className="row-actions">
                 <button type="button" onClick={() => handleResetPassword(admin)}>重置密码</button>

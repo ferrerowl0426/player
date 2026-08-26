@@ -21,7 +21,7 @@ function signToken(payload) {
   });
 }
 
-// 管理员和普通用户使用不同 Cookie 名称，并且 token 里写入 type。
+// 老师和学员使用不同 Cookie 名称，并且 token 里写入 type。
 // 这样即使浏览器同时登录两种身份，后端也能明确知道当前接口需要哪一种身份。
 function readToken(req, cookieName) {
   return req.cookies?.[cookieName];
@@ -68,7 +68,7 @@ export function requireAdmin(req, res, next) {
   const token = readToken(req, config.auth.adminCookieName);
 
   if (!token) {
-    res.status(401).json({ message: '请先登录管理员账号' });
+    res.status(401).json({ message: '请先登录老师账号' });
     return;
   }
 
@@ -76,7 +76,7 @@ export function requireAdmin(req, res, next) {
     const payload = jwt.verify(token, config.auth.jwtSecret);
 
     if (payload.type !== 'admin') {
-      res.status(401).json({ message: '管理员登录状态无效' });
+      res.status(401).json({ message: '老师登录状态无效' });
       return;
     }
 
@@ -92,7 +92,7 @@ export function requireSuperAdmin(req, res, next) {
   const token = readToken(req, config.auth.adminCookieName);
 
   if (!token) {
-    res.status(401).json({ message: '请先登录管理员账号' });
+    res.status(401).json({ message: '请先登录老师账号' });
     return;
   }
 
@@ -100,12 +100,12 @@ export function requireSuperAdmin(req, res, next) {
     const payload = jwt.verify(token, config.auth.jwtSecret);
 
     if (payload.type !== 'admin') {
-      res.status(401).json({ message: '管理员登录状态无效' });
+      res.status(401).json({ message: '老师登录状态无效' });
       return;
     }
 
     if (payload.role !== 'super_admin') {
-      res.status(403).json({ message: '需要超级管理员权限' });
+      res.status(403).json({ message: '需要教导主任权限' });
       return;
     }
 
@@ -121,7 +121,7 @@ export function requireUser(req, res, next) {
   const token = readToken(req, config.auth.userCookieName);
 
   if (!token) {
-    res.status(401).json({ message: '请先登录用户账号' });
+    res.status(401).json({ message: '请先登录学员账号' });
     return;
   }
 
@@ -129,7 +129,7 @@ export function requireUser(req, res, next) {
     const payload = jwt.verify(token, config.auth.jwtSecret);
 
     if (payload.type !== 'user') {
-      res.status(401).json({ message: '用户登录状态无效' });
+      res.status(401).json({ message: '学员登录状态无效' });
       return;
     }
 
@@ -145,7 +145,7 @@ export function requireUserOrAdmin(req, res, next) {
   const userToken = readToken(req, config.auth.userCookieName);
   const adminToken = readToken(req, config.auth.adminCookieName);
 
-  // 视频列表和详情页普通用户、管理员都会访问，所以这里允许两种 Cookie。
+  // 视频列表和详情页学员、老师都会访问，所以这里允许两种 Cookie。
   // 具体上传、删除等后台操作仍然只使用 requireAdmin。
   for (const token of [userToken, adminToken]) {
     if (!token) {

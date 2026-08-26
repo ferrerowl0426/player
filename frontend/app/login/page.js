@@ -1,11 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { loginUser } from '../../lib/api.js';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { loginAdmin, loginUser } from '../../lib/api.js';
 
-export default function UserLoginPage() {
+const TABS = [
+  { key: 'student', label: '学员登录' },
+  { key: 'teacher', label: '老师登录' },
+  { key: 'super', label: '教导主任登录' }
+];
+
+export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get('tab') === 'teacher' ? 'teacher' : 'student');
   const [status, setStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -17,7 +25,7 @@ export default function UserLoginPage() {
     const password = String(formData.get('password') || '');
 
     if (!username || !password) {
-      setStatus('请填写用户账号和密码');
+      setStatus('请填写账号和密码');
       return;
     }
 
@@ -25,8 +33,27 @@ export default function UserLoginPage() {
     setStatus('正在登录...');
 
     try {
-      await loginUser({ username, password });
-      router.replace('/');
+      if (tab === 'student') {
+        await loginUser({ username, password });
+        router.replace('/');
+      } else {
+        const result = await loginAdmin({ username, password });
+
+        if (tab === 'super' && result.data?.role !== 'super_admin') {
+          setStatus('该账号不是教导主任');
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (tab === 'teacher' && result.data?.role !== 'teacher' && result.data?.role !== 'super_admin') {
+          setStatus('该账号不是老师');
+          setIsSubmitting(false);
+          return;
+        }
+
+        router.replace('/admin');
+      }
+
       router.refresh();
     } catch (error) {
       setStatus(error.message);
@@ -35,20 +62,42 @@ export default function UserLoginPage() {
     }
   }
 
+  const descriptions = {
+    student: '学员登录后可以浏览视频列表，并查看老师单独推送的今日作业。',
+    teacher: '老师登录后可以管理班级学员、上传视频并推送作业。',
+    super: '教导主任登录后可以管理班级、老师账号、删除视频并给任意学员推送。'
+  };
+
   return (
     <section className="login-panel">
-      <h1>用户登录</h1>
-      <p>普通用户登录后可以浏览视频列表，并查看管理员单独推送的今日作业。</p>
+      <div className="login-tabs">
+        {TABS.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={tab === item.key ? 'active' : ''}
+            onClick={() => {
+              setTab(item.key);
+              setStatus('');
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <h1>{TABS.find((item) => item.key === tab).label}</h1>
+      <p>{descriptions[tab]}</p>
 
       <form className="upload-form" onSubmit={handleLogin}>
         <label>
           <span>账号</span>
-          <input name="username" type="text" autoComplete="username" placeholder="demo" required />
+          <input name="username" type="text" autoComplete="username" placeholder="请输入账号" required />
         </label>
 
         <label>
           <span>密码</span>
-          <input name="password" type="password" autoComplete="current-password" placeholder="123456" required />
+          <input name="password" type="password" autoComplete="current-password" placeholder="请输入密码" required />
         </label>
 
         <button type="submit" disabled={isSubmitting}>{isSubmitting ? '登录中...' : '登录'}</button>

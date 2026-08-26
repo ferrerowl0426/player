@@ -62,7 +62,7 @@ export default function AdminPage() {
   }
 
   if (!admin) {
-    return <p className="empty-text">正在检查管理员登录状态...</p>;
+    return <p className="empty-text">正在检查老师登录状态...</p>;
   }
 
   const isSuperAdmin = admin.role === 'super_admin';
@@ -71,11 +71,11 @@ export default function AdminPage() {
     <>
       <section className="hero">
         <div>
-          <h1>{isSuperAdmin ? '超级管理员后台' : '老师后台'}</h1>
+          <h1>{isSuperAdmin ? '教导主任后台' : '老师后台'}</h1>
           <p>
             {isSuperAdmin
-              ? '超级管理员可以管理班级、老师账号、视频，并给每个学生推送内容。'
-              : '老师可以管理本班学生、上传视频，并给学生推送内容。'}
+              ? '教导主任可以管理班级、老师账号、视频，并给每个学员推送内容。'
+              : '老师可以管理本班学员、上传视频，并给学员推送内容。'}
           </p>
         </div>
         <button className="hero-button" type="button" onClick={handleLogout}>退出登录</button>
@@ -87,8 +87,8 @@ export default function AdminPage() {
         </div>
         <div className="admin-link-grid">
           {isSuperAdmin && <a href="/admin/classes">班级管理</a>}
-          <a href="/admin/users">{isSuperAdmin ? '用户管理' : '班级学生'}</a>
-          {isSuperAdmin && <a href="/admin/admins">管理员账号</a>}
+          <a href="/admin/users">{isSuperAdmin ? '学员管理' : '班级学员'}</a>
+          {isSuperAdmin && <a href="/admin/admins">老师账号</a>}
         </div>
       </section>
 
@@ -102,7 +102,7 @@ export default function AdminPage() {
               <a key={cls.id} className="class-overview-card" href="/admin/classes">
                 <strong>{cls.name}</strong>
                 <span>负责老师：{cls.teacher_name || '未分配'}</span>
-                <span>学生：{cls.students?.length || 0} 人</span>
+                <span>学员：{cls.students?.length || 0} 人</span>
               </a>
             ))}
           </div>

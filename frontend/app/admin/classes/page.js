@@ -98,7 +98,7 @@ export default function ClassesPage() {
   }
 
   async function handleDelete(classId) {
-    if (!window.confirm('确定要删除这个班级吗？班级里的学生将变为未分班状态。')) {
+    if (!window.confirm('确定要删除这个班级吗？班级里的学员将变为未分班状态。')) {
       return;
     }
 
@@ -134,7 +134,7 @@ export default function ClassesPage() {
       <section className="hero">
         <div>
           <h1>班级管理</h1>
-          <p>超级管理员可以创建班级、分配老师、给学生转班。</p>
+          <p>教导主任可以创建班级、分配老师、给学员转班。</p>
         </div>
       </section>
 
@@ -180,7 +180,7 @@ export default function ClassesPage() {
                   </button>
                   <strong>{cls.name}</strong>
                   <span className="class-meta">负责老师：{cls.teacher_name || '未分配'}</span>
-                  <span className="class-meta">学生：{cls.students?.length || 0} 人</span>
+                  <span className="class-meta">学员：{cls.students?.length || 0} 人</span>
                   <div className="class-actions">
                     <button type="button" onClick={() => setEditingClass(cls)}>编辑</button>
                     <button type="button" onClick={() => handleDelete(cls.id)}>删除</button>
@@ -212,12 +212,12 @@ export default function ClassesPage() {
                 {expandedClassIds.has(cls.id) && (
                   <div className="class-students">
                     {cls.students.length === 0 ? (
-                      <p className="empty-text">该班级还没有学生</p>
+                      <p className="empty-text">该班级还没有学员</p>
                     ) : (
                       <table className="data-table">
                         <thead>
                           <tr>
-                            <th>学生账号</th>
+                            <th>学员账号</th>
                             <th>状态</th>
                             <th>操作</th>
                           </tr>

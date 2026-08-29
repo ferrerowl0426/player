@@ -777,8 +777,28 @@ main {
   display: grid;
   gap: 8px;
   padding: 12px;
+  overflow: hidden;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
+}
+
+.assignment-video-card strong,
+.admin-row strong,
+.operation-video-title {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignment-video-card span,
+.admin-row div:first-child > span:first-of-type {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .assignment-video-card .cover-wrap {
@@ -813,6 +833,122 @@ main {
   color: #9ca3af;
   background: #f3f4f6;
   opacity: 0.72;
+}
+
+.operations-list {
+  display: grid;
+  gap: 14px;
+}
+
+.operation-card {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 16px;
+  overflow: hidden;
+  background: #fff;
+  border: 2px solid #7dd3fc;
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.operation-deleted {
+  color: #6b7280;
+  background: #fafafa;
+  border-color: #d1d5db;
+  box-shadow: none;
+}
+
+.operation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.operation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.operation-id {
+  color: #0ea5e9;
+  font-weight: 800;
+}
+
+.operation-delete-button {
+  padding: 8px 12px;
+  color: #dc2626;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 999px;
+}
+
+.operation-delete-reason {
+  max-width: 45%;
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operation-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.operation-description,
+.operation-message {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.operation-message {
+  padding: 10px 12px;
+  color: #374151;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  background: #f8fafc;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+}
+
+.operation-videos {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.operation-video-item {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  padding: 10px 12px;
+  overflow: hidden;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+}
+
+.operation-video-deleted {
+  color: #9ca3af;
+  background: #f3f4f6;
+  border-color: #d1d5db;
 }
 
 .operation-video-thumb {
@@ -853,6 +989,8 @@ main {
 .admin-row div:first-child {
   display: grid;
   gap: 4px;
+  min-width: 0;
+  flex: 1;
 }
 
 .admin-row span {

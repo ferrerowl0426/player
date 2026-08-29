@@ -277,7 +277,6 @@ export default function UserAssignmentsPage() {
                           title={video.title}
                         >
                           <span className="operation-video-title">{video.title}</span>
-                          {video.is_deleted || video.is_video_deleted ? <span className="operation-video-reason">{video.is_video_deleted ? '课程已删除' : '已删除'}</span> : null}
                         </div>
                       ))}
                     </div>

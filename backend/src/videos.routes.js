@@ -12,7 +12,8 @@ import {
   deleteFromBucket,
   ensureObjectExists,
   getKeyFromPublicUrl,
-  getPublicUrl
+  getPublicUrl,
+  normalizePublicUrl
 } from './storage.js';
 
 const TITLE_MAX_LENGTH = 120;
@@ -266,6 +267,21 @@ function normalizeMultipartParts(parts) {
     .sort((first, second) => first.partNumber - second.partNumber);
 }
 
+function formatVideoResponse(video) {
+  return {
+    ...video,
+    video_url: normalizePublicUrl(video.video_url),
+    cover_url: normalizePublicUrl(video.cover_url)
+  };
+}
+
+function formatAttachmentResponse(attachment) {
+  return {
+    ...attachment,
+    file_url: normalizePublicUrl(attachment.file_url || attachment.file_key)
+  };
+}
+
 function normalizeIds(value) {
   const rawValues = Array.isArray(value) ? value : [];
 
@@ -332,7 +348,7 @@ videoRouter.get('/', requireUserOrAdmin, async (req, res, next) => {
       params
     );
 
-    res.json({ data: result.rows });
+    res.json({ data: result.rows.map(formatVideoResponse) });
   } catch (error) {
     next(error);
   }
@@ -714,8 +730,8 @@ videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
 
     res.json({
       data: {
-        ...result.rows[0],
-        attachments: attachmentsResult.rows,
+        ...formatVideoResponse(result.rows[0]),
+        attachments: attachmentsResult.rows.map(formatAttachmentResponse),
         prerequisites: prerequisitesResult.rows,
         descendantVideoIds: descendantsResult.rows.map((row) => row.id)
       }
@@ -908,7 +924,7 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
 
       await client.query('COMMIT');
       await Promise.all(oldKeysToDelete.map((key) => deleteFromBucket(key).catch(() => {})));
-      res.json({ data: result.rows[0] });
+      res.json({ data: formatVideoResponse(result.rows[0]) });
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

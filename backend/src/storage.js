@@ -38,7 +38,29 @@ const presignClient = new S3Client({
 });
 
 export function getPublicUrl(key) {
-  return `${config.s3.publicBaseUrl}/${key}`;
+  if (!config.s3.publicBaseUrl) {
+    throw new Error('PUBLIC_BUCKET_BASE_URL 或 S3_PUBLIC_ENDPOINT 未配置，无法生成文件公开访问地址');
+  }
+
+  return `${config.s3.publicBaseUrl.replace(/\/$/, '')}/${key}`;
+}
+
+export function normalizePublicUrl(url) {
+  const text = String(url || '').trim();
+
+  if (!text || text === 'undefined') {
+    return '';
+  }
+
+  if (text.startsWith('undefined/')) {
+    return getPublicUrl(text.replace(/^undefined\//, ''));
+  }
+
+  if (text.startsWith('videos/') || text.startsWith('covers/') || text.startsWith('attachments/')) {
+    return getPublicUrl(text);
+  }
+
+  return text;
 }
 
 // 生成一个短时间有效的 PUT 上传地址。

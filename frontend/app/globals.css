@@ -977,8 +977,11 @@ main {
 
 .video-card h3 {
   margin: 12px 12px 6px;
+  overflow: hidden;
   font-size: 16px;
   line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .video-card p {

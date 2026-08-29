@@ -46,6 +46,8 @@ export const config = {
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
     forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
     publicEndpoint: process.env.S3_PUBLIC_ENDPOINT,
-    publicBaseUrl: process.env.PUBLIC_BUCKET_BASE_URL
+    publicBaseUrl: process.env.PUBLIC_BUCKET_BASE_URL || (process.env.S3_PUBLIC_ENDPOINT && process.env.S3_BUCKET
+      ? `${process.env.S3_PUBLIC_ENDPOINT.replace(/\/$/, '')}/${process.env.S3_BUCKET}`
+      : '')
   }
 };

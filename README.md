@@ -4,7 +4,7 @@
 
 ## 1. 项目当前定位
 
-项目目标不是做复杂业务，而是通过一个完整的视频上传、管理和推送项目，练习全栈开发链路：
+项目目标不是做复杂业务，而是通过一个完整的视频上传、管理、学生主页课程设置项目，练习全栈开发链路：
 
 ```txt
 Next.js 前端页面 -> Express 后端 API -> PostgreSQL 数据库 -> 腾讯云 COS / S3 兼容对象存储
@@ -12,15 +12,21 @@ Next.js 前端页面 -> Express 后端 API -> PostgreSQL 数据库 -> 腾讯云 
 
 核心功能：
 
-- 上传视频、标题、介绍、封面图
-- 首页卡片形式展示视频列表
+- 上传视频、标题、介绍、封面图（封面必填）、资料附件和前置知识点
+- 上传视频已拆成独立页面，老师和教导主任都可从后台跳转上传
+- 上传时可实时预览封面、标题、简介、附件数量和前置知识点显示效果
+- 首页卡片形式展示视频列表，封面统一 16:9 比例
 - 点击视频进入播放页
-- 删除视频
-- 删除时同步删除数据库记录和存储桶文件
+- 删除视频时同步删除数据库记录、视频文件、封面图片和附件
 - 使用清理脚本排查和删除孤儿文件
-- 管理员和普通用户双账号体系
-- 管理员给指定普通用户推送视频并留言
-- 推送记录按操作（operation）聚合展示
+- 三角色账号体系：学员、老师、教导主任
+- 班级管理：老师负责一个班级，学员属于一个班级
+- 老师和教导主任均可编辑学生主页置顶的课程视频，并填写作业备注
+- 已置顶课程视频在选择区会禁选并用颜色区分，避免重复选择
+- 学生主页课程设置记录按操作（operation）聚合展示
+- 课程视频支持设置多个前置知识点，前置知识点本身也可以继续有前置知识点，学生点击后可跳转查看
+- 登录时按选择的身份严格校验账号角色，角色不匹配拒绝登录
+- 游客模式：无需登录即可浏览和搜索公开视频，看不到学生主页置顶课程和作业备注
 - 后端提供 REST API，后续可继续接入小程序或其他客户端
 
 当前上传方式：
@@ -77,8 +83,8 @@ http://服务器IP:3002
 
 ### 数据库和存储
 
-- PostgreSQL：保存视频元数据、用户、管理员、推送记录
-- 腾讯云 COS：保存视频文件和封面图片
+- PostgreSQL：保存视频元数据、用户、管理员、班级、学生主页课程设置记录、附件和前置知识点关系
+- 腾讯云 COS：保存视频文件、封面图片和附件
 - AWS S3 SDK：后端通过 S3 兼容协议上传、删除、列出对象
 
 数据库只保存文件 URL，不保存文件本体。
@@ -93,7 +99,7 @@ http://服务器IP:3002
 
 本地 MinIO 调试配置放在 [docker-compose.local.yml](file:///c:/Users/user/Desktop/播放器/docker-compose.local.yml)，只在本地叠加使用。生产服务器部署腾讯云 COS 时不启动 MinIO。
 
-服务器部署时只需要配置根目录 `.env`，填写服务器地址和腾讯云 COS 密钥即可。
+服务器部署时只需要配置根目录 `.env`；本地 Docker 试用时使用根目录 `.env.local`，填写本地 MinIO 或 COS 配置。
 
 ## 3. 项目目录结构
 
@@ -133,10 +139,11 @@ http://服务器IP:3002
 | 文件 | 作用 |
 |---|---|
 | [config.js](file:///c:/Users/user/Desktop/播放器/backend/src/config.js) | 读取环境变量，集中管理端口、数据库、S3/COS、JWT、Cookie 配置 |
-| [server.js](file:///c:/Users/user/Desktop/播放器/backend/src/server.js) | Express 服务入口，配置 CORS、JSON、健康检查、管理员路由和视频路由 |
-| [db.js](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) | PostgreSQL 连接池；后端启动时兜底创建表并初始化默认管理员和普通用户 |
-| [auth.js](file:///c:/Users/user/Desktop/播放器/backend/src/auth.js) | 管理员 JWT 签发、HttpOnly Cookie 配置、管理员接口鉴权中间件 |
-| [admin.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/admin.routes.js) | 管理员用户管理、推送视频、留言、推送记录聚合查询 API |
+| [server.js](file:///c:/Users/user/Desktop/播放器/backend/src/server.js) | Express 服务入口，配置 CORS、JSON、健康检查、路由注册 |
+| [db.js](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) | PostgreSQL 连接池；后端启动时兜底创建表、初始化默认角色和班级 |
+| [auth.js](file:///c:/Users/user/Desktop/播放器/backend/src/auth.js) | JWT 签发、HttpOnly Cookie 配置、管理员接口鉴权中间件 |
+| [admin.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/admin.routes.js) | 老师/教导主任登录、班级/老师/学员管理、学生主页课程设置、作业备注、操作聚合 API |
+| [user-auth.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/user-auth.routes.js) | 学员登录、退出、今日作业查询 |
 | [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) | 生成预签名上传地址，删除、检查、列出 S3/COS 对象 |
 | [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js) | 视频列表、详情、上传地址生成、完成上传、删除 API |
 | [clean-orphan-objects.js](file:///c:/Users/user/Desktop/播放器/backend/scripts/clean-orphan-objects.js) | 清理存储桶孤儿文件脚本 |
@@ -145,20 +152,23 @@ http://服务器IP:3002
 
 | 文件 | 作用 |
 |---|---|
-| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/page.js) | 普通用户首页，登录后显示今日作业和推荐视频 |
-| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/login/page.js) | 普通用户 PIN 登录页 |
-| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/page.js) | 管理员后台，登录后可搜索、筛选、上传和删除视频 |
-| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/users/page.js) | 管理员管理普通用户列表 |
-| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/users/[id]/assignments/page.js) | 管理员给指定用户推送视频、留言、查看历史操作 |
-| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/login/page.js) | 管理员登录页 |
-| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/videos/[id]/page.js) | 视频详情播放页 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/page.js) | 学员首页，登录后显示今日作业、学生主页置顶课程视频和作业备注 |
+| [LoginForm.js](file:///c:/Users/user/Desktop/播放器/frontend/app/login/LoginForm.js) | 统一登录页，支持学员/老师/教导主任三种身份 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/page.js) | 老师/教导主任后台入口，按角色显示不同内容 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/users/page.js) | 学员列表；老师只看本班，教导主任看全部 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/users/[id]/assignments/page.js) | 编辑指定学员主页置顶课程视频、作业备注、查看历史操作聚合 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/classes/page.js) | 班级管理，教导主任可操作 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/admins/page.js) | 老师/教导主任账号管理，仅教导主任可操作 |
+| [page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/videos/[id]/page.js) | 视频详情播放页，显示资料附件和前置知识点 |
+| [SiteHeader.js](file:///c:/Users/user/Desktop/播放器/frontend/components/SiteHeader.js) | 顶部导航，根据当前身份显示不同入口 |
 | [VideoPlayer.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoPlayer.js) | 客户端视频播放器组件，处理播放清理和避免叠音 |
-| [AdminUploadForm.js](file:///c:/Users/user/Desktop/播放器/frontend/components/AdminUploadForm.js) | 管理员上传表单和直传流程入口 |
+| [AdminUploadForm.js](file:///c:/Users/user/Desktop/播放器/frontend/components/AdminUploadForm.js) | 上传表单和直传流程入口，支持预览和前置知识点选择 |
 | [VideoFilters.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoFilters.js) | 视频关键词和日期筛选表单 |
-| [VideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoList.js) | 视频列表展示组件，支持选择模式 |
+| [VideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoList.js) | 视频列表展示组件，支持选择、删除模式 |
 | [api.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/api.js) | 前端请求后端 API、直传对象存储和上传进度封装 |
-| [useVideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/useVideoList.js) | 首页和管理员页共用的视频列表加载、搜索、重置逻辑 |
-| [globals.css](file:///c:/Users/user/Desktop/播放器/frontend/app/globals.css) | 全局样式 |
+| [guest.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/guest.js) | 游客模式状态管理（基于 localStorage） |
+| [useVideoList.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/useVideoList.js) | 共用的视频列表加载、搜索、重置逻辑 |
+| [globals.css](file:///c:/Users/user/Desktop/播放器/frontend/app/globals.css) | 全局样式，包含 16:9 封面统一样式 |
 
 ### 数据库文件
 
@@ -166,16 +176,19 @@ http://服务器IP:3002
 |---|---|
 | [schema.sql](file:///c:/Users/user/Desktop/播放器/database/schema.sql) | 创建 `videos` 表和视频列表相关索引 |
 
-`schema.sql` 只维护视频基础表结构。管理员表、普通用户表、推送记录表由后端启动时的 [ensureAppSchema](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) 统一创建和更新，避免 Docker 数据卷已存在时初始化 SQL 不再执行导致旧环境缺表。
+`schema.sql` 只维护视频基础表结构。管理员表、学员表、班级表、学生主页课程设置表、附件表和前置知识点关系表由后端启动时的 [ensureAppSchema](file:///c:/Users/user/Desktop/播放器/backend/src/db.js) 统一创建和更新，避免 Docker 数据卷已存在时初始化 SQL 不再执行导致旧环境缺表。
 
 主要表：
 
 - `videos`：视频元数据
-- `admins`：管理员账号
-- `users`：普通用户账号和 6 位 PIN 登录码
-- `user_assignments`：管理员给普通用户的推送记录，按 `operation_id` 聚合
+- `admins`：老师/教导主任账号，含 `role` 字段（`teacher` / `super_admin`）
+- `teaching_classes`：班级，含 `teacher_id` 外键，班级名唯一
+- `users`：学员账号，含 `class_id` 外键
+- `user_assignments`：学生主页课程设置和作业备注记录，按 `operation_id` 聚合，支持软删除
+- `video_attachments`：视频资料附件
+- `video_prerequisites`：课程视频的前置知识点关系
 
-注意：视频文件和封面图片不进数据库，只保存到对象存储桶。
+注意：视频文件、封面图片和附件不进数据库，只保存到对象存储桶。
 
 ## 5. memory 目录说明
 
@@ -386,8 +399,7 @@ docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml
 ```txt
 前端：http://localhost:3001
 后端：http://localhost:3002/api/health
-普通用户登录：http://localhost:3001/login
-管理员：http://localhost:3001/admin/login
+统一登录页：http://localhost:3001/login
 MinIO 控制台：http://localhost:9001
 ```
 
@@ -398,25 +410,27 @@ username: minioadmin
 password: minioadmin
 ```
 
-管理员登录：
+统一登录页支持三种身份：
 
 ```txt
-username: admin
-password: 123456
+学员登录 / 老师登录 / 教导主任登录
 ```
 
-普通用户登录：
+默认测试账号：
 
 ```txt
-6 位数字 PIN 码
+教导主任：admin / 123456
+老师：    teacher_a / 123456（负责一班）
+老师：    teacher_b / 123456（负责二班）
+学员：    student_a1 / 123456（一班）
+学员：    student_a2 / 123456（一班）
+学员：    student_a3 / 123456（一班）
+学员：    student_b1 / 123456（二班）
+学员：    student_b2 / 123456（二班）
+学员：    student_b3 / 123456（二班）
 ```
 
-普通用户默认由后端启动时创建，当前默认：
-
-```txt
-用户名: demo
-PIN: 123456
-```
+账号由后端启动时写入 PostgreSQL。数据库中不保存明文密码，均保存 bcrypt hash。
 
 ### 7.2 Node.js 代码开发
 
@@ -431,7 +445,38 @@ npm run install:all
 
 ## 8. 当前已实现的重要逻辑
 
-### 8.1 上传校验
+### 8.1 三角色账号体系
+
+当前项目使用三种角色：
+
+| 角色 | 数据库 role | 功能范围 |
+|---|---|---|
+| 学员 | （users 表） | 登录后浏览视频列表，查看老师设置的今日作业、主页置顶课程视频和作业备注 |
+| 老师 | `teacher` | 管理本班学员、上传课程视频、编辑本班学员主页置顶课程视频和作业备注，不能删除视频 |
+| 教导主任 | `super_admin` | 管理所有班级、老师账号、教导主任账号、学员；可上传和删除视频；可编辑任意学员主页置顶课程视频和作业备注 |
+
+老师和教导主任共享 `/admin` 路径，但页面内容根据 `role` 动态切换。
+
+### 8.2 登录身份严格校验
+
+登录页提供三个选项卡：学员登录、老师登录、教导主任登录。前端把当前选择的身份通过 `expectedRole` 传给后端，后端校验账号实际角色必须和选择身份一致：
+
+- 学员登录输入老师/教导主任账号 → 返回 **"没有这个学生"**
+- 老师登录输入学员账号 → 返回 **"没有这个老师"**
+- 老师登录输入教导主任账号 → 返回 **"没有这个老师"**
+- 教导主任登录输入老师账号 → 返回 **"该账号不是教导主任"**
+
+后端 `/api/admin/login` 强制要求 `expectedRole` 字段，不允许跳过校验。
+
+### 8.3 班级与权限边界
+
+- 每个老师对应一个 `teaching_classes` 班级记录
+- 每个学员通过 `users.class_id` 关联班级
+- 老师只能查看和管理自己班级的学员
+- 教导主任可以查看所有班级、所有学员、所有老师账号
+- 新创建的学员默认放入创建者所属班级（老师创建）或教导主任选择的班级
+
+### 8.4 上传校验
 
 上传表单已做前后端校验。
 
@@ -447,6 +492,7 @@ npm run install:all
 | 视频格式 | mp4、webm、mov |
 | 封面 | 必填，最大 5MB |
 | 封面格式 | jpg、jpeg、png、webp |
+| 前置知识点 | 可选，可搜索并选择多个已有课程视频 |
 
 原则：
 
@@ -454,27 +500,29 @@ npm run install:all
 前端校验是为了体验，后端校验才是真正安全。
 ```
 
-### 8.2 上传数据流
+### 8.5 上传数据流
 
 当前上传流程：
 
 ```txt
 1. 前端校验表单
-2. 前端把标题、介绍、视频文件信息、封面文件信息 POST 到 /api/videos/multipart/create
-3. 后端校验元数据，创建视频 Multipart Upload，并返回 uploadId、videoKey、封面上传地址
+2. 前端把标题、介绍、视频文件信息、封面文件信息、附件信息 POST 到 /api/videos/multipart/create
+3. 后端校验元数据，创建视频 Multipart Upload，并返回 uploadId、videoKey、封面和附件的预签名上传地址
 4. 前端把视频按 8MB 切片，每个分片向 /api/videos/multipart/part-url 申请预签名 PUT 地址
 5. 前端并发把视频分片直接 PUT 到 COS，并记录每个分片返回的 ETag
 6. 前端把 uploadId、videoKey、PartNumber + ETag 列表 POST 到 /api/videos/multipart/complete
 7. 后端通知 COS 合并视频分片，并确认最终视频对象存在
-8. 前端把封面直接 PUT 到 COS
-9. 前端把 title / description / videoKey / coverKey POST 到 /api/videos/complete
-10. 后端确认视频和封面对象存在后，把 video_url / cover_url 保存到 PostgreSQL
+8. 前端把封面和附件直接 PUT 到 COS
+9. 前端把 title / description / videoKey / coverKey / attachments / prerequisiteVideoIds POST 到 /api/videos/complete
+10. 后端确认视频、封面和附件对象存在后，把 video_url / cover_url / 附件 / 前置知识点关系保存到 PostgreSQL
 11. 前端刷新列表
 ```
 
 这个方案比后端中转更快，也适合大文件上传；如果上传中途失败，前端会调用 abort 接口取消未完成的 Multipart Upload，避免 COS 里长期残留未合并分片。
 
-### 8.3 视频播放叠音修复
+后端保存前会通过 COS HeadObject 校验对象真实大小，不轻信前端上报的文件元数据。
+
+### 8.6 视频播放叠音修复
 
 之前出现过：从视频播放页返回首页后，声音还在播放，甚至出现叠音。
 
@@ -487,7 +535,7 @@ npm run install:all
 
 详见：[bug-video-audio-overlap.md](file:///c:/Users/user/Desktop/播放器/memory/bug-video-audio-overlap.md)
 
-### 8.4 数据库和存储桶同步
+### 8.7 数据库和存储桶同步
 
 项目中：
 
@@ -502,7 +550,7 @@ PostgreSQL 保存“文件在哪里”
 
 ```txt
 1. 先查询数据库记录
-2. 根据 video_url / cover_url 删除存储桶对象
+2. 根据 video_url / cover_url / attachments 删除存储桶对象
 3. 存储桶删除成功后，再删除数据库记录
 ```
 
@@ -522,48 +570,48 @@ npm run storage:clean --prefix backend -- --delete
 
 详见：[storage-sync-notes.md](file:///c:/Users/user/Desktop/播放器/memory/storage-sync-notes.md)
 
-### 8.5 管理员推送视频和留言
+### 8.8 老师/教导主任编辑学生主页课程和作业备注
 
-管理员可以在 `/admin/users` 查看普通用户列表，进入某个用户的推送管理页 `/admin/users/[id]/assignments`：
+老师和教导主任可以在 `/admin/users` 查看学员列表，进入某个学员的主页课程设置页 `/admin/users/[id]/assignments`：
 
-- 查看当前正在推送的视频
-- 从视频库中选择推荐视频
-- 填写留言
-- 一次「保存推送」同时提交视频和留言
-- 取消正在推送的视频
-- 删除历史推送记录（软删除，需要填写原因）
+- 查看当前学生主页置顶的课程视频
+- 从视频库中选择课程视频，已置顶视频会禁选并用颜色区分
+- 填写作业备注
+- 一次「保存设置」可以同时提交课程视频和作业备注
+- 取消正在置顶的课程视频
+- 删除历史操作记录（软删除，需要填写原因）
 
-每次「保存推送」后端会生成一个 `operation_id`，同一次操作里的视频记录和留言记录共享这个 ID。历史操作区按 `operation_id` 聚合显示为以下三种情况之一：
+每次「保存设置」后端会生成一个 `operation_id`，同一次操作里的视频记录和作业备注记录共享这个 ID。历史操作区按 `operation_id` 聚合显示为以下三种情况之一：
 
-1. 管理员 admin 给用户 demo 把推送更新为以下 N 个视频：…，并留言：…
-2. 管理员 admin 单独修改了留言为：…
-3. 管理员 admin 单独更新了视频推送为以下 N 个视频：…
+1. 老师 admin 给学员 demo 编辑了 N 个主页置顶课程视频，并填写作业备注：…
+2. 老师 admin 单独修改了作业备注：…
+3. 老师 admin 单独编辑了 N 个主页置顶课程视频：…
 
 业务规则：
 
-- 同一个用户最多同时存在 5 个正在推送的视频
-- 已经推送过的视频不会重复推送
-- 取消推送只做软删除，历史记录仍可查看
+- 同一个学员最多同时存在 5 个主页置顶课程视频
+- 已经置顶的视频不会重复置顶，前端选择区会禁选
+- 取消置顶只做软删除，历史记录仍可查看
 - 删除历史记录需要填写原因
+- 老师只能编辑自己班级学员的主页课程设置
 
-### 8.6 普通用户登录和首页
+### 8.9 学员登录和首页
 
-普通用户使用 6 位数字 PIN 码登录：
+学员使用账号密码登录：
 
 ```txt
-POST /api/users/login    登录，设置 HttpOnly Cookie
-GET  /api/users/me       检查当前普通用户登录状态
-POST /api/users/logout   退出登录，清除 Cookie
+POST /api/user/login    登录，设置 HttpOnly Cookie
+GET  /api/user/me       检查当前学员登录状态
+POST /api/user/logout   退出登录，清除 Cookie
+GET  /api/user/assignments/today  获取今日作业
 ```
 
 登录后首页显示：
 
-- 今日作业：管理员当前推送的视频 + 留言
-- 推荐视频：全部视频列表，支持搜索和日期筛选
+- 今日的作业：老师设置的主页置顶课程视频 + 作业备注
+- 视频列表：全部视频列表，支持搜索和日期筛选
 
-视频播放页 `/videos/[id]` 公开访问，但会通过 `from` 参数区分管理员和普通用户身份校验。
-
-### 8.7 Cookie 策略
+### 8.10 Cookie 策略
 
 登录 Cookie 设置原则：
 
@@ -574,6 +622,33 @@ POST /api/users/logout   退出登录，清除 Cookie
 - token 有过期时间
 
 这样生产环境用 `http://IP:3001` 临时访问时也不会因为 Secure Cookie 被浏览器拒绝而导致登录无反应。
+
+### 8.11 游客模式
+
+登录页左上角提供"先不登录使用游客模式访问"入口。点击后前端会在 `localStorage` 中标记游客状态，并直接进入首页。
+
+游客模式特点：
+
+- 无需账号密码即可访问
+- 可以浏览、搜索、播放公开视频
+- 首页不显示"今日的作业"、"学生主页置顶的课程视频"和"作业备注"
+- 顶部导航显示"回到首页"和"去登录"，点击"去登录"会清除游客标记并回到登录页
+- 游客身份不是后端认证状态，不能访问任何需要登录的接口
+
+相关文件：
+
+- [frontend/lib/guest.js](file:///c:/Users/user/Desktop/播放器/frontend/lib/guest.js)：游客模式读写封装
+- [frontend/components/SiteHeader.js](file:///c:/Users/user/Desktop/播放器/frontend/components/SiteHeader.js)：游客入口和退出按钮
+- [frontend/app/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/page.js)：游客首页逻辑
+- [frontend/app/videos/[id]/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/videos/[id]/page.js)：游客播放页逻辑
+
+### 8.12 封面统一 16:9
+
+所有视频封面显示统一使用 16:9 比例，相关 CSS 类包括：
+
+- `.cover-wrap`：视频列表卡片封面
+- `.operation-video-thumb`：操作记录小缩略图
+- `.player`：视频播放器
 
 ## 9. 当前部署上下文
 
@@ -655,58 +730,61 @@ curl http://localhost:3002/api/health
 curl -I http://localhost:3001
 ```
 
-## 12. 当前已实现：管理员、普通用户、推送系统
+## 12. 当前已实现：角色、班级、学生主页课程系统
 
-项目已拆成普通用户前台和管理员后台。
+项目已拆成学员前台和老师/教导主任后台。
 
 ### 12.1 页面规划
 
 ```txt
-/                              普通用户首页，登录后显示今日作业和推荐视频
-/login                         普通用户 PIN 登录页
-/admin                         管理员后台，登录后可浏览、搜索、筛选、上传、删除
-/admin/login                   管理员登录页
-/admin/users                   管理员管理普通用户
-/admin/users/[id]/assignments  管理员给用户推送视频、留言、查看历史操作
-/videos/[id]                   视频播放页，公开访问
+/                              学员首页；游客模式下只显示视频列表和搜索
+/login                         统一登录页，支持学员/老师/教导主任；左上角可进入游客模式
+/admin                         老师/教导主任后台，按角色显示不同内容
+/admin/login                   老师/教导主任登录页
+/admin/upload                  独立上传课程视频页，支持封面/标题/简介预览和前置知识点选择
+/admin/users                   学员管理；老师只看本班，教导主任看全部
+/admin/users/[id]/assignments  编辑指定学员主页置顶课程视频、作业备注、查看历史操作
+/admin/classes                 班级管理，仅教导主任可操作
+/admin/admins                  老师/教导主任账号管理，仅教导主任可操作
+/videos/[id]                   视频播放页，公开访问，显示资料附件和前置知识点
 ```
 
 ### 12.2 账号体系
 
-管理员默认账号：
+默认测试账号：
 
 ```txt
-username: admin
-password: 123456
+教导主任：admin        / 123456
+老师：    teacher_a    / 123456（负责一班）
+老师：    teacher_b    / 123456（负责二班）
+学员：    student_a1   / 123456（一班）
+学员：    student_a2   / 123456（一班）
+学员：    student_a3   / 123456（一班）
+学员：    student_b1   / 123456（二班）
+学员：    student_b2   / 123456（二班）
+学员：    student_b3   / 123456（二班）
 ```
 
-普通用户默认账号：
-
-```txt
-username: demo
-PIN: 123456
-```
-
-账号由后端启动时写入 PostgreSQL。数据库中不保存明文密码，管理员密码保存 bcrypt hash，普通用户保存 6 位 PIN。
+账号由后端启动时写入 PostgreSQL。数据库中不保存明文密码，均保存 bcrypt hash。
 
 ### 12.3 鉴权方案
 
-管理员和普通用户分别使用独立的 HttpOnly Cookie：
+学员使用独立 HttpOnly Cookie，老师和教导主任共用另一套 HttpOnly Cookie：
 
-管理员：
+学员：
+
+```txt
+POST /api/user/login    登录，设置 HttpOnly Cookie
+GET  /api/user/me       检查当前学员登录状态
+POST /api/user/logout   退出登录，清除 Cookie
+```
+
+老师 / 教导主任：
 
 ```txt
 POST /api/admin/login    登录，设置 HttpOnly Cookie
-GET  /api/admin/me       检查当前管理员登录状态
+GET  /api/admin/me       检查当前登录状态，返回 role
 POST /api/admin/logout   退出登录，清除 Cookie
-```
-
-普通用户：
-
-```txt
-POST /api/users/login    登录，设置 HttpOnly Cookie
-GET  /api/users/me       检查当前普通用户登录状态
-POST /api/users/logout   退出登录，清除 Cookie
 ```
 
 Cookie 设置原则：
@@ -727,14 +805,15 @@ GET /api/videos
 GET /api/videos/:id
 ```
 
-普通用户接口（需要 user_token Cookie）：
+学员接口（需要 user_token Cookie）：
 
 ```txt
-GET  /api/users/me
-POST /api/users/logout
+GET  /api/user/me
+POST /api/user/logout
+GET  /api/user/assignments/today
 ```
 
-仅管理员可用：
+老师和教导主任共有接口（需要 admin_token Cookie）：
 
 ```txt
 POST /api/admin/login
@@ -743,21 +822,35 @@ GET  /api/admin/me
 GET  /api/admin/users
 POST /api/admin/users
 POST /api/admin/users/:userId/assignments
-POST /api/admin/users/:userId/message
 PATCH /api/admin/assignments/:id/cancel
 PATCH /api/admin/assignments/:id/delete
+PATCH /api/admin/operations/:operationId/delete
 POST /api/videos/multipart/create
 POST /api/videos/multipart/part-url
 POST /api/videos/multipart/complete
 POST /api/videos/multipart/abort
 POST /api/videos/complete
+```
+
+仅教导主任可用：
+
+```txt
+GET    /api/admin/classes
+POST   /api/admin/classes
+PATCH  /api/admin/classes/:id
+DELETE /api/admin/classes/:id
+GET    /api/admin/admins
+POST   /api/admin/admins
+POST   /api/admin/admins/:id/reset-password
+DELETE /api/admin/admins/:id
+PATCH  /api/admin/users/:id/class
 DELETE /api/videos/:id
 ```
 
 上传仍然保持前端直传腾讯云 COS：
 
 ```txt
-管理员浏览器 -> 后端获取预签名分片 URL -> 管理员浏览器分片 PUT 到 COS -> 后端 Complete Multipart -> 后端写数据库
+老师/教导主任浏览器 -> 后端获取预签名分片 URL -> 浏览器分片 PUT 到 COS -> 后端 Complete Multipart -> 后端写数据库和前置知识关系
 ```
 
 文件内容不经过后端中转。
@@ -786,7 +879,7 @@ GET /api/videos?keyword=关键词&startDate=2026-01-01&endDate=2026-01-31
 3. 配置 HTTPS，并把 `FRONTEND_URL` / `NEXT_PUBLIC_API_BASE_URL` 改为 https://域名
 4. 按实际域名收紧 COS CORS 配置
 5. 增加分页、编辑视频信息等功能
-6. 增加推送到期时间、用户观看进度等
+6. 增加学生主页置顶课程有效期、用户观看进度等
 
 ## 14. 新对话接手提示
 
@@ -794,11 +887,11 @@ GET /api/videos?keyword=关键词&startDate=2026-01-01&endDate=2026-01-31
 
 1. [README.md](file:///c:/Users/user/Desktop/播放器/README.md)
 2. [memory/README.md](file:///c:/Users/user/Desktop/播放器/memory/README.md)
-3. [project-study-notes.md](file:///c:/Users/user/Desktop/播放器/memory/project-study-notes.md)
+3. [memory/project-study-notes.md](file:///c:/Users/user/Desktop/播放器/memory/project-study-notes.md)
 4. 如果继续部署，再重点看本 README 的“服务器部署流程”和“当前部署上下文”。
 
 一句话交接：
 
 ```txt
-这是一个 Next.js + Express + PostgreSQL + 腾讯云 COS 的视频播放器教学项目；当前包含管理员和普通用户双账号、管理员给普通用户推送视频并留言、推送记录按 operation 聚合；部署方式是服务器 git pull 后填写根目录 .env，再用 docker compose up -d --build 启动，上传采用后端创建 COS Multipart 任务、浏览器分片直传、后端合并分片、完成后后端入库的流程。
+这是一个 Next.js + Express + PostgreSQL + 腾讯云 COS / S3 兼容对象存储的视频播放器教学项目；当前包含学员/老师/教导主任三角色、班级管理、登录角色严格校验、独立课程视频上传页、封面标题简介预览、附件上传、课程前置知识点、学生主页置顶课程视频和作业备注、操作记录按 operation 聚合、游客模式浏览公开视频；admin 是默认教导主任且不带班，老师至少保留一个；本地 Docker 试用使用根目录 .env.local，服务器部署使用根目录 .env，上传采用后端创建 COS Multipart 任务、浏览器分片直传、后端合并分片、完成后后端入库的流程。
 ```

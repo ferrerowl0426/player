@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import VideoFilters from '../components/VideoFilters.js';
 import VideoList from '../components/VideoList.js';
 import { fetchTodayAssignments, fetchUserMe, logoutUser } from '../lib/api.js';
+import { isGuestMode } from '../lib/guest.js';
 import { EMPTY_VIDEO_FILTERS, useVideoList } from '../lib/useVideoList.js';
 
 function formatDate(dateString) {
@@ -16,6 +17,7 @@ function formatDate(dateString) {
 export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [isGuest, setIsGuest] = useState(false);
   const [todayAssignments, setTodayAssignments] = useState([]);
   const [assignmentDate, setAssignmentDate] = useState(null);
   const [assignmentStatus, setAssignmentStatus] = useState('正在加载今日作业...');
@@ -45,6 +47,13 @@ export default function HomePage() {
 
   useEffect(() => {
     async function initUserPage() {
+      // 游客模式不需要登录即可查看公开视频列表。
+      if (isGuestMode()) {
+        setIsGuest(true);
+        await loadVideos(EMPTY_VIDEO_FILTERS);
+        return;
+      }
+
       try {
         const result = await fetchUserMe();
         setUser(result.data);
@@ -65,7 +74,7 @@ export default function HomePage() {
     router.replace('/login');
   }
 
-  if (!user) {
+  if (!isGuest && !user) {
     return <p className="empty-text">正在检查学员登录状态...</p>;
   }
 
@@ -76,56 +85,64 @@ export default function HomePage() {
     <>
       <section className="hero">
         <div>
-          <h1>视频首页</h1>
-          <p>学员可以浏览完整视频列表，老师推送的内容会额外显示在今日作业区域。</p>
+          <h1>{isGuest ? '视频首页' : '视频首页'}</h1>
+          <p>
+            {isGuest
+              ? '游客模式：可以搜索和播放公开视频，不会看到推送和留言。'
+              : '学员可以浏览完整视频列表，老师推送的内容会额外显示在今日作业区域。'}
+          </p>
         </div>
-        <button className="hero-button" type="button" onClick={handleLogout}>退出登录</button>
+        {!isGuest && (
+          <button className="hero-button" type="button" onClick={handleLogout}>退出登录</button>
+        )}
       </section>
 
-      <section className="video-section">
-        <div className="section-title">
-          <h2>今日的作业</h2>
-          <button type="button" onClick={loadTodayAssignments}>刷新</button>
-        </div>
+      {!isGuest && (
+        <section className="video-section">
+          <div className="section-title">
+            <h2>今日的作业</h2>
+            <button type="button" onClick={loadTodayAssignments}>刷新</button>
+          </div>
 
-        {assignmentDate ? <p className="section-note">最近更新：{formatDate(assignmentDate)}</p> : null}
-        {assignmentStatus ? <p className="empty-text">{assignmentStatus}</p> : null}
+          {assignmentDate ? <p className="section-note">最近更新：{formatDate(assignmentDate)}</p> : null}
+          {assignmentStatus ? <p className="empty-text">{assignmentStatus}</p> : null}
 
-        <div className="assignment-block">
-          <h3>推荐视频</h3>
-          {assignmentsWithVideo.length === 0 ? (
-            <p className="empty-text">老师还没有推荐视频</p>
-          ) : (
-            <div className="assignment-video-grid">
-              {assignmentsWithVideo.map((assignment) => (
-                <Link className="assignment-video-card" href={`/videos/${assignment.video_id}`} key={assignment.id}>
-                  <div className="cover-wrap">
-                    <Image src={assignment.video_cover_url} alt={assignment.video_title} fill unoptimized style={{ objectFit: 'cover' }} />
-                  </div>
-                  <strong>{assignment.video_title}</strong>
-                  <span>{assignment.video_description || '暂无介绍'}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+          <div className="assignment-block">
+            <h3>推荐视频</h3>
+            {assignmentsWithVideo.length === 0 ? (
+              <p className="empty-text">老师还没有推荐视频</p>
+            ) : (
+              <div className="assignment-video-grid">
+                {assignmentsWithVideo.map((assignment) => (
+                  <Link className="assignment-video-card" href={`/videos/${assignment.video_id}`} key={assignment.id}>
+                    <div className="cover-wrap">
+                      <Image src={assignment.video_cover_url} alt={assignment.video_title} fill unoptimized style={{ objectFit: 'cover' }} />
+                    </div>
+                    <strong>{assignment.video_title}</strong>
+                    <span>{assignment.video_description || '暂无介绍'}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <div className="assignment-block">
-          <h3>留言板</h3>
-          {assignmentsWithMessage.length === 0 ? (
-            <p className="empty-text">老师没有给你留言</p>
-          ) : (
-            <div className="message-list">
-              {assignmentsWithMessage.map((assignment) => (
-                <article className="message-item" key={assignment.id}>
-                  <p>{assignment.message}</p>
-                  <time>{new Date(assignment.created_at).toLocaleString('zh-CN')}</time>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+          <div className="assignment-block">
+            <h3>作业备注</h3>
+            {assignmentsWithMessage.length === 0 ? (
+              <p className="empty-text">老师没有给你作业备注</p>
+            ) : (
+              <div className="message-list">
+                {assignmentsWithMessage.map((assignment) => (
+                  <article className="message-item" key={assignment.id}>
+                    <p>{assignment.message}</p>
+                    <time>{new Date(assignment.created_at).toLocaleString('zh-CN')}</time>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="video-section">
         <div className="section-title">

@@ -139,14 +139,16 @@ export async function fetchTodayAssignments() {
 }
 
 // 老师登录。后端会设置 HttpOnly Cookie，前端不直接保存 token。
-export async function loginAdmin({ username, password }) {
+// expectedRole 用于前端告诉后端当前选择的登录身份（teacher 或 super_admin），
+// 后端会校验账号实际角色必须和选择的身份一致。
+export async function loginAdmin({ username, password, expectedRole }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/login`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ username, password, expectedRole })
   });
 
   return parseJsonResponse(response, '老师登录失败');
@@ -224,6 +226,16 @@ export async function updateManagedUserStatus({ id, isActive }) {
   return parseJsonResponse(response, '更新学员状态失败');
 }
 
+// 教导主任删除学员。
+export async function deleteManagedUser(id) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  });
+
+  return parseJsonResponse(response, '删除学员失败');
+}
+
 // 老师查看老师账号列表。
 export async function fetchManagedAdmins() {
   const response = await fetch(`${getApiBaseUrl()}/admin/admins`, {
@@ -234,18 +246,18 @@ export async function fetchManagedAdmins() {
   return parseJsonResponse(response, '获取老师列表失败');
 }
 
-// 老师创建其他老师。
-export async function createManagedAdmin({ username, password }) {
+// 教导主任创建老师或教导主任账号。
+export async function createManagedAdmin({ username, password, role }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/admins`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ username, password, role })
   });
 
-  return parseJsonResponse(response, '创建老师失败');
+  return parseJsonResponse(response, '创建账号失败');
 }
 
 // 老师重置其他老师密码。
@@ -458,7 +470,7 @@ export async function uploadFileToBucket({ uploadUrl, file, onProgress }) {
 }
 
 // 直传完成后，通知后端写入数据库。
-export async function completeVideoUpload({ title, description, videoKey, coverKey, attachments = [] }) {
+export async function completeVideoUpload({ title, description, videoKey, coverKey, attachments = [], prerequisiteVideoIds = [] }) {
   const response = await fetch(`${getApiBaseUrl()}/videos/complete`, {
     method: 'POST',
     credentials: 'include',
@@ -470,11 +482,56 @@ export async function completeVideoUpload({ title, description, videoKey, coverK
       description,
       videoKey,
       coverKey,
-      attachments
+      attachments,
+      prerequisiteVideoIds
     })
   });
 
   return parseJsonResponse(response, '保存视频信息失败');
+}
+
+// 教导主任编辑课程时，为可选替换的视频、封面和资料申请上传地址。
+export async function createEditVideoUpload({ title, description, video = null, cover = null, attachments = [] }) {
+  const response = await fetch(`${getApiBaseUrl()}/videos/edit-upload/create`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      title,
+      description,
+      video: video ? { name: video.name, size: video.size, type: video.type } : null,
+      cover: cover ? { name: cover.name, size: cover.size, type: cover.type } : null,
+      attachments: attachments.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type
+      }))
+    })
+  });
+
+  return parseJsonResponse(response, '创建编辑上传任务失败');
+}
+
+// 教导主任保存课程编辑结果。
+export async function updateVideo({ id, title, description, videoKey = '', coverKey = '', attachments, prerequisiteVideoIds }) {
+  const body = { title, description, videoKey, coverKey, attachments };
+
+  if (Array.isArray(prerequisiteVideoIds)) {
+    body.prerequisiteVideoIds = prerequisiteVideoIds;
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/videos/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  return parseJsonResponse(response, '保存课程编辑失败');
 }
 
 // 删除视频。

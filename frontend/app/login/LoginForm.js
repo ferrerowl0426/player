@@ -36,21 +36,13 @@ export default function LoginForm() {
       if (tab === 'student') {
         await loginUser({ username, password });
         router.replace('/');
+      } else if (tab === 'teacher') {
+        // 老师登录选项卡只允许实际角色为 teacher 的账号。
+        await loginAdmin({ username, password, expectedRole: 'teacher' });
+        router.replace('/admin');
       } else {
-        const result = await loginAdmin({ username, password });
-
-        if (tab === 'super' && result.data?.role !== 'super_admin') {
-          setStatus('该账号不是教导主任');
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (tab === 'teacher' && result.data?.role !== 'teacher' && result.data?.role !== 'super_admin') {
-          setStatus('该账号不是老师');
-          setIsSubmitting(false);
-          return;
-        }
-
+        // 教导主任登录选项卡只允许实际角色为 super_admin 的账号。
+        await loginAdmin({ username, password, expectedRole: 'super_admin' });
         router.replace('/admin');
       }
 
@@ -103,6 +95,23 @@ export default function LoginForm() {
         <button type="submit" disabled={isSubmitting}>{isSubmitting ? '登录中...' : '登录'}</button>
         <p className="status-text">{status}</p>
       </form>
+
+      <div className="login-test-note">
+        <strong>测试账号备注</strong>
+        <p>仅用于测试人员快捷登录，正式版本需要删除。</p>
+        <div className="login-test-grid">
+          <span>教导主任：admin / 123456</span>
+          <span>老师：ab / 123456</span>
+          <span>学员：student_01 / 123456</span>
+          <span>学员：student_a1 / 123456</span>
+          <span>学员：student_a2 / 123456</span>
+          <span>学员：student_a3 / 123456</span>
+          <span>学员：student_a4 / 123456</span>
+          <span>学员：student_b1 / 123456</span>
+          <span>学员：student_b2 / 123456</span>
+          <span>学员：student_b3 / 123456</span>
+        </div>
+      </div>
     </section>
   );
 }

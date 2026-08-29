@@ -9,6 +9,8 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+# 避免 Docker 层缓存导致 Next.js 使用旧的构建产物或页面缓存。
+RUN rm -rf .next
 RUN npm run build
 
 EXPOSE 3001

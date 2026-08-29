@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import AdminUploadForm from '../../components/AdminUploadForm.js';
 import VideoFilters from '../../components/VideoFilters.js';
 import VideoList from '../../components/VideoList.js';
 import { deleteVideo, fetchAdminMe, fetchClasses, logoutAdmin } from '../../lib/api.js';
@@ -41,15 +40,15 @@ export default function AdminPage() {
     initAdminPage();
   }, [router]);
 
-  async function handleDelete(videoId) {
-    const confirmed = window.confirm('确定要删除这个视频吗？删除后数据库记录、视频文件和封面都会被删除。');
+  async function handleDelete(video) {
+    const confirmed = window.confirm(`确定删除《${video.title}》吗？\n\n删除后：\n- 视频文件、封面和附件会从存储桶删除\n- 其他课程中引用它的前置知识关系会自动移除\n- 学生主页历史操作记录会保留课程标题，但不再跳转\n\n此操作不可恢复。`);
 
     if (!confirmed) {
       return;
     }
 
     try {
-      await deleteVideo(videoId);
+      await deleteVideo(video.id);
       await loadVideos(filters);
     } catch (error) {
       alert(error.message);
@@ -74,8 +73,8 @@ export default function AdminPage() {
           <h1>{isSuperAdmin ? '教导主任后台' : '老师后台'}</h1>
           <p>
             {isSuperAdmin
-              ? '教导主任可以管理班级、老师账号、视频，并给每个学员推送内容。'
-              : '老师可以管理本班学员、上传视频，并给学员推送内容。'}
+              ? '教导主任可以管理班级、视频，并编辑每个学员主页置顶的课程视频和作业备注。'
+              : '老师可以管理本班学员、上传视频，并编辑学员主页置顶的课程视频和作业备注。'}
           </p>
         </div>
         <button className="hero-button" type="button" onClick={handleLogout}>退出登录</button>
@@ -86,9 +85,9 @@ export default function AdminPage() {
           <h2>快捷入口</h2>
         </div>
         <div className="admin-link-grid">
+          <a href="/admin/upload">上传视频</a>
           {isSuperAdmin && <a href="/admin/classes">班级管理</a>}
           <a href="/admin/users">{isSuperAdmin ? '学员管理' : '班级学员'}</a>
-          {isSuperAdmin && <a href="/admin/admins">老师账号</a>}
         </div>
       </section>
 
@@ -109,18 +108,18 @@ export default function AdminPage() {
         </section>
       )}
 
-      <AdminUploadForm onUploaded={() => loadVideos(filters)} />
-
       <section className="video-section">
         <div className="section-title">
           <h2>视频管理</h2>
           <button type="button" onClick={() => loadVideos(filters)}>刷新</button>
         </div>
+        {isSuperAdmin ? <p className="section-note">教导主任可以在课程卡片中编辑或删除课程。编辑课程会修改原课程记录，不会新建课程。</p> : null}
 
         <VideoFilters filters={filters} onChange={setFilters} onSubmit={handleSearch} onReset={handleReset} />
         <VideoList
           videos={videos}
           status={listStatus}
+          canEdit={isSuperAdmin}
           canDelete={isSuperAdmin}
           onDelete={isSuperAdmin ? handleDelete : undefined}
           detailQuery="?from=admin"
@@ -129,3 +128,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+

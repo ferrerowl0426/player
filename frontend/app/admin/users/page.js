@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createManagedUser,
+  deleteManagedUser,
   fetchAdminMe,
   fetchClasses,
   fetchManagedUsers,
@@ -72,9 +73,9 @@ export default function AdminUsersPage() {
     setStatus('正在创建学员...');
 
     try {
-      const result = await createManagedUser(account);
+      await createManagedUser(account);
       event.currentTarget.reset();
-      setUsers((current) => [result.data, ...current.filter((item) => item.id !== result.data.id)]);
+      await loadUsers();
       setStatus('');
     } catch (error) {
       setStatus(error.message);
@@ -101,6 +102,21 @@ export default function AdminUsersPage() {
   async function handleToggleStatus(user) {
     try {
       await updateManagedUserStatus({ id: user.id, isActive: !user.is_active });
+      await loadUsers();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function handleDeleteUser(user) {
+    const confirmed = window.confirm(`确定删除学员 ${user.username} 吗？该学员的主页课程设置记录也会删除。`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteManagedUser(user.id);
       await loadUsers();
     } catch (error) {
       setStatus(error.message);
@@ -173,9 +189,10 @@ export default function AdminUsersPage() {
                 <span>{user.is_active ? '已启用' : '已禁用'} · 创建于 {formatDate(user.created_at)}</span>
               </div>
               <div className="row-actions">
-                <a href={`/admin/users/${user.id}/assignments`}>推送/留言</a>
+                <a href={`/admin/users/${user.id}/assignments`}>主页课程/作业备注</a>
                 <button type="button" onClick={() => handleResetPassword(user)}>重置密码</button>
                 <button type="button" onClick={() => handleToggleStatus(user)}>{user.is_active ? '禁用' : '启用'}</button>
+                {isSuperAdmin && <button type="button" onClick={() => handleDeleteUser(user)}>删除</button>}
               </div>
             </article>
           ))}

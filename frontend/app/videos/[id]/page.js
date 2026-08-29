@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import VideoPlayer from '../../../components/VideoPlayer.js';
 import { fetchAdminMe, fetchUserMe, fetchVideoById } from '../../../lib/api.js';
+import { isGuestMode } from '../../../lib/guest.js';
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleString('zh-CN');
@@ -32,10 +33,13 @@ export default function VideoDetailPage() {
   useEffect(() => {
     async function loadVideoDetail() {
       try {
-        if (isFromAdmin) {
-          await fetchAdminMe();
-        } else {
-          await fetchUserMe();
+        // 游客模式不需要登录即可播放公开视频。
+        if (!isGuestMode()) {
+          if (isFromAdmin) {
+            await fetchAdminMe();
+          } else {
+            await fetchUserMe();
+          }
         }
 
         setStatus('正在加载视频...');
@@ -72,6 +76,25 @@ export default function VideoDetailPage() {
       <h1>{video.title}</h1>
       <p className="detail-time">发布时间：{formatDate(video.created_at)}</p>
       <p className="detail-desc">{video.description || '暂无介绍'}</p>
+
+      <div className="prerequisite-section">
+        <h2>前置知识点</h2>
+        {video.prerequisites?.length > 0 ? (
+          <div className="prerequisite-link-list">
+            {video.prerequisites.map((prerequisite) => (
+              <a
+                className="prerequisite-link"
+                href={`/videos/${prerequisite.id}${isFromAdmin ? `?from=admin&returnTo=${encodeURIComponent(backHref)}` : ''}`}
+                key={prerequisite.id}
+              >
+                {prerequisite.title}
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-text">这个课程没有前置知识点。</p>
+        )}
+      </div>
 
       <div className="attachment-section">
         <h2>资料下载</h2>

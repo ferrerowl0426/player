@@ -37,7 +37,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS teaching_classes (
       id SERIAL PRIMARY KEY,
-      name VARCHAR(100) NOT NULL,
+      name VARCHAR(100) NOT NULL UNIQUE,
       teacher_id INTEGER REFERENCES admins(id) ON DELETE SET NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
@@ -99,6 +99,19 @@ export async function ensureAppSchema() {
     ALTER COLUMN operation_id SET DEFAULT nextval('user_assignments_operation_id_seq')
   `);
 
+  await pool.query(`
+    ALTER TABLE user_assignments
+    ADD COLUMN IF NOT EXISTS assigned_video_title TEXT NOT NULL DEFAULT ''
+  `);
+
+  await pool.query(`
+    UPDATE user_assignments ua
+    SET assigned_video_title = v.title
+    FROM videos v
+    WHERE ua.video_id = v.id
+      AND ua.assigned_video_title = ''
+  `);
+
   await pool.query('CREATE INDEX IF NOT EXISTS idx_user_assignments_user_id_created_at ON user_assignments (user_id, created_at DESC)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_user_assignments_deleted ON user_assignments (is_deleted)');
 
@@ -117,6 +130,19 @@ export async function ensureAppSchema() {
 
   await pool.query('CREATE INDEX IF NOT EXISTS idx_video_attachments_video_id ON video_attachments (video_id)');
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS video_prerequisites (
+      video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+      prerequisite_video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (video_id, prerequisite_video_id),
+      CONSTRAINT video_prerequisites_no_self CHECK (video_id <> prerequisite_video_id)
+    )
+  `);
+
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_video_prerequisites_video_id ON video_prerequisites (video_id)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_video_prerequisites_prerequisite_id ON video_prerequisites (prerequisite_video_id)');
+
   // 管理员至少要有一个，否则后台无法再创建用户或修复数据。
   await pool.query(
     `INSERT INTO admins (username, password_hash, role)
@@ -125,13 +151,8 @@ export async function ensureAppSchema() {
     ['admin', DEFAULT_PASSWORD_HASH, 'super_admin']
   );
 
-  // 初始化教导主任账号。
-  await pool.query(
-    `INSERT INTO admins (username, password_hash, role)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
-    ['director', DEFAULT_PASSWORD_HASH, 'super_admin']
-  );
+  // admin 作为唯一的教导主任账号，便于用户沿用原有管理员账号。
+  // 如需测试老师界面，请使用 teacher_a 或 teacher_b。
 
   // 初始化两位老师。
   await pool.query(
@@ -140,6 +161,12 @@ export async function ensureAppSchema() {
      ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
     ['teacher_a', DEFAULT_PASSWORD_HASH, 'teacher', 'teacher_b', DEFAULT_PASSWORD_HASH, 'teacher']
   );
+
+  await pool.query(`
+    UPDATE teaching_classes c
+    SET teacher_id = (SELECT id FROM admins WHERE username = 'teacher_a')
+    WHERE c.teacher_id IN (SELECT id FROM admins WHERE role <> 'teacher')
+  `);
 
   // 初始化两个班级（一班、二班），分别分配给两位老师。
   await pool.query(

@@ -26,8 +26,9 @@ function readAccountForm(form) {
 
 export default function AdminAdminsPage() {
   const router = useRouter();
+  const [admin, setAdmin] = useState(null);
   const [admins, setAdmins] = useState([]);
-  const [status, setStatus] = useState('正在检查老师登录状态...');
+  const [status, setStatus] = useState('正在检查登录状态...');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function loadAdmins() {
@@ -46,6 +47,7 @@ export default function AdminAdminsPage() {
           return;
         }
 
+        setCurrentAdmin(me.data);
         await loadAdmins();
       } catch (error) {
         router.replace('/admin/login');
@@ -66,7 +68,7 @@ export default function AdminAdminsPage() {
     }
 
     setIsSubmitting(true);
-    setStatus('正在创建老师...');
+    setStatus('正在创建账号...');
 
     try {
       await createManagedAdmin(account);
@@ -94,15 +96,16 @@ export default function AdminAdminsPage() {
     }
   }
 
-  async function handleDeleteAdmin(admin) {
-    const confirmed = window.confirm(`确定删除老师 ${admin.username} 吗？系统至少会保留一个老师。`);
+  async function handleDeleteAdmin(targetAdmin) {
+    const roleName = targetAdmin.role === 'super_admin' ? '教导主任' : '老师';
+    const confirmed = window.confirm(`确定删除${roleName} ${targetAdmin.username} 吗？系统至少会保留一个老师。`);
 
     if (!confirmed) {
       return;
     }
 
     try {
-      await deleteManagedAdmin(admin.id);
+      await deleteManagedAdmin(targetAdmin.id);
       await loadAdmins();
     } catch (error) {
       setStatus(error.message);
@@ -113,14 +116,14 @@ export default function AdminAdminsPage() {
     <>
       <section className="hero">
         <div>
-          <h1>老师账号管理</h1>
-          <p>教导主任可以创建老师或教导主任账号，也可以重置密码；系统会阻止删除最后一个老师。</p>
+          <h1>账号管理</h1>
+          <p>教导主任可以创建或删除老师、学员、教导主任；不能删除自己，系统会阻止删除最后一个老师。</p>
         </div>
         <a className="hero-button" href="/admin">返回后台</a>
       </section>
 
       <section className="upload-panel">
-        <h2>创建老师</h2>
+        <h2>创建账号</h2>
         <form className="upload-form" onSubmit={handleCreateAdmin}>
           <label>
             <span>账号</span>
@@ -143,13 +146,13 @@ export default function AdminAdminsPage() {
             <small>老师只能管理自己班级；教导主任可以管理所有班级和视频删除。</small>
           </label>
 
-          <button type="submit" disabled={isSubmitting}>{isSubmitting ? '创建中...' : '创建老师'}</button>
+          <button type="submit" disabled={isSubmitting}>{isSubmitting ? '创建中...' : '创建账号'}</button>
         </form>
       </section>
 
       <section className="video-section">
         <div className="section-title">
-          <h2>老师列表</h2>
+          <h2>账号列表</h2>
           <button type="button" onClick={loadAdmins}>刷新</button>
         </div>
 
@@ -162,7 +165,13 @@ export default function AdminAdminsPage() {
               </div>
               <div className="row-actions">
                 <button type="button" onClick={() => handleResetPassword(admin)}>重置密码</button>
-                <button type="button" onClick={() => handleDeleteAdmin(admin)}>删除</button>
+                <button
+                  type="button"
+                  disabled={admin?.id === admin.id}
+                  onClick={() => handleDeleteAdmin(admin)}
+                >
+                  删除
+                </button>
               </div>
             </article>
           ))}

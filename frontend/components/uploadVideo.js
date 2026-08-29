@@ -129,7 +129,7 @@ function buildVideoParts(file) {
   });
 }
 
-async function uploadVideoByMultipart({ file, key, uploadId, onProgress }) {
+export async function uploadVideoByMultipart({ file, key, uploadId, onProgress }) {
   const fileParts = buildVideoParts(file);
   const loadedBytesByPart = new Map();
   const uploadedParts = [];
@@ -185,6 +185,10 @@ export async function uploadVideoFromForm({ formData, onStatus, onProgress }) {
   const video = formData.get('video');
   const cover = formData.get('cover');
   const attachments = getAttachments(formData);
+  const prerequisiteVideoIds = formData
+    .getAll('prerequisiteVideoIds')
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0);
 
   onStatus('正在获取上传地址...');
   const multipartUpload = await createMultipartVideoUpload({ title, description, video, cover, attachments });
@@ -245,6 +249,7 @@ export async function uploadVideoFromForm({ formData, onStatus, onProgress }) {
     description,
     videoKey: uploadInfo.video.key,
     coverKey: uploadInfo.cover.key,
-    attachments: completedAttachments
+    attachments: completedAttachments,
+    prerequisiteVideoIds
   });
 }

@@ -228,9 +228,9 @@ export default function ClassesPage() {
                               <td>{student.username}</td>
                               <td>{student.is_active ? '正常' : '已禁用'}</td>
                               <td>
-                                <a href={`/admin/users/${student.id}/assignments`}>推送/留言</a>
+                                <a href={`/admin/users/${student.id}/assignments`}>主页课程/作业备注</a>
                                 {transferForm.userId === student.id ? (
-                                  <>
+                                  <div className="transfer-actions">
                                     <select
                                       value={transferForm.classId}
                                       onChange={(event) => setTransferForm({ ...transferForm, classId: event.target.value })}
@@ -240,11 +240,11 @@ export default function ClassesPage() {
                                         <option key={target.id} value={target.id}>{target.name}</option>
                                       ))}
                                     </select>
-                                    <button type="button" onClick={() => handleTransfer(student.id)}>确认</button>
-                                    <button type="button" onClick={() => setTransferForm({ userId: null, classId: '' })}>取消</button>
-                                  </>
+                                    <button className="transfer-confirm-button" type="button" onClick={() => handleTransfer(student.id)}>确认</button>
+                                    <button className="transfer-cancel-button" type="button" onClick={() => setTransferForm({ userId: null, classId: '' })}>取消</button>
+                                  </div>
                                 ) : (
-                                  <button type="button" onClick={() => setTransferForm({ userId: student.id, classId: '' })}>转班</button>
+                                  <button className="transfer-open-button" type="button" onClick={() => setTransferForm({ userId: student.id, classId: '' })}>转班</button>
                                 )}
                               </td>
                             </tr>

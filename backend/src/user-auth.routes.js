@@ -23,6 +23,17 @@ userAuthRouter.post('/login', async (req, res, next) => {
       return;
     }
 
+    // 学员登录时，如果输入的是老师/教导主任账号，明确提示角色不匹配。
+    const adminResult = await pool.query(
+      `SELECT id FROM admins WHERE username = $1`,
+      [username]
+    );
+
+    if (adminResult.rows.length > 0) {
+      res.status(403).json({ message: '没有这个学生' });
+      return;
+    }
+
     const result = await pool.query(
       `SELECT id, username, password_hash, is_active
        FROM users
@@ -45,7 +56,7 @@ userAuthRouter.post('/login', async (req, res, next) => {
 
     const token = signUserToken(user);
     res.cookie(config.auth.userCookieName, token, getUserCookieOptions());
-    res.json({ data: { username: user.username } });
+    res.json({ data: { username: user.username, role: 'user' } });
   } catch (error) {
     next(error);
   }

@@ -66,6 +66,38 @@ function validateVideoText({ title, description }) {
   return '';
 }
 
+function validateOptionalVideoFile(videoFile) {
+  if (!videoFile) {
+    return '';
+  }
+
+  if (Number(videoFile.size) > MAX_VIDEO_SIZE) {
+    return `视频文件不能超过 ${formatFileSize(MAX_VIDEO_SIZE)}`;
+  }
+
+  if (!videoFile.type?.startsWith('video/')) {
+    return '请上传视频文件';
+  }
+
+  return ALLOWED_VIDEO_EXTENSIONS.includes(getExtension(videoFile.name)) ? '' : '视频格式只支持 mp4、webm、mov';
+}
+
+function validateOptionalCoverFile(coverFile) {
+  if (!coverFile) {
+    return '';
+  }
+
+  if (Number(coverFile.size) > MAX_COVER_SIZE) {
+    return `封面图片不能超过 ${formatFileSize(MAX_COVER_SIZE)}`;
+  }
+
+  if (!coverFile.type?.startsWith('image/')) {
+    return '封面必须是图片文件';
+  }
+
+  return ALLOWED_IMAGE_EXTENSIONS.includes(getExtension(coverFile.name)) ? '' : '封面格式只支持 jpg、jpeg、png、webp';
+}
+
 function validateUploadInput({ title, description, videoFile, coverFile }) {
   const textValidationMessage = validateVideoText({ title, description });
 
@@ -149,6 +181,68 @@ function normalizeCompletedAttachments(value) {
   }));
 }
 
+function normalizeAttachmentPlan(value) {
+  const plan = value && typeof value === 'object' ? value : {};
+
+  return {
+    keepIds: normalizeIds(plan.keepIds),
+    deleteIds: normalizeIds(plan.deleteIds),
+    replace: normalizeAttachments(plan.replace).map((attachment) => ({
+      oldAttachmentId: Number(attachment?.oldAttachmentId),
+      key: String(attachment?.key || '').trim(),
+      fileName: normalizeText(attachment?.fileName),
+      fileType: normalizeText(attachment?.fileType)
+    })).filter((attachment) => Number.isInteger(attachment.oldAttachmentId) && attachment.oldAttachmentId > 0),
+    add: normalizeCompletedAttachments(plan.add)
+  };
+}
+
+function buildAttachmentFileMeta(file) {
+  return {
+    name: normalizeText(file?.name),
+    type: normalizeText(file?.type),
+    size: Number(file?.size) || 0
+  };
+}
+
+async function ensurePrerequisitesValid({ videoId, prerequisiteVideoIds }) {
+  if (prerequisiteVideoIds.includes(videoId)) {
+    return '前置知识点不能选择当前课程自己';
+  }
+
+  if (prerequisiteVideoIds.length === 0) {
+    return '';
+  }
+
+  const prerequisiteResult = await pool.query(
+    `SELECT id FROM videos WHERE id = ANY($1::int[])`,
+    [prerequisiteVideoIds]
+  );
+
+  if (prerequisiteResult.rowCount !== prerequisiteVideoIds.length) {
+    return '部分前置知识点视频不存在';
+  }
+
+  const cycleResult = await pool.query(
+    `WITH RECURSIVE downstream AS (
+       SELECT video_id, prerequisite_video_id
+       FROM video_prerequisites
+       WHERE prerequisite_video_id = $1
+       UNION
+       SELECT vp.video_id, vp.prerequisite_video_id
+       FROM video_prerequisites vp
+       JOIN downstream d ON vp.prerequisite_video_id = d.video_id
+     )
+     SELECT 1
+     FROM downstream
+     WHERE video_id = ANY($2::int[])
+     LIMIT 1`,
+    [videoId, prerequisiteVideoIds]
+  );
+
+  return cycleResult.rowCount > 0 ? '前置知识点不能形成循环引用' : '';
+}
+
 function isExpectedUploadKey(key, prefix) {
   return typeof key === 'string' && key.startsWith(prefix) && !key.includes('..');
 }
@@ -170,6 +264,14 @@ function normalizeMultipartParts(parts) {
     }))
     .filter((part) => part.etag && part.partNumber)
     .sort((first, second) => first.partNumber - second.partNumber);
+}
+
+function normalizeIds(value) {
+  const rawValues = Array.isArray(value) ? value : [];
+
+  return [...new Set(rawValues
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item > 0))];
 }
 
 function normalizeDate(value) {
@@ -380,6 +482,7 @@ videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
     const videoKey = req.body.videoKey;
     const coverKey = req.body.coverKey;
     const attachments = normalizeCompletedAttachments(req.body.attachments);
+    const prerequisiteVideoIds = normalizeIds(req.body.prerequisiteVideoIds);
 
     const validationMessage = validateVideoText({ title, description });
 
@@ -407,6 +510,18 @@ videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
     for (const attachment of attachments) {
       if (!isExpectedUploadKey(attachment.key, 'attachments/')) {
         res.status(400).json({ message: '资料文件地址无效' });
+        return;
+      }
+    }
+
+    if (prerequisiteVideoIds.length > 0) {
+      const prerequisiteResult = await pool.query(
+        `SELECT id FROM videos WHERE id = ANY($1::int[])`,
+        [prerequisiteVideoIds]
+      );
+
+      if (prerequisiteResult.rowCount !== prerequisiteVideoIds.length) {
+        res.status(404).json({ message: '部分前置知识点视频不存在' });
         return;
       }
     }
@@ -453,6 +568,15 @@ videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
 
       const video = result.rows[0];
 
+      if (prerequisiteVideoIds.length > 0) {
+        await client.query(
+          `INSERT INTO video_prerequisites (video_id, prerequisite_video_id)
+           SELECT $1, unnest($2::int[])
+           ON CONFLICT DO NOTHING`,
+          [video.id, prerequisiteVideoIds]
+        );
+      }
+
       for (const [index, attachment] of attachments.entries()) {
         await client.query(
           `INSERT INTO video_attachments (video_id, file_name, file_url, file_key, file_type, file_size)
@@ -481,6 +605,65 @@ videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
   }
 });
 
+// POST /api/videos/edit-upload/create
+// 教导主任编辑课程时，为可选替换的视频、封面、附件生成对象存储上传地址。
+videoRouter.post('/edit-upload/create', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const videoFile = req.body.video || null;
+    const coverFile = req.body.cover || null;
+    const attachments = normalizeAttachments(req.body.attachments);
+    const validationMessage = validateVideoText({
+      title: normalizeText(req.body.title),
+      description: normalizeText(req.body.description)
+    }) || validateOptionalVideoFile(videoFile) || validateOptionalCoverFile(coverFile) || validateAttachmentInput(attachments);
+
+    if (validationMessage) {
+      res.status(400).json({ message: validationMessage });
+      return;
+    }
+
+    const videoKey = videoFile ? `videos/${uuid()}${getExtension(videoFile.name)}` : '';
+    const coverKey = coverFile ? `covers/${uuid()}${getExtension(coverFile.name)}` : '';
+    const attachmentItems = attachments.map((attachment) => {
+      const fileName = normalizeText(attachment.name);
+      const key = `attachments/${uuid()}${getExtension(fileName)}`;
+
+      return {
+        key,
+        fileName,
+        fileType: normalizeText(attachment.type),
+        size: Number(attachment.size) || 0
+      };
+    });
+
+    const [uploadId, coverUploadUrl, attachmentUploadUrls] = await Promise.all([
+      videoFile ? createMultipartUpload({ key: videoKey, contentType: videoFile.type }) : Promise.resolve(''),
+      coverFile ? createUploadUrl({ key: coverKey, contentType: coverFile.type }) : Promise.resolve(''),
+      Promise.all(attachmentItems.map((attachment) => createUploadUrl({
+        key: attachment.key,
+        contentType: attachment.fileType || 'application/octet-stream'
+      })))
+    ]);
+
+    res.json({
+      data: {
+        video: videoFile ? { key: videoKey, uploadId, publicUrl: getPublicUrl(videoKey) } : null,
+        cover: coverFile ? { key: coverKey, uploadUrl: coverUploadUrl, publicUrl: getPublicUrl(coverKey) } : null,
+        attachments: attachmentItems.map((attachment, index) => ({
+          key: attachment.key,
+          uploadUrl: attachmentUploadUrls[index],
+          publicUrl: getPublicUrl(attachment.key),
+          fileName: attachment.fileName,
+          fileType: attachment.fileType,
+          size: attachment.size
+        }))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/videos/:id
 // 获取单个视频详情，播放页会用到。
 videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
@@ -498,17 +681,43 @@ videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
     }
 
     const attachmentsResult = await pool.query(
-      `SELECT id, file_name, file_url, file_type, file_size, created_at
+      `SELECT id, file_name, file_url, file_key, file_type, file_size, created_at
        FROM video_attachments
        WHERE video_id = $1
        ORDER BY created_at ASC`,
       [req.params.id]
     );
 
+    const prerequisitesResult = await pool.query(
+      `SELECT v.id, v.title
+       FROM video_prerequisites vp
+       JOIN videos v ON v.id = vp.prerequisite_video_id
+       WHERE vp.video_id = $1
+       ORDER BY vp.created_at ASC`,
+      [req.params.id]
+    );
+
+    const descendantsResult = await pool.query(
+      `WITH RECURSIVE descendants AS (
+         SELECT video_id
+         FROM video_prerequisites
+         WHERE prerequisite_video_id = $1
+         UNION
+         SELECT vp.video_id
+         FROM video_prerequisites vp
+         JOIN descendants d ON vp.prerequisite_video_id = d.video_id
+       )
+       SELECT video_id AS id
+       FROM descendants`,
+      [req.params.id]
+    );
+
     res.json({
       data: {
         ...result.rows[0],
-        attachments: attachmentsResult.rows
+        attachments: attachmentsResult.rows,
+        prerequisites: prerequisitesResult.rows,
+        descendantVideoIds: descendantsResult.rows.map((row) => row.id)
       }
     });
   } catch (error) {
@@ -516,10 +725,205 @@ videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
   }
 });
 
+// PATCH /api/videos/:id
+// 教导主任编辑旧课程记录。文字和前置知识直接改旧记录；替换文件时使用新对象 key，成功后清理旧对象。
+videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const videoId = Number(req.params.id);
+    const title = normalizeText(req.body.title);
+    const description = normalizeText(req.body.description);
+    const videoKey = String(req.body.videoKey || '').trim();
+    const coverKey = String(req.body.coverKey || '').trim();
+    const attachmentPlan = normalizeAttachmentPlan(req.body.attachments);
+    const shouldUpdatePrerequisites = Object.prototype.hasOwnProperty.call(req.body, 'prerequisiteVideoIds');
+    const prerequisiteVideoIds = shouldUpdatePrerequisites ? normalizeIds(req.body.prerequisiteVideoIds) : [];
+    const validationMessage = validateVideoText({ title, description });
+
+    if (!Number.isInteger(videoId) || videoId <= 0) {
+      res.status(400).json({ message: '课程 id 无效' });
+      return;
+    }
+
+    if (validationMessage) {
+      res.status(400).json({ message: validationMessage });
+      return;
+    }
+
+    if (videoKey && !isExpectedUploadKey(videoKey, 'videos/')) {
+      res.status(400).json({ message: '视频文件地址无效' });
+      return;
+    }
+
+    if (coverKey && !isExpectedUploadKey(coverKey, 'covers/')) {
+      res.status(400).json({ message: '封面文件地址无效' });
+      return;
+    }
+
+    const plannedNewAttachments = [...attachmentPlan.replace, ...attachmentPlan.add];
+    const attachmentValidation = validateAttachmentInput(plannedNewAttachments.map((attachment) => buildAttachmentFileMeta({
+      name: attachment.fileName,
+      type: attachment.fileType,
+      size: 0
+    })));
+
+    if (attachmentValidation) {
+      res.status(400).json({ message: attachmentValidation });
+      return;
+    }
+
+    for (const attachment of plannedNewAttachments) {
+      if (!isExpectedUploadKey(attachment.key, 'attachments/')) {
+        res.status(400).json({ message: '资料文件地址无效' });
+        return;
+      }
+    }
+
+    if (shouldUpdatePrerequisites) {
+      const prerequisiteValidation = await ensurePrerequisitesValid({ videoId, prerequisiteVideoIds });
+
+      if (prerequisiteValidation) {
+        res.status(prerequisiteValidation.includes('不存在') ? 404 : 400).json({ message: prerequisiteValidation });
+        return;
+      }
+    }
+
+    const videoResult = await pool.query(
+      `SELECT id, video_url, cover_url FROM videos WHERE id = $1`,
+      [videoId]
+    );
+
+    if (videoResult.rowCount === 0) {
+      res.status(404).json({ message: '课程不存在' });
+      return;
+    }
+
+    const oldVideo = videoResult.rows[0];
+    const currentAttachmentsResult = await pool.query(
+      `SELECT id, file_key FROM video_attachments WHERE video_id = $1`,
+      [videoId]
+    );
+    const currentAttachmentIds = new Set(currentAttachmentsResult.rows.map((item) => item.id));
+    const changedOldAttachmentIds = [
+      ...attachmentPlan.deleteIds,
+      ...attachmentPlan.replace.map((item) => item.oldAttachmentId)
+    ];
+    const submittedOldAttachmentIds = [
+      ...attachmentPlan.keepIds,
+      ...changedOldAttachmentIds
+    ];
+
+    if (new Set(submittedOldAttachmentIds).size !== submittedOldAttachmentIds.length) {
+      res.status(400).json({ message: '资料编辑清单重复' });
+      return;
+    }
+
+    if (submittedOldAttachmentIds.some((id) => !currentAttachmentIds.has(id))) {
+      res.status(400).json({ message: '资料编辑清单包含不属于当前课程的资料' });
+      return;
+    }
+
+    const untouchedAttachmentCount = currentAttachmentsResult.rows.filter((attachment) => !changedOldAttachmentIds.includes(attachment.id)).length;
+    const finalAttachmentCount = untouchedAttachmentCount + attachmentPlan.replace.length + attachmentPlan.add.length;
+
+    if (finalAttachmentCount > MAX_ATTACHMENT_COUNT) {
+      res.status(400).json({ message: `资料文件最多上传 ${MAX_ATTACHMENT_COUNT} 个` });
+      return;
+    }
+
+    const [videoHead, coverHead, newAttachmentHeads] = await Promise.all([
+      videoKey ? ensureObjectExists(videoKey) : Promise.resolve(null),
+      coverKey ? ensureObjectExists(coverKey) : Promise.resolve(null),
+      Promise.all(plannedNewAttachments.map((attachment) => ensureObjectExists(attachment.key)))
+    ]);
+
+    if (videoHead && Number(videoHead.ContentLength || 0) > MAX_VIDEO_SIZE) {
+      await deleteFromBucket(videoKey).catch(() => {});
+      res.status(400).json({ message: `视频文件不能超过 ${formatFileSize(MAX_VIDEO_SIZE)}` });
+      return;
+    }
+
+    if (coverHead && Number(coverHead.ContentLength || 0) > MAX_COVER_SIZE) {
+      await deleteFromBucket(coverKey).catch(() => {});
+      res.status(400).json({ message: `封面图片不能超过 ${formatFileSize(MAX_COVER_SIZE)}` });
+      return;
+    }
+
+    for (const [index, head] of newAttachmentHeads.entries()) {
+      if (Number(head.ContentLength || 0) > MAX_ATTACHMENT_SIZE) {
+        await deleteFromBucket(plannedNewAttachments[index].key).catch(() => {});
+        res.status(400).json({ message: `单个资料文件不能超过 ${formatFileSize(MAX_ATTACHMENT_SIZE)}` });
+        return;
+      }
+    }
+
+    const oldKeysToDelete = [
+      videoKey ? getKeyFromPublicUrl(oldVideo.video_url) : '',
+      coverKey ? getKeyFromPublicUrl(oldVideo.cover_url) : '',
+      ...currentAttachmentsResult.rows
+        .filter((attachment) => changedOldAttachmentIds.includes(attachment.id))
+        .map((attachment) => attachment.file_key)
+    ].filter(Boolean);
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `UPDATE videos
+         SET title = $1,
+             description = $2,
+             video_url = COALESCE($3, video_url),
+             cover_url = COALESCE($4, cover_url)
+         WHERE id = $5
+         RETURNING id, title, description, video_url, cover_url, created_at`,
+        [title, description, videoKey ? getPublicUrl(videoKey) : null, coverKey ? getPublicUrl(coverKey) : null, videoId]
+      );
+
+      if (shouldUpdatePrerequisites) {
+        await client.query('DELETE FROM video_prerequisites WHERE video_id = $1', [videoId]);
+
+        if (prerequisiteVideoIds.length > 0) {
+          await client.query(
+            `INSERT INTO video_prerequisites (video_id, prerequisite_video_id)
+             SELECT $1, unnest($2::int[])
+             ON CONFLICT DO NOTHING`,
+            [videoId, prerequisiteVideoIds]
+          );
+        }
+      }
+
+      if (changedOldAttachmentIds.length > 0) {
+        await client.query(
+          `DELETE FROM video_attachments WHERE video_id = $1 AND id = ANY($2::int[])`,
+          [videoId, changedOldAttachmentIds]
+        );
+      }
+
+      for (const [index, attachment] of plannedNewAttachments.entries()) {
+        await client.query(
+          `INSERT INTO video_attachments (video_id, file_name, file_url, file_key, file_type, file_size)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [videoId, attachment.fileName, getPublicUrl(attachment.key), attachment.key, attachment.fileType, Number(newAttachmentHeads[index].ContentLength || 0)]
+        );
+      }
+
+      await client.query('COMMIT');
+      await Promise.all(oldKeysToDelete.map((key) => deleteFromBucket(key).catch(() => {})));
+      res.json({ data: result.rows[0] });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
 // DELETE /api/videos/:id
 // 删除视频接口。
-// 删除顺序：先查数据库拿到视频和封面 URL，再删除存储桶文件，最后删除数据库记录。
-// 这样可以减少“数据库记录已删除，但存储桶文件删除失败”的孤儿文件问题。
+// 删除顺序：先删除数据库记录，让前置知识关系和学生主页历史记录按外键规则稳定落库；
+// 数据库提交成功后再删除存储桶对象，失败时只留下可清理的孤儿文件，不影响业务数据。
 videoRouter.delete('/:id', requireSuperAdmin, async (req, res, next) => {
   try {
     const findResult = await pool.query(
@@ -546,11 +950,10 @@ videoRouter.delete('/:id', requireSuperAdmin, async (req, res, next) => {
       getKeyFromPublicUrl(video.video_url),
       getKeyFromPublicUrl(video.cover_url),
       ...attachmentsResult.rows.map((attachment) => attachment.file_key)
-    ];
-
-    await Promise.all(objectKeys.map((key) => deleteFromBucket(key)));
+    ].filter(Boolean);
 
     await pool.query('DELETE FROM videos WHERE id = $1', [video.id]);
+    await Promise.all(objectKeys.map((key) => deleteFromBucket(key).catch(() => {})));
 
     res.json({ message: '删除成功' });
   } catch (error) {

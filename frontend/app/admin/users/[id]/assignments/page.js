@@ -71,7 +71,7 @@ export default function UserAssignmentsPage() {
     const activeVideoIds = activeVideos.map((item) => item.id);
 
     if (activeVideoIds.includes(video.id)) {
-      setStatus('这个视频已经在推送中');
+      setStatus('这个课程视频已经在学生主页置顶中');
       return;
     }
 
@@ -96,17 +96,17 @@ export default function UserAssignmentsPage() {
     const trimmedMessage = message.trim();
 
     if (selectedVideoIds.length === 0 && !trimmedMessage) {
-      setStatus('请选择要推送的视频或填写留言');
+      setStatus('请选择要置顶的课程视频或填写作业备注');
       return;
     }
 
     if (trimmedMessage.length > MESSAGE_MAX_LENGTH) {
-      setStatus(`留言最多 ${MESSAGE_MAX_LENGTH} 个字`);
+      setStatus(`作业备注最多 ${MESSAGE_MAX_LENGTH} 个字`);
       return;
     }
 
     try {
-      setStatus('正在保存推送...');
+      setStatus('正在保存学生主页设置...');
       await createUserAssignment({
         userId,
         videoIds: selectedVideoIds,
@@ -121,7 +121,7 @@ export default function UserAssignmentsPage() {
 
   async function handleCancelAssignment(assignmentId) {
     try {
-      setStatus('正在取消推送...');
+      setStatus('正在取消置顶...');
       await cancelUserAssignment(assignmentId);
       await loadAssignments();
     } catch (error) {
@@ -149,19 +149,21 @@ export default function UserAssignmentsPage() {
     return <p className="empty-text">{status}</p>;
   }
 
+  const activeVideoIds = activeVideos.map((item) => item.id);
+
   return (
     <>
       <section className="hero">
         <div>
-          <h1>{user.username} 的推送记录</h1>
-          <p>老师选择推荐视频并填写留言后，一次保存会生成一条操作记录。</p>
+          <h1>{user.username} 的主页课程设置</h1>
+          <p>老师可以编辑学生主页置顶的课程视频，并填写作业备注。一次保存会生成一条操作记录。</p>
         </div>
         <a className="hero-button" href="/admin/users">{admin?.role === 'super_admin' ? '返回学员管理' : '返回班级学员'}</a>
       </section>
 
       <section className="video-section">
         <div className="section-title">
-          <h2>正在推送的视频</h2>
+          <h2>学生主页置顶的课程视频</h2>
           <span>{activeVideos.length}/{MAX_ACTIVE_VIDEO_ASSIGNMENTS}</span>
         </div>
 
@@ -181,34 +183,45 @@ export default function UserAssignmentsPage() {
           ))}
         </div>
 
-        {activeVideos.length === 0 ? <p className="empty-text">还没有正在推送的视频。</p> : null}
+        {activeVideos.length === 0 ? <p className="empty-text">还没有学生主页置顶课程视频。</p> : null}
       </section>
 
       <section className="video-section">
         <div className="section-title">
-          <h2>选择推荐视频</h2>
-          <button type="button" onClick={() => loadVideos(filters)}>刷新视频</button>
+          <h2>选择课程视频</h2>
+          <button type="button" onClick={() => loadVideos(filters)}>刷新课程</button>
         </div>
         <VideoFilters filters={filters} onChange={setFilters} onSubmit={handleSearch} onReset={handleReset} />
-        <VideoList videos={videos} status={listStatus} canSelect selectedIds={selectedVideoIds} onSelect={handleToggleVideo} detailQuery={`?from=admin&returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`} />
+        <VideoList
+          videos={videos}
+          status={listStatus}
+          canSelect
+          selectedIds={selectedVideoIds}
+          disabledIds={activeVideoIds}
+          disabledSelectText="已置顶"
+          selectText="选择置顶"
+          selectedText="已选择"
+          onSelect={handleToggleVideo}
+          detailQuery={`?from=admin&returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`}
+        />
       </section>
 
       <section className="upload-panel">
-        <h2>保存推送</h2>
+        <h2>保存主页课程设置</h2>
         <form className="upload-form" onSubmit={handleSaveAssignment}>
           <label>
-            <span>已选视频数量</span>
+            <span>已选课程视频数量</span>
             <input value={`${selectedVideoIds.length} 个`} readOnly />
-            <small>同一个学员最多只能同时存在 {MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个正在推送的视频。</small>
+            <small>同一个学员最多只能同时存在 {MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个主页置顶课程视频。</small>
           </label>
 
           <label>
-            <span>留言</span>
-            <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows="4" maxLength={MESSAGE_MAX_LENGTH} placeholder="写给这个学员的留言" />
-            <small>留言最多 {MESSAGE_MAX_LENGTH} 个字。</small>
+            <span>作业备注</span>
+            <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows="4" maxLength={MESSAGE_MAX_LENGTH} placeholder="写给这个学员的作业备注" />
+            <small>作业备注最多 {MESSAGE_MAX_LENGTH} 个字。</small>
           </label>
 
-          <button type="submit">保存推送</button>
+          <button type="submit">保存设置</button>
           <p className="status-text">{status}</p>
         </form>
       </section>
@@ -227,11 +240,11 @@ export default function UserAssignmentsPage() {
 
             let description;
             if (hasVideos && hasMessage) {
-              description = `老师${operation.admin_username}给学员${user.username}把推送更新为以下 ${operation.videos.length} 个视频，并留言：`;
+              description = `老师${operation.admin_username}给学员${user.username}编辑了 ${operation.videos.length} 个主页置顶课程视频，并填写作业备注：`;
             } else if (!hasVideos && hasMessage) {
-              description = `老师${operation.admin_username}单独修改了留言：`;
+              description = `老师${operation.admin_username}单独修改了作业备注：`;
             } else {
-              description = `老师${operation.admin_username}单独更新了视频推送为以下 ${operation.videos.length} 个视频：`;
+              description = `老师${operation.admin_username}单独编辑了 ${operation.videos.length} 个主页置顶课程视频：`;
             }
 
             return (
@@ -258,22 +271,14 @@ export default function UserAssignmentsPage() {
                   {hasVideos ? (
                     <div className="operation-videos">
                       {operation.videos.map((video) => (
-                        <a
+                        <div
                           key={video.assignment_id}
-                          className={`operation-video-item ${video.is_deleted ? 'operation-video-deleted' : ''}`}
-                          href={video.is_deleted ? undefined : `/videos/${video.id}?from=admin&returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`}
+                          className={`operation-video-item operation-video-title-only ${video.is_deleted || video.is_video_deleted ? 'operation-video-deleted' : ''}`}
                           title={video.title}
                         >
-                          {video.cover_url ? (
-                            <div className="operation-video-thumb">
-                              <img src={video.cover_url} alt={video.title} />
-                            </div>
-                          ) : (
-                            <div className="operation-video-thumb operation-video-placeholder">无封面</div>
-                          )}
                           <span className="operation-video-title">{video.title}</span>
-                          {video.is_deleted ? <span className="operation-video-reason">已删除</span> : null}
-                        </a>
+                          {video.is_deleted || video.is_video_deleted ? <span className="operation-video-reason">{video.is_video_deleted ? '课程已删除' : '已删除'}</span> : null}
+                        </div>
                       ))}
                     </div>
                   ) : null}

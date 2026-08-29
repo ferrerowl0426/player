@@ -3,20 +3,33 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { fetchAdminMe, fetchUserMe, logoutAdmin, logoutUser } from '../lib/api.js';
+import { clearGuestMode, isGuestMode, setGuestMode } from '../lib/guest.js';
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [identity, setIdentity] = useState('checking');
+  const [guest, setGuest] = useState(false);
   const isAdminPage = pathname.startsWith('/admin');
+  const isLoginPage = pathname === '/login' || pathname === '/admin/login';
 
   useEffect(() => {
     let active = true;
 
     async function checkLogin() {
+      // 游客模式只在客户端标记，优先检查。
+      if (isGuestMode()) {
+        if (active) {
+          setGuest(true);
+          setIdentity('guest');
+        }
+        return;
+      }
+
       try {
         await fetchAdminMe();
         if (active) {
+          setGuest(false);
           setIdentity('admin');
         }
         return;
@@ -27,10 +40,12 @@ export default function SiteHeader() {
       try {
         await fetchUserMe();
         if (active) {
+          setGuest(false);
           setIdentity('user');
         }
       } catch {
         if (active) {
+          setGuest(false);
           setIdentity('guest');
         }
       }
@@ -47,6 +62,8 @@ export default function SiteHeader() {
   async function handleLogout() {
     if (identity === 'admin') {
       await logoutAdmin();
+      clearGuestMode();
+      setGuest(false);
       setIdentity('guest');
       router.replace('/admin/login');
       return;
@@ -54,36 +71,53 @@ export default function SiteHeader() {
 
     if (identity === 'user') {
       await logoutUser();
+      clearGuestMode();
+      setGuest(false);
       setIdentity('guest');
       router.replace('/login');
     }
   }
 
+  function handleEnterGuest() {
+    setGuestMode(true);
+    router.replace('/');
+  }
+
+  function handleExitGuest() {
+    clearGuestMode();
+    setGuest(false);
+    setIdentity('guest');
+    router.replace('/login');
+  }
+
   return (
     <header className="site-header">
-      <a className="logo" href={isAdminPage ? '/admin' : '/'}>学习播放器</a>
+      <a className="logo" href="/">学习播放器</a>
       <nav className="site-nav">
-        {identity === 'checking' ? null : isAdminPage ? (
-          identity === 'admin' ? (
-            <>
-              <a href="/admin">老师首页</a>
-              <button type="button" onClick={handleLogout}>退出登录</button>
-            </>
-          ) : (
-            <a href="/admin/login">老师登录</a>
-          )
+        {identity === 'checking' ? null : isLoginPage ? (
+          <button type="button" onClick={handleEnterGuest}>先不登录使用游客模式访问</button>
+        ) : identity === 'admin' ? (
+          <>
+            <a href="/admin">回到首页</a>
+            <button type="button" onClick={handleLogout}>退出</button>
+          </>
+        ) : identity === 'user' ? (
+          <>
+            <a href="/">回到首页</a>
+            <button type="button" onClick={handleLogout}>退出</button>
+          </>
+        ) : guest ? (
+          <>
+            <a href="/">回到首页</a>
+            <button type="button" onClick={handleExitGuest}>去登录</button>
+          </>
+        ) : isAdminPage ? (
+          <a href="/admin/login">老师登录</a>
         ) : (
-          identity === 'user' || identity === 'admin' ? (
-            <>
-              <a href="/">首页</a>
-              <button type="button" onClick={handleLogout}>退出登录</button>
-            </>
-          ) : (
-            <>
-              <a href="/login">学员登录</a>
-              <a href="/admin/login">老师入口</a>
-            </>
-          )
+          <>
+            <a href="/login">学员登录</a>
+            <a href="/admin/login">老师登录</a>
+          </>
         )}
       </nav>
     </header>

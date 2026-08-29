@@ -175,9 +175,26 @@ adminRouter.post('/login', async (req, res, next) => {
   try {
     const username = normalizeLoginText(req.body.username);
     const password = String(req.body.password ?? '');
+    const expectedRole = req.body.expectedRole;
 
     if (!username || !password) {
       res.status(400).json({ message: '请填写老师账号和密码' });
+      return;
+    }
+
+    if (!expectedRole || (expectedRole !== 'teacher' && expectedRole !== 'super_admin')) {
+      res.status(400).json({ message: '请选择有效的登录身份' });
+      return;
+    }
+
+    // 老师/教导主任登录时，如果输入的是学员账号，明确提示角色不匹配。
+    const userResult = await pool.query(
+      `SELECT id FROM users WHERE username = $1`,
+      [username]
+    );
+
+    if (userResult.rows.length > 0) {
+      res.status(403).json({ message: '没有这个老师' });
       return;
     }
 
@@ -196,6 +213,13 @@ adminRouter.post('/login', async (req, res, next) => {
       return;
     }
 
+    // 选择的登录身份和账号实际角色必须一致。
+    if (expectedRole && admin.role !== expectedRole) {
+      const message = expectedRole === 'super_admin' ? '该账号不是教导主任' : '没有这个老师';
+      res.status(403).json({ message });
+      return;
+    }
+
     const token = signAdminToken(admin);
     res.cookie(config.auth.adminCookieName, token, getAdminCookieOptions());
     res.json({ data: { username: admin.username, role: admin.role } });
@@ -208,6 +232,7 @@ adminRouter.post('/login', async (req, res, next) => {
 adminRouter.get('/me', requireAdmin, (req, res) => {
   res.json({
     data: {
+      id: req.admin.adminId,
       username: req.admin.username,
       role: req.admin.role
     }
@@ -418,6 +443,34 @@ adminRouter.patch('/users/:id/class', requireSuperAdmin, async (req, res, next) 
   }
 });
 
+// DELETE /api/admin/users/:id
+adminRouter.delete('/users/:id', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const userId = normalizeId(req.params.id);
+
+    if (!userId) {
+      sendValidationError(res, '学员 id 无效');
+      return;
+    }
+
+    const result = await pool.query(
+      `DELETE FROM users
+       WHERE id = $1
+       RETURNING id`,
+      [userId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: '学员不存在' });
+      return;
+    }
+
+    res.json({ message: '学员已删除' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/admin/admins
 adminRouter.get('/admins', requireSuperAdmin, async (req, res, next) => {
   try {
@@ -438,12 +491,17 @@ adminRouter.post('/admins', requireSuperAdmin, async (req, res, next) => {
   try {
     const username = normalizeLoginText(req.body.username);
     const password = String(req.body.password ?? '');
-    const role = req.body.role === 'teacher' ? 'teacher' : 'super_admin';
+    const role = req.body.role;
     const usernameError = validateUsername(username);
     const passwordError = validatePassword(password);
 
     if (usernameError || passwordError) {
       sendValidationError(res, usernameError || passwordError);
+      return;
+    }
+
+    if (role !== 'teacher' && role !== 'super_admin') {
+      sendValidationError(res, '请选择有效的账号角色');
       return;
     }
 
@@ -500,26 +558,46 @@ adminRouter.post('/admins/:id/reset-password', requireSuperAdmin, async (req, re
 // DELETE /api/admin/admins/:id
 adminRouter.delete('/admins/:id', requireSuperAdmin, async (req, res, next) => {
   try {
-    const countResult = await pool.query('SELECT COUNT(*)::int AS count FROM admins');
+    const adminId = normalizeId(req.params.id);
 
-    if (countResult.rows[0].count <= 1) {
-      res.status(400).json({ message: '至少需要保留一个老师' });
+    if (!adminId) {
+      sendValidationError(res, '账号 id 无效');
       return;
     }
 
-    const result = await pool.query(
-      `DELETE FROM admins
-       WHERE id = $1
-       RETURNING id`,
-      [req.params.id]
+    if (adminId === req.admin.adminId) {
+      res.status(400).json({ message: '不能删除当前登录的教导主任账号' });
+      return;
+    }
+
+    const adminResult = await pool.query(
+      `SELECT id, role FROM admins WHERE id = $1`,
+      [adminId]
     );
 
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: '老师不存在' });
+    if (adminResult.rowCount === 0) {
+      res.status(404).json({ message: '账号不存在' });
       return;
     }
 
-    res.json({ message: '老师已删除' });
+    if (adminResult.rows[0].role === 'teacher') {
+      const teacherCountResult = await pool.query(
+        `SELECT COUNT(*)::int AS count FROM admins WHERE role = 'teacher'`
+      );
+
+      if (teacherCountResult.rows[0].count <= 1) {
+        res.status(400).json({ message: '至少需要保留一个老师' });
+        return;
+      }
+    }
+
+    await pool.query(
+      `DELETE FROM admins
+       WHERE id = $1`,
+      [adminId]
+    );
+
+    res.json({ message: '账号已删除' });
   } catch (error) {
     next(error);
   }
@@ -756,19 +834,20 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
          SELECT
            ua.operation_id,
            COALESCE(json_agg(
-             json_build_object(
-               'id', v.id,
-               'title', v.title,
-               'cover_url', v.cover_url,
-               'assignment_id', ua.id,
-               'is_deleted', ua.is_deleted,
-               'delete_reason', ua.delete_reason
-             ) ORDER BY ua.created_at DESC
-           ) FILTER (WHERE v.id IS NOT NULL), '[]'::json) AS videos
-         FROM user_assignments ua
-         LEFT JOIN videos v ON v.id = ua.video_id
-         WHERE ua.user_id = $1 AND ua.video_id IS NOT NULL
-         GROUP BY ua.operation_id
+            json_build_object(
+             'id', ua.video_id,
+             'title', COALESCE(NULLIF(ua.assigned_video_title, ''), v.title, '已删除课程'),
+             'assignment_id', ua.id,
+             'is_deleted', ua.is_deleted,
+             'is_video_deleted', ua.video_id IS NULL OR v.id IS NULL,
+             'delete_reason', ua.delete_reason
+           ) ORDER BY ua.created_at DESC
+         ) FILTER (WHERE ua.video_id IS NOT NULL OR ua.assigned_video_title <> ''), '[]'::json) AS videos
+       FROM user_assignments ua
+       LEFT JOIN videos v ON v.id = ua.video_id
+        WHERE ua.user_id = $1
+          AND (ua.video_id IS NOT NULL OR ua.assigned_video_title <> '')
+        GROUP BY ua.operation_id
        ),
        operation_messages AS (
          SELECT
@@ -899,10 +978,12 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
 
     if (newVideoIds.length > 0) {
       const videoResult = await pool.query(
-        `INSERT INTO user_assignments (operation_id, user_id, video_id, message, assigned_by_admin_id)
-         SELECT $1, $2, unnest($3::int[]), '', $4
+        `INSERT INTO user_assignments (operation_id, user_id, video_id, message, assigned_by_admin_id, assigned_video_title)
+         SELECT $1, $2, v.id, '', $3, v.title
+         FROM videos v
+         WHERE v.id = ANY($4::int[])
          RETURNING id, operation_id, user_id, video_id, message, is_deleted, delete_reason, deleted_at, created_at`,
-        [operationId, userId, newVideoIds, req.admin.adminId]
+        [operationId, userId, req.admin.adminId, newVideoIds]
       );
       insertedRows.push(...videoResult.rows);
     }
@@ -971,7 +1052,7 @@ adminRouter.patch('/assignments/:id/cancel', requireAdmin, async (req, res, next
     const assignmentId = normalizeId(req.params.id);
 
     if (!assignmentId) {
-      sendValidationError(res, '推送记录 id 无效');
+      sendValidationError(res, '主页课程设置记录 id 无效');
       return;
     }
 
@@ -1003,7 +1084,7 @@ adminRouter.patch('/assignments/:id/cancel', requireAdmin, async (req, res, next
     );
 
     if (result.rowCount === 0) {
-      res.status(404).json({ message: '正在推送的视频不存在' });
+      res.status(404).json({ message: '正在置顶的课程视频不存在' });
       return;
     }
 

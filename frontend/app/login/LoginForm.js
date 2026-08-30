@@ -101,12 +101,11 @@ export default function LoginForm() {
         <p>仅用于测试人员快捷登录，正式版本需要删除。</p>
         <div className="login-test-grid">
           <span>教导主任：admin / 123456</span>
-          <span>老师：ab / 123456</span>
-          <span>学员：student_01 / 123456</span>
+          <span>老师：teacher_a / 123456</span>
+          <span>老师：teacher_b / 123456</span>
           <span>学员：student_a1 / 123456</span>
           <span>学员：student_a2 / 123456</span>
           <span>学员：student_a3 / 123456</span>
-          <span>学员：student_a4 / 123456</span>
           <span>学员：student_b1 / 123456</span>
           <span>学员：student_b2 / 123456</span>
           <span>学员：student_b3 / 123456</span>

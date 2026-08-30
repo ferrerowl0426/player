@@ -21,7 +21,7 @@ services:
     depends_on:
       - postgres
     env_file:
-      - ./.env.local
+      - ./.env
     environment:
       NODE_ENV: production
       PORT: 3000

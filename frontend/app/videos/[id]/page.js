@@ -75,7 +75,6 @@ export default function VideoDetailPage() {
       <VideoPlayer src={video.video_url} poster={video.cover_url} />
       <h1>{video.title}</h1>
       <p className="detail-time">发布时间：{formatDate(video.created_at)}</p>
-      <p className="detail-desc">{video.description || '暂无介绍'}</p>
 
       <div className="prerequisite-section">
         <h2>前置知识点</h2>
@@ -111,6 +110,8 @@ export default function VideoDetailPage() {
           <p className="empty-text">这个视频还没有资料附件。</p>
         )}
       </div>
+
+      <p className="detail-desc">{video.description || '暂无介绍'}</p>
     </section>
   );
 }

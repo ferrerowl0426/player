@@ -139,7 +139,12 @@ export default function AdminUploadForm({ onUploaded, compact = false }) {
     }
 
     if (name === 'attachments') {
-      setAttachmentFiles(Array.from(files || []));
+      const selectedFiles = Array.from(files || []);
+      setAttachmentFiles((current) => {
+        const nextFiles = [...current, ...selectedFiles];
+        syncAttachmentInput(nextFiles);
+        return nextFiles;
+      });
     }
   }
 

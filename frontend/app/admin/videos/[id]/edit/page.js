@@ -384,7 +384,16 @@ export default function EditVideoPage() {
 
               <label className="add-attachment-field">
                 <span>新增资料</span>
-                <input ref={addAttachmentsInputRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.mp4" multiple onChange={(event) => setAddFiles(Array.from(event.target.files || []))} />
+                <input ref={addAttachmentsInputRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.mp4" multiple onChange={(event) => {
+                  const selectedFiles = Array.from(event.target.files || []);
+                  setAddFiles((current) => {
+                    const nextFiles = [...current, ...selectedFiles];
+                    if (addAttachmentsInputRef.current) {
+                      addAttachmentsInputRef.current.files = toFileList(nextFiles);
+                    }
+                    return nextFiles;
+                  });
+                }} />
                 {addFiles.length > 0 ? (
                   <div className="attachment-chips">
                     {addFiles.map((file, index) => (

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="RpP1SFCJOLMR4AhYFSCMPw">
+<head data-page-node-id="OpI0KuLmRNWnnKCUFr998L">
+<meta charset="UTF-8" data-page-node-id="36MGzdYBqqOy0FXOf5GyPO">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="pfV5RrH9HYFPSDkM9KcSgW">
+<title>我的历史作业 · 能学慧吉他教室</title>
+<style>
+/* ============================================================
+   我的历史作业 · 学员
+   按 operation 聚合展示历次推送（推送内容 + 老师留言 + 时间）
+   视觉遵循 design-spec v1.0
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底 + 格纹底饰（design-spec v2.0 §3） */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow-x:hidden;overflow-y:auto;  /* 页面整体滚动（时间线不再框内滚） */
+}
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ============ 导航（学员） ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区 ============ */
+.home{flex:1;min-height:0;max-width:1180px;width:100%;margin:0 auto;padding:14px 36px 20px;display:flex;flex-direction:column;gap:12px}
+
+/* ---- 工具行 ---- */
+.toolrow{flex:none;display:flex;align-items:center;gap:14px}
+.toolrow h1{font-size:16px;font-weight:700;letter-spacing:2px;color:var(--ink);display:flex;align-items:center;gap:9px}
+.toolrow h1::before{content:"";width:4px;height:15px;border-radius:1px;background:var(--orange)}
+.toolrow .hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+.viewseg{margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid var(--hair-2);border-radius:4px;overflow:hidden;background:var(--white)}
+.viewseg .lbl{font-size:10px;letter-spacing:1.5px;color:var(--ink-3);padding:0 10px;border-right:1px dashed var(--hair-2)}
+.viewseg button{font-size:11px;letter-spacing:1px;color:var(--ink-3);padding:5px 13px;transition:all .25s}
+.viewseg button + button{border-left:1px solid var(--hair)}
+.viewseg button.on{background:var(--coffee);color:var(--white);font-weight:600}
+
+/* ---- 停用横幅 ---- */
+.stop-banner{
+  flex:none;display:none;align-items:flex-start;gap:12px;
+  border:1.5px dashed rgba(180,69,46,.55);border-radius:6px;
+  background:rgba(255,252,242,.85);
+  padding:12px 18px;
+}
+body.disabled .stop-banner{display:flex}
+.stop-banner .ico{
+  flex:none;width:30px;height:30px;border-radius:50%;margin-top:2px;
+  border:1.5px solid rgba(180,69,46,.5);background:rgba(180,69,46,.06);
+  display:grid;place-items:center;color:#b4452e;
+}
+.stop-banner .ico svg{width:15px;height:15px}
+.stop-banner .t{font-size:12.5px;color:var(--ink);letter-spacing:.5px;line-height:1.8}
+.stop-banner .t b{color:#b4452e}
+
+/* ---- 时间线列表（无外框，卡片直接排在页面上） ---- */
+.zone{
+  flex:none;position:relative;
+}
+.tl{padding:2px 6px 26px}
+/* 分组日期 */
+.tl-date{
+  display:flex;align-items:center;gap:12px;margin:6px 0 10px;
+  font-size:10.5px;letter-spacing:2px;color:var(--ink-3);
+}
+.tl-date::after{content:"";flex:1;border-top:1px dashed var(--hair-2)}
+.tl-date b{color:var(--coffee);font-weight:700}
+/* 单次推送记录（operation 卡） */
+.op{
+  position:relative;
+  display:flex;gap:14px;
+  border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.05);
+  padding:12px 16px;margin:0 0 12px 14px;
+}
+.op::before{  /* 时间线竖轴节点（棕焦糖） */
+  content:"";position:absolute;left:-19px;top:20px;width:8px;height:8px;border-radius:50%;
+  background:#a06a35;box-shadow:0 0 0 2.5px #ffffff;
+}
+.op-side{flex:none;width:86px;text-align:center;padding-top:4px}
+.op-side .tm{font-size:15px;font-weight:700;color:var(--coffee);letter-spacing:.5px}
+.op-side .dt{font-size:9.5px;color:var(--ink-3);letter-spacing:1px;margin-top:2px}
+.op-main{flex:1;min-width:0}
+.op-from{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink-3);letter-spacing:.5px;margin-bottom:7px}
+.op-from .tk{flex:none;width:18px;height:18px;border-radius:50%;border:1px solid var(--hair-2);display:inline-grid;place-items:center;font-size:9.5px;color:var(--coffee)}
+/* 留言（便签 · 纸面米色，不用橙） */
+.op-msg{
+  font-size:11.5px;line-height:1.8;color:var(--ink-2);letter-spacing:.3px;
+  background:rgba(93,67,38,.05);border:1px dashed rgba(93,67,38,.28);border-radius:4px;
+  padding:6px 11px;margin-bottom:9px;
+}
+.op-msg .who{color:var(--coffee);font-weight:600;margin-right:4px}
+/* 推送条目（纯标题快照 · 不可交互） */
+.op-items{display:flex;flex-wrap:wrap;gap:6px 20px;padding-top:2px}
+.op-items .it{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:11.5px;font-weight:600;color:var(--ink-2);letter-spacing:.3px;
+}
+.op-items .it::before{content:"";width:4px;height:4px;border-radius:50%;background:#a06a35;flex:none}
+.op-items .it em{
+  font-style:normal;font-weight:400;font-size:9px;color:var(--ink-3);letter-spacing:1px;
+  border:1px solid var(--hair);border-radius:3px;padding:0 4px;
+}
+/* 空态 */
+.tl-empty{
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  padding:80px 10px;text-align:center;color:var(--ink-3);font-size:12.5px;letter-spacing:.5px;
+}
+.tl-empty.show{display:flex}
+.tl-empty .big{font-size:15px;color:var(--ink);font-weight:700;letter-spacing:1px}
+.tl-empty .big mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 3px}
+
+/* 回到顶部（时间线旁 · 右下角） */
+.to-top{
+  position:fixed;right:30px;bottom:34px;z-index:60;
+  width:38px;height:38px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);color:var(--coffee);
+  display:grid;place-items:center;
+  box-shadow:0 2px 8px rgba(64,45,20,.16);
+  opacity:0;pointer-events:none;transform:translateY(8px);
+  transition:all .3s var(--ease);
+}
+.to-top.show{opacity:1;pointer-events:auto;transform:translateY(0)}
+.to-top:hover{background:var(--coffee);color:var(--white)}
+.to-top svg{width:16px;height:16px}
+
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+.rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){.rise{opacity:1;transform:none;animation:none}}
+
+@media (max-width:1024px){
+  body{overflow:auto;display:block}
+  .home{padding:14px 20px 40px}
+}
+@media (max-width:640px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .home{padding:12px 14px 32px}
+  .op{flex-direction:column;gap:6px;margin-left:0;padding-left:14px}
+  .op::before{left:2px}
+  .op-side{width:auto;text-align:left;display:flex;gap:10px;align-items:baseline}
+  .viewseg{margin-left:0}
+  .toolrow{flex-wrap:wrap}
+}
+</style>
+</head>
+<body data-page-node-id="7smnK2fKYhsQ9qkDEoxQTn">
+
+<!-- ================= 导航（学员） ================= -->
+<nav class="nav" data-page-node-id="dJvZTdUkXpQpk1QMj44SpI">
+  <div class="nav-inner" data-page-node-id="rQoHCL1emd93uHUlsc4prq">
+    <a class="logo" href="#" data-page-node-id="fBHDUtHN5JT580LV2Pks61">
+      <span class="mark" data-page-node-id="WFrCw5ywNi9H0ZzjgBM7OH"></span>
+      能学慧吉他教室
+      <small data-page-node-id="XDzAHWhPGeHpyZiLkS1nK7">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="XwPAebT0vBF3Fc1AoR7cUp">
+      <a href="student-home.html" data-page-node-id="3kdPDpLCvvvi50C9peaddq">首页</a>
+      <a href="knowledge-home.html" data-page-node-id="AUIn6k65DCfym4g6jtah2w">知识点区</a>
+      <a href="tracks-home.html" data-page-node-id="wbpVEUDpAtc6bQ6VUPF2Fr">曲目库</a>
+      <a href="library.html" data-page-node-id="cq2Sxm1ditoA8K8f09A8rd">图书馆</a>
+      <a href="#" class="active" data-page-node-id="8hMCAYsTWFEUrvKE3iz0bX">我的历史作业</a>
+    </div>
+    <div class="nav-right" data-page-node-id="FxFqrVXkSoAp6sinon5xzS">
+      <div class="avatar" data-page-node-id="YhrAKUQwsbmAAKRzXJCykA">陈</div>
+    </div>
+  </div>
+</nav>
+
+<main class="home" data-page-node-id="2l88xmfYnhNvRU1KTSf2E9">
+
+  <!-- 工具行 -->
+  <div class="toolrow rise" data-page-node-id="Q1qDiWbFiUfec9uprPVm0K">
+    <h1 data-page-node-id="7lTExy3wgZQ1AS5YbZTWI3">我的历史作业</h1>
+    <span class="hint num" id="cntHint" data-page-node-id="L7rcGHSqdRVoAnuiI15Ug6">共 8 次推送 · 按时间倒序</span>
+    <div class="viewseg" role="group" aria-label="预览视角" data-page-node-id="vmpTaAVPRbakXnCNQbVfwp">
+      <span class="lbl" data-page-node-id="RdeNezcAL94DElnC9x0sMc">预览视角</span>
+      <button type="button" class="on" data-v="normal" data-page-node-id="wgasBWjIC4mAtoOJcgQF1n">学员</button>
+      <button type="button" data-v="disabled" data-page-node-id="aLCMBFOEVq5GCqpiOfk1S3">停用学员</button>
+    </div>
+  </div>
+
+  <!-- 停用横幅 -->
+  <div class="stop-banner rise d1" role="alert" data-page-node-id="RuH6Gr4iNBTBObmCmzd5XM">
+    <span class="ico" data-page-node-id="HAXWmPFqXxwNPAgTLvB8Ii">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="wxaSr3GJRsVRZD5jfyEC6F"><circle cx="12" cy="12" r="9" data-page-node-id="2yQOSJtsPQavdsvwp7g2pz"/><path d="M12 8v5" data-page-node-id="TiFp3ZlHwRRKX3MoWeVOhl"/><circle cx="12" cy="16" r=".5" fill="currentColor" data-page-node-id="Xd2bKV8Mo5aFnNDbkc2pAS"/></svg>
+    </span>
+    <span class="t" data-page-node-id="iWoHmpAcnYkXIyF6ceW5d2"><b data-page-node-id="1fyjWwka3WmK0zckUNXRx1">你的课程已暂时停用。</b>老师之前带你学到了这里，如需恢复课程请联系老师。</span>
+  </div>
+
+  <!-- 时间线 -->
+  <section class="zone rise d2" data-page-node-id="0avBI2fpGcNDnJC9SfI5U8">
+    <div class="tl" id="tl" data-page-node-id="Xa2nGI8VAfDCzyVr5Gys1y"><!-- JS 渲染 --></div>
+    <div class="tl-empty" id="tlEmpty" data-page-node-id="Jip3aEWSCy9LzihT91Jm4J">
+      <span class="big" data-page-node-id="PlDwg2QOeu2kY1yedvEpTJ">还没有收到过<mark data-page-node-id="lQf2vNbn0AB1DElEnUdnAm">作业</mark></span>
+      <span data-page-node-id="yNdt6u8qiYxvIfhzTnOAmq">老师布置作业后会出现在这里和首页</span>
+    </div>
+  </section>
+
+  <!-- 回到顶部 -->
+  <button class="to-top" id="toTop" type="button" aria-label="回到顶部" title="回到顶部" data-page-node-id="toTopBtnNxde0a">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="toTopIcoNxde0a"><path d="M12 19V5" data-page-node-id="toTopL1Nxde0a"/><path d="m5 12 7-7 7 7" data-page-node-id="toTopL2Nxde0a"/></svg>
+  </button>
+
+</main>
+
+<script>
+/* ================= 假数据（每次推送 = 一个 operation） ================= */
+const OPS = [
+  {d:'9月9日', tm:'20:30', from:'李弦安',
+   msg:'重点看 P2 的段落衔接，跟练时开节拍器 60。',
+   items:[
+     {kd:'单课', nm:'卡农独奏 · 全曲精讲', img:'assets/covers/real-01.jpg', href:'track-point-detail.html'},
+     {kd:'P', p:'P2', nm:'卡农 · 分段讲解', img:'assets/covers/real-01.jpg', href:'track-point-detail.html'},
+   ]},
+  {d:'9月6日', tm:'19:12', from:'李弦安',
+   msg:'',
+   items:[
+     {kd:'合集', nm:'指弹入门 30 首', img:'assets/covers/real-15.jpg', href:'#'},
+   ]},
+  {d:'9月5日', tm:'21:47', from:'李弦安',
+   msg:'天空之城全曲过一遍，P2 慢速跟练三遍再提速。',
+   items:[
+     {kd:'单课', nm:'天空之城 · 指弹改编', img:'assets/covers/real-02.jpg', href:'#'},
+     {kd:'P', p:'P2', nm:'天空之城 · 分段讲解', img:'assets/covers/real-02.jpg', href:'#'},
+   ]},
+  {d:'9月2日', tm:'18:05', from:'李弦安',
+   msg:'',
+   items:[
+     {kd:'单课', nm:'晴天 · 前奏精讲', img:'assets/covers/real-06.jpg', href:'#'},
+     {kd:'P', p:'P1', nm:'晴天 · 前奏演示', img:'assets/covers/real-06.jpg', href:'#'},
+   ]},
+  {d:'8月29日', tm:'20:22', from:'李弦安',
+   msg:'这周把风之诗的引子磨下来，不用赶。',
+   items:[
+     {kd:'单课', nm:'风之诗 · Wind Song', img:'assets/covers/real-03.jpg', href:'#'},
+   ]},
+  {d:'8月25日', tm:'19:40', from:'李弦安',
+   msg:'',
+   items:[
+     {kd:'合集', nm:'宫崎骏动画曲集', img:'assets/covers/real-13.jpg', href:'#'},
+     {kd:'单课', nm:'千与千寻 · Always With Me', img:'assets/covers/real-13.jpg', href:'#'},
+   ]},
+  {d:'8月20日', tm:'20:11', from:'李弦安',
+   msg:'乐谱在附件里，看不懂的地方课上问。',
+   items:[
+     {kd:'单课', nm:'奇迹的山', img:'assets/covers/real-04.jpg', href:'#'},
+   ]},
+  {d:'8月16日', tm:'18:33', from:'李弦安',
+   msg:'',
+   items:[
+     {kd:'P', p:'P1', nm:'卡农 · 完整示范', img:'assets/covers/real-01.jpg', href:'track-point-detail.html'},
+   ]},
+];
+
+/* ================= 渲染（按日期分组的时间线） ================= */
+const tl = document.getElementById('tl');
+function render(){
+  if(!OPS.length){
+    document.getElementById('tlEmpty').classList.add('show');
+    document.getElementById('cntHint').textContent = '暂无推送记录';
+    return;
+  }
+  document.getElementById('cntHint').textContent = '共 ' + OPS.length + ' 次推送 · 按时间倒序';
+  let lastD = null;
+  tl.innerHTML = OPS.map(o=>{
+    const dateHead = (o.d !== lastD)
+      ? '<div class="tl-date num"><b>' + o.d + '</b></div>'
+      : '';
+    lastD = o.d;
+    return dateHead +
+    '<div class="op rise">' +
+      '<div class="op-side num"><div class="tm">' + o.tm + '</div><div class="dt">推送</div></div>' +
+      '<div class="op-main">' +
+        '<div class="op-from"><span class="tk">' + o.from[0] + '</span>' + o.from + '老师 布置了 ' + o.items.length + ' 项内容</div>' +
+        (o.msg ? '<div class="op-msg"><span class="who">留言</span>「' + o.msg + '」</div>' : '') +
+        '<div class="op-items">' +
+          o.items.map(it=>
+            '<span class="it num">' + it.nm +
+              '<em>' + (it.p ? it.p : it.kd) + '</em>' +
+            '</span>'
+          ).join('') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+render();
+
+/* ================= 视角切换（学员 / 停用学员） ================= */
+document.querySelectorAll('.viewseg button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.viewseg button').forEach(x=>x.classList.toggle('on', x===b));
+    document.body.classList.toggle('disabled', b.dataset.v === 'disabled');
+  });
+});
+
+/* ================= 回到顶部 ================= */
+const toTop = document.getElementById('toTop');
+window.addEventListener('scroll', ()=>{
+  toTop.classList.toggle('show', window.scrollY > 240);
+}, {passive:true});
+toTop.addEventListener('click', ()=>{
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+</script>
+</body>
+</html>

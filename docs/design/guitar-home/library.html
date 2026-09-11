@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="Ho8HxHQr5Kr0C3zw7wyanj">
+<head data-page-node-id="XAC1xfiQoGCFbFbkYtzBhD">
+<meta charset="UTF-8" data-page-node-id="TBGYibn5DnArpDWxdW7Nol">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="kVhpTle2Hj1gj7JW595BtD">
+<title>图书馆 · 能学慧吉他教室</title>
+<style>
+/* ============================================================
+   图书馆 · PDF 资料区
+   视觉遵循 design-spec v1.0：纸底 / 咖啡描边盒子 / 橘色强调
+   封面比例 = A4 竖版（210 : 297）
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底 + 格纹底饰（design-spec v2.0 §3） */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+input{font-family:inherit}
+.num{font-variant-numeric:tabular-nums}
+.rise{opacity:0;transform:translateY(14px);animation:rise .7s var(--ease) forwards}
+.d1{animation-delay:.08s}.d2{animation-delay:.18s}
+@keyframes rise{to{opacity:1;transform:none}}
+
+/* ============ 导航（复用课程页） ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区 ============ */
+.home{flex:1;min-height:0;max-width:1440px;width:100%;margin:0 auto;padding:14px 36px 20px;display:flex;flex-direction:column;gap:14px}
+
+/* ---- 搜索条 + 视角切换 ---- */
+.toolrow{flex:none;display:flex;align-items:center;gap:16px}
+.searchbar{
+  flex:1;max-width:520px;display:flex;align-items:center;gap:10px;
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:9px 16px;transition:box-shadow .25s var(--ease);
+}
+.searchbar:focus-within{box-shadow:0 2px 8px rgba(93,67,38,.12)}
+.searchbar svg{width:15px;height:15px;color:var(--ink-3);flex:none}
+.searchbar input{
+  flex:1;border:none;background:none;outline:none;
+  font-size:13px;color:var(--ink);letter-spacing:.4px;
+}
+.searchbar input::placeholder{color:#b3a58c}
+.searchbar .clr{
+  display:none;font-size:10.5px;letter-spacing:1px;color:var(--ink-3);
+  border:1px solid var(--hair-2);border-radius:4px;padding:2px 8px;transition:all .25s;
+}
+.searchbar .clr:hover{color:var(--orange);border-color:var(--orange)}
+.searchbar.filtering .clr{display:inline-block}
+.toolrow .hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+.viewseg{margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid var(--hair-2);border-radius:4px;overflow:hidden;background:var(--white)}
+.viewseg .lbl{font-size:10px;letter-spacing:1.5px;color:var(--ink-3);padding:0 10px;border-right:1px dashed var(--hair-2)}
+.viewseg button{
+  font-size:11px;letter-spacing:1px;color:var(--ink-3);padding:5px 13px;
+  transition:all .25s;
+}
+.viewseg button + button{border-left:1px solid var(--hair)}
+.viewseg button.on{background:var(--coffee);color:var(--white);font-weight:600}
+
+/* ---- 区块（图书馆）：去外框 · 仿知识点首页平铺 ---- */
+.zone{
+  flex:1;min-height:0;
+  display:flex;flex-direction:column;
+  overflow:visible;
+}
+.zone-head{
+  flex:none;display:flex;align-items:center;gap:14px;
+  padding:2px 0 0;
+}
+.zone-head h2{font-size:13.5px;font-weight:700;letter-spacing:2px;color:var(--coffee);display:flex;align-items:center;gap:9px}
+.zone-head h2::before{content:"";width:4px;height:14px;border-radius:1px;flex:none;background:var(--orange)}
+.zone-head .meta{font-size:11px;color:var(--ink-3);letter-spacing:.5px}
+.zone-head .order{font-size:10px;color:var(--ink-3);letter-spacing:1px;opacity:.8}
+.zone-ops{margin-left:auto;display:flex;gap:8px}
+.zbtn{
+  font-size:11px;letter-spacing:1.5px;border-radius:4px;padding:5px 14px;
+  transition:all .25s var(--ease);
+}
+.zbtn.ghost{color:var(--coffee);border:1px solid var(--coffee);background:var(--white)}
+.zbtn.ghost:hover{background:rgba(255,127,0,.1);border-color:var(--orange);color:var(--orange)}
+
+/* ---- PDF 卡片网格：A4 竖版封面 ---- */
+.grid{
+  flex:1;min-height:0;padding:12px 0 10px;
+  display:grid;gap:14px;
+  grid-template-columns:repeat(8, minmax(0,1fr));
+  align-content:center;overflow:hidden;   /* 垂直居中：上下留白均等，最多两排由分页保证 */
+  scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
+}
+.grid::-webkit-scrollbar{width:4px}
+.grid::-webkit-scrollbar-thumb{background:var(--hair-2)}
+.card{
+  position:relative;text-decoration:none;color:inherit;cursor:pointer;
+  display:flex;flex-direction:column;
+  border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.06);
+  padding:6px;transition:all .3s var(--ease);
+}
+.card:hover{transform:translateY(-3px);box-shadow:0 6px 16px rgba(93,67,38,.13)}
+.card .cover{
+  position:relative;width:100%;aspect-ratio:210/297;   /* A4 竖版比例 */
+  border-radius:4px;background:var(--wood) center/cover no-repeat;
+  display:grid;place-items:center;overflow:hidden;
+}
+/* 封面下缘的 PDF 小徽标 */
+.card .cover .pdf-badge{
+  position:absolute;left:7px;bottom:7px;z-index:2;
+  font-size:8.5px;letter-spacing:1.5px;font-weight:700;color:var(--white);
+  background:rgba(180,69,46,.92);border-radius:3px;padding:1.5px 6px;
+}
+.pg-hide{display:none!important}
+.card .name{
+  font-size:12px;font-weight:600;letter-spacing:.3px;line-height:1.5;
+  margin-top:7px;height:1.5em;
+  display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;
+}
+.card .meta{
+  font-size:10px;color:var(--ink-3);letter-spacing:.4px;margin-top:1px;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;
+}
+
+/* ---- 分页器 ---- */
+.pager{
+  flex:none;display:flex;align-items:center;gap:10px;
+  padding:2px 0 0;
+}
+.pager .pgbtn{
+  font-size:10.5px;letter-spacing:1px;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:2px 11px;
+  background:var(--white);transition:all .25s;
+}
+.pager .pgbtn:hover:not(:disabled){border-color:var(--orange);color:var(--orange)}
+.pager .pgbtn:disabled{opacity:.35;cursor:not-allowed}
+.pager .pginfo{font-size:10.5px;color:var(--ink-3);letter-spacing:1px}
+.pager .pginfo b{color:var(--coffee);font-weight:700}
+.pager .pgjump{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--ink-3);letter-spacing:1px}
+.pager .pgjump input{
+  width:46px;text-align:center;font-size:11px;color:var(--ink);
+  border:1px solid var(--hair-2);border-radius:4px;padding:2px 4px;
+  background:var(--white);outline:none;transition:border-color .25s;
+  -moz-appearance:textfield;appearance:textfield;
+}
+.pager .pgjump input::-webkit-outer-spin-button,.pager .pgjump input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.pager .pgjump input:focus{border-color:var(--coffee)}
+
+/* ---- 教导主任视角：封面居中悬停操作层（克制磨砂玻璃） ---- */
+.card .ops{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;
+  display:none;flex-direction:column;
+  background:rgba(252,249,242,.55);
+  border:1px solid rgba(255,255,255,.45);
+  border-radius:8px;padding:4px;
+  backdrop-filter:blur(12px) saturate(1.08);-webkit-backdrop-filter:blur(12px) saturate(1.08);
+  box-shadow:0 4px 16px rgba(40,28,12,.16);
+}
+body.dean .card:hover .ops{display:flex}
+.card .ops button{
+  flex:none;font-size:10px;letter-spacing:1px;color:var(--coffee);
+  border:none;border-radius:5px;padding:4px 12px;background:transparent;
+  transition:all .2s;white-space:nowrap;cursor:pointer;
+}
+.card .ops button:hover{background:rgba(255,255,255,.5)}
+.card .ops button.op-del:hover{background:rgba(180,69,46,.12);color:#b4452e}
+
+/* ---- 删除二次确认弹层 ---- */
+.modal-mask{
+  position:fixed;inset:0;z-index:100;display:none;place-items:center;
+  background:rgba(60,42,20,.38);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+}
+.modal-mask.show{display:grid}
+.modal{
+  width:320px;background:var(--white);border:1.5px solid var(--coffee);border-radius:8px;
+  box-shadow:0 12px 32px rgba(60,42,20,.18);padding:20px 22px;
+  animation:modal-pop .25s var(--ease);
+}
+@keyframes modal-pop{from{transform:scale(.94);opacity:0}}
+.modal .modal-title{
+  font-size:14px;font-weight:700;letter-spacing:2px;color:var(--coffee);
+  margin-bottom:10px;padding-bottom:9px;border-bottom:1px dashed var(--hair-2);
+}
+.modal p{font-size:12px;line-height:1.9;color:var(--ink);margin:0 0 16px;letter-spacing:.3px}
+.modal p b{color:#b4452e}
+.modal .modal-ops{display:flex;gap:10px;justify-content:flex-end}
+.mbtn{
+  font-size:11.5px;letter-spacing:1px;padding:5px 16px;border-radius:4px;
+  border:1px solid var(--hair-2);color:var(--ink-3);background:var(--white);
+  transition:all .2s;cursor:pointer;
+}
+.mbtn:hover{border-color:var(--coffee);color:var(--coffee)}
+.mbtn.danger{color:var(--white);background:var(--orange);border-color:var(--orange)}
+.mbtn.danger:hover{background:#b4452e;border-color:#b4452e}
+.dean-toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%, 12px);z-index:99;
+  font-size:11.5px;letter-spacing:.5px;color:var(--coffee);
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:7px 18px;box-shadow:0 6px 18px rgba(60,42,20,.15);
+  opacity:0;pointer-events:none;transition:all .25s var(--ease);
+}
+.dean-toast.show{opacity:1;transform:translate(-50%, 0)}
+
+/* 响应式 */
+@media (max-width:1024px){
+  body{overflow:auto;display:block}
+  .home{padding:14px 20px 40px;gap:16px}
+  .zone{min-height:420px}
+  .grid{grid-template-columns:repeat(4,1fr)}
+}
+@media (max-width:640px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .home{padding:12px 14px 32px}
+  .grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:12px 14px}
+  .toolrow{flex-wrap:wrap}
+  .viewseg{margin-left:0}
+}
+</style>
+</head>
+<body data-page-node-id="dFnm0JMnEABry8gHefK4Uz">
+
+<!-- ================= 导航 ================= -->
+<nav class="nav" data-page-node-id="uLqizSNR1NCPm63NT5cVgT">
+  <div class="nav-inner" data-page-node-id="Dm0QZVfoHGoWzuEx27aFBr">
+    <a class="logo" href="#" data-page-node-id="jvmtp0tdCDEFrApc9HJ8JX">
+      <span class="mark" data-page-node-id="OD65DDfCc8rJmSE1hpUmYq"></span>
+      能学慧吉他教室
+      <small data-page-node-id="CvuCVinvjtoZJduWnOsgAm">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="ZojGFKMJMsIeeUkgTmBTSe">
+      <a href="#" data-page-node-id="5hYPgbCqbHEHZJ137MRV5G">首页</a>
+      <a href="knowledge-home.html" data-page-node-id="jpw3g1keY9FFkkvrNyggeH">知识点区</a>
+      <a href="tracks-home.html" data-page-node-id="5zao4kYlq2cnJfgSHh9Ypq">曲目库</a>
+      <a href="library.html" class="active" data-page-node-id="dNY4p5W8DZ5BXhmeZc9lB0">图书馆</a>
+      <a href="#" data-page-node-id="yg8jTejeWrJ9yKFjMr4y1b">作业记录</a>
+    </div>
+    <div class="nav-right" data-page-node-id="VINbYbyHFq0NJFrU7VLOqY">
+      <div class="avatar" data-page-node-id="xo4pGLK43oQ6IHbon7cidv">李</div>
+    </div>
+  </div>
+</nav>
+
+<main class="home" data-page-node-id="p8lko6aAYXjUzxW5vL7f9B">
+
+  <!-- 搜索条 + 视角切换（演示用） -->
+  <div class="toolrow rise" data-page-node-id="hkqutdRCnd6fC8Fg8twRmF">
+    <div class="searchbar" id="searchbar" data-page-node-id="90P7WsxgCKYD3nSvXJSjAj">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="EdGlXnLjlSi7F5BnAuQE6z"><circle cx="11" cy="11" r="7" data-page-node-id="NShrVX3utUnDIt0KMIqTKi"/><path d="m20 20-3.5-3.5" data-page-node-id="XK6zdtLRd4cu0FXbwRUyJ6"/></svg>
+      <input type="text" id="searchInput" placeholder="搜索资料名称…" aria-label="搜索图书馆资料" data-page-node-id="vHMeEC4l8WVB3YGCDJrqeS">
+      <button type="button" class="clr" id="clrBtn" data-page-node-id="C2EWtESTqFZLrfnhcw9yxP">清除</button>
+    </div>
+    <span class="hint" data-page-node-id="WEjqIy0bHhu8xdctxVrMv6">共 12 份 PDF 资料 · 按上传时间倒序</span>
+    <div class="viewseg" role="group" aria-label="预览视角" data-page-node-id="1RRlco10NXb79AXJrcv7ds">
+      <span class="lbl" data-page-node-id="V4WpC1MhM1iYQO5lcn5d75">预览视角</span>
+      <button type="button" class="on" data-dean="0" data-page-node-id="gmYfOUrzh46012nshv6Xxq">老师</button>
+      <button type="button" data-dean="0" data-page-node-id="0DjtqAQYtNJIYpacKBBpRm">学生</button>
+      <button type="button" data-dean="0" data-page-node-id="gbDUdH8rViEg0WziTqjmMK">游客</button>
+      <button type="button" data-dean="1" data-page-node-id="9KaYExhd65SB06Pvz7w0Uz">教导主任</button>
+    </div>
+  </div>
+
+  <!-- ============ 图书馆区 ============ -->
+  <section class="zone rise d1" data-page-node-id="DTn0Pijh7rBi3h7WhqVnKw">
+    <div class="zone-head" data-page-node-id="oPLOsQnQGPRd7YUxe8FelL">
+      <h2 data-page-node-id="vBtRFPfd9hlyHaF5NKHFaD">图书馆</h2>
+      <span class="meta num" id="libMeta" data-page-node-id="C1cdJpHcS7pdQdzBDAUWl4">共 12 份</span>
+      <span class="order" data-page-node-id="WzZjKdUWbHAgQ1q062kDhE">按上传时间倒序 · 封面为 A4 竖版比例</span>
+      <div class="zone-ops teacher-only" style="display:none" data-page-node-id="fAl92LbYhomYHfXNrDwDxM">
+        <button class="zbtn ghost" onclick="location.href='admin-upload-pdf.html'" data-page-node-id="0uRnHhRFCjAoCq3DZ0pZAO">＋ 上传 PDF</button>
+      </div>
+    </div>
+    <div class="grid" id="libGrid" data-page-node-id="HyPdLozUFNSWfNEptAdtf0"><!-- 卡片由 JS 渲染 --></div>
+    <div class="pager" id="libPager" aria-label="分页" data-page-node-id="eCFKNhY4Op02wH057gs4rR">
+      <button type="button" class="pgbtn" data-act="prev" data-page-node-id="ZycAdN5DjdtS7oYIlxm44B">上一页</button>
+      <span class="pginfo num" data-info data-page-node-id="6MuFmtsAZuqJaATMez3KDP">第 1 页 · 共 1 页</span>
+      <button type="button" class="pgbtn" data-act="next" data-page-node-id="Ywp6Eim0wRClzvH8sDpB5t">下一页</button>
+      <span class="pgjump num" data-page-node-id="mB1Pod3o3YrjyPzU6AQ7Vp">跳转到 <input type="number" min="1" value="1" aria-label="跳转到指定页" data-page-node-id="JSCKtgCRNoEUhwdJLZg2dW"> 页 <button type="button" class="pgbtn" data-act="go" data-page-node-id="jXhHELiJSBwCv6nTTwZB1K">跳转</button></span>
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* ================= 假数据（封面用已下载的真实图片素材裁切为 A4 比例） ================= */
+const DOCS = [
+  {nm:'卡农独奏 · 全曲乐谱',   img:'assets/covers/real-01.jpg', pdf:'assets/pdf/doc-01.pdf', meta:'8 页 · 2.4 MB · 2 天前'},
+  {nm:'天空之城 · 改编笔记',   img:'assets/covers/real-02.jpg', pdf:'assets/pdf/doc-02.pdf', meta:'6 页 · 1.8 MB · 4 天前'},
+  {nm:'风之诗 · 六线谱',       img:'assets/covers/real-03.jpg', pdf:'assets/pdf/doc-03.pdf', meta:'4 页 · 1.2 MB · 5 天前'},
+  {nm:'奇迹的山 · 演奏解析',   img:'assets/covers/real-04.jpg', pdf:'assets/pdf/doc-04.pdf', meta:'12 页 · 3.6 MB · 1 周前'},
+  {nm:'Merry Christmas · 乐谱',img:'assets/covers/real-05.jpg', pdf:'assets/pdf/doc-05.pdf', meta:'5 页 · 1.5 MB · 1 周前'},
+  {nm:'晴天 · 前奏教学讲义',   img:'assets/covers/real-06.jpg', pdf:'assets/pdf/doc-06.pdf', meta:'9 页 · 2.1 MB · 2 周前'},
+  {nm:'指弹入门 · 基础教程',   img:'assets/covers/real-15.jpg', pdf:'assets/pdf/doc-07.pdf', meta:'24 页 · 5.8 MB · 2 周前'},
+  {nm:'和弦转换 · 专项练习册', img:'assets/covers/real-16.jpg', pdf:'assets/pdf/doc-08.pdf', meta:'10 页 · 2.9 MB · 3 周前'},
+  {nm:'节拍器训练 · 指南',     img:'assets/covers/real-17.jpg', pdf:'assets/pdf/doc-09.pdf', meta:'7 页 · 1.1 MB · 3 周前'},
+  {nm:'右手技巧 · 讲义合集',   img:'assets/covers/real-18.jpg', pdf:'assets/pdf/doc-10.pdf', meta:'15 页 · 4.2 MB · 1 个月前'},
+  {nm:'乐理基础 · 图解手册',   img:'assets/covers/real-13.jpg', pdf:'assets/pdf/doc-11.pdf', meta:'18 页 · 4.7 MB · 1 个月前'},
+  {nm:'考级曲目 · 总表',       img:'assets/covers/real-14.jpg', pdf:'assets/pdf/doc-12.pdf', meta:'3 页 · 0.6 MB · 1 个月前'},
+];
+
+/* ================= 渲染卡片 ================= */
+const grid = document.getElementById('libGrid');
+grid.innerHTML = DOCS.map((d, i)=>(
+  '<article class="card" data-nm="' + d.nm + '" data-pdf="' + d.pdf + '" data-i="' + i + '">' +
+    '<div class="cover" style="background-image:url(\'' + d.img + '\')">' +
+      '<span class="pdf-badge">PDF</span>' +
+    '</div>' +
+    '<div class="name">' + d.nm + '</div>' +
+    '<div class="meta num">' + d.meta + '</div>' +
+  '</article>'
+)).join('') + '<div class="pick-empty" id="libEmpty" style="display:none;grid-column:1/-1;padding:30px 10px;text-align:center;font-size:11px;color:var(--ink-3);letter-spacing:.5px;border:1px dashed var(--hair-2);border-radius:6px">未找到相关资料，换个关键词试试</div>';
+
+/* ================= 视角切换（老师/学生/游客 = 浏览视角；教导主任 = 管理视角） ================= */
+const vBtns = [...document.querySelectorAll('.viewseg button')];
+function setView(dean){
+  vBtns.forEach(b=>b.classList.toggle('on', (b.dataset.dean === '1') === dean));
+  document.body.classList.toggle('dean', dean);
+  document.querySelectorAll('.teacher-only').forEach(el=>{ el.style.display = dean ? 'flex' : 'none'; });
+}
+vBtns.forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.dean === '1')));
+
+/* ================= 悬停操作层（仅教导主任）：查看详情 / 编辑 / 删除 ================= */
+(function(){
+  let toastTimer = null;
+  function toast(msg){
+    let t = document.querySelector('.dean-toast');
+    if(!t){
+      t = document.createElement('div');
+      t.className = 'dean-toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove('show'), 1600);
+  }
+  function bumpMeta(){
+    const meta = document.getElementById('libMeta');
+    const left = grid.querySelectorAll('.card').length;
+    if(meta) meta.textContent = '共 ' + left + ' 份';
+    document.querySelector('.toolrow .hint').textContent = '共 ' + left + ' 份 PDF 资料 · 按上传时间倒序';
+  }
+  document.querySelectorAll('.card').forEach(card=>{
+    const ops = document.createElement('div');
+    ops.className = 'ops';
+    /* 教导主任悬停：查看详情 / 编辑 / 删除 */
+    ops.innerHTML =
+      '<button type="button" data-act="view">查看详情</button>' +
+      '<button type="button" data-act="edit" class="op-dean">编辑</button>' +
+      '<button type="button" data-act="del" class="op-dean op-del">删除</button>';
+    /* 挂到封面上，操作层相对封面居中 */
+    card.querySelector('.cover').appendChild(ops);
+    ops.addEventListener('click', e=>{
+      e.preventDefault(); e.stopPropagation();
+      const act = e.target.dataset && e.target.dataset.act;
+      if(!act) return;
+      if(act === 'view'){
+        location.href = 'library-book.html?i=' + card.dataset.i;
+      }else if(act === 'del'){
+        pendingCard = card;
+        document.getElementById('delName').textContent = card.dataset.nm;
+        document.getElementById('delModal').classList.add('show');
+      }else{
+        toast('演示：进入「' + card.dataset.nm + '」编辑页');
+      }
+    });
+  });
+  /* 点击卡片 → 图书详情页（学生 / 老师浏览路径；教导主任点卡片空白处同样进入） */
+  grid.addEventListener('click', e=>{
+    if(e.target.closest('.ops')) return;   /* 操作层内点击不触发跳转 */
+    const card = e.target.closest('.card');
+    if(card) location.href = 'library-book.html?i=' + card.dataset.i;
+  });
+})();
+
+/* ================= 非教导主任视角：隐藏管理按钮 ================= */
+function applyRoleOps(){
+  const dean = document.body.classList.contains('dean');
+  document.querySelectorAll('.card .ops .op-dean').forEach(b=>{
+    b.style.display = dean ? '' : 'none';
+  });
+}
+new MutationObserver(applyRoleOps).observe(document.body, {attributes:true, attributeFilter:['class']});
+applyRoleOps();
+
+/* ================= 删除二次确认弹层 ================= */
+let pendingCard = null;
+const mask = (function(){
+  document.body.insertAdjacentHTML('beforeend', [
+    '<div class="modal-mask" id="delModal" role="dialog" aria-modal="true" aria-label="删除确认">',
+      '<div class="modal">',
+        '<div class="modal-title">删 除 确 认</div>',
+        '<p>确定要删除「<b id="delName"></b>」吗？<br>删除后该资料将不可恢复。</p>',
+        '<div class="modal-ops">',
+          '<button type="button" class="mbtn" id="delCancel">取 消</button>',
+          '<button type="button" class="mbtn danger" id="delOk">确认删除</button>',
+        '</div>',
+      '</div>',
+    '</div>'
+  ].join(''));
+  return document.getElementById('delModal');
+})();
+function doDelete(){
+  if(!pendingCard) return;
+  const card = pendingCard; pendingCard = null;
+  mask.classList.remove('show');
+  card.style.transition = 'opacity .25s, transform .25s';
+  card.style.opacity = '0'; card.style.transform = 'scale(.94)';
+  setTimeout(()=>{ card.remove(); bumpMeta(); layoutPage(); }, 250);
+  toast('演示：已删除「' + card.dataset.nm + '」');
+}
+document.getElementById('delOk').addEventListener('click', doDelete);
+document.getElementById('delCancel').addEventListener('click', closeDel);
+mask.addEventListener('click', e=>{ if(e.target === mask) closeDel(); });
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && mask.classList.contains('show')) closeDel(); });
+function closeDel(){ pendingCard = null; mask.classList.remove('show'); }
+
+/* ================= 搜索（实时过滤） ================= */
+const searchInput = document.getElementById('searchInput');
+const searchbar   = document.getElementById('searchbar');
+function applySearch(){
+  const kw = searchInput.value.trim().toLowerCase();
+  searchbar.classList.toggle('filtering', !!kw);
+  let shown = 0;
+  document.querySelectorAll('#libGrid .card').forEach(card=>{
+    const ok = !kw || card.dataset.nm.toLowerCase().includes(kw);
+    card.style.display = ok ? '' : 'none';
+    if(ok) shown++;
+  });
+  document.getElementById('libEmpty').style.display = shown ? 'none' : 'block';
+  page = 1; layoutPage();
+}
+searchInput.addEventListener('input', applySearch);
+document.getElementById('clrBtn').addEventListener('click', ()=>{
+  searchInput.value = ''; applySearch(); searchInput.focus();
+});
+searchInput.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ searchInput.value = ''; applySearch(); } });
+
+/* ================= 分页：每页行数随框高自适应 · 上一页 / 下一页 / 跳转 ================= */
+const PAGE_COLS = 8;          // 每行固定 8 张
+let PAGE_SIZE = PAGE_COLS;    // 每页张数 = 每行张数 × 可容纳行数（运行时计算）
+const pager = document.getElementById('libPager');
+let page = 1;
+/* 计算框体内能放下几行 A4 卡片，动态得出每页张数 */
+function calcPageSize(){
+  const cards = [...grid.querySelectorAll('.card')];
+  if(!cards.length){ PAGE_SIZE = PAGE_COLS; return; }
+  const probe = cards[0];
+  const hidden = probe.classList.contains('pg-hide');
+  probe.classList.remove('pg-hide');               // display:none 量不到高度，先临时放出
+  const h = probe.offsetHeight;
+  if(hidden) probe.classList.add('pg-hide');
+  if(!h){ PAGE_SIZE = PAGE_COLS; return; }
+  const gap = parseFloat(getComputedStyle(grid).rowGap) || 0;
+  const rows = Math.min(2, Math.max(1, Math.floor((grid.clientHeight + gap) / (h + gap))));  // 最多显示两排，其余翻页
+  PAGE_SIZE = PAGE_COLS * rows;
+}
+function layoutPage(){
+  const vis = [...grid.querySelectorAll('.card')].filter(c=>c.style.display !== 'none');
+  const total = Math.max(1, Math.ceil(vis.length / PAGE_SIZE));
+  page = Math.min(Math.max(1, page), total);
+  vis.forEach((c, i)=> c.classList.toggle('pg-hide', !(i >= (page-1)*PAGE_SIZE && i < page*PAGE_SIZE)));
+  pager.querySelector('[data-info]').innerHTML = '第 <b>' + page + '</b> 页 · 共 <b>' + total + '</b> 页';
+  pager.querySelector('[data-act="prev"]').disabled = page <= 1;
+  pager.querySelector('[data-act="next"]').disabled = page >= total;
+  const input = pager.querySelector('input');
+  input.max = total; input.value = page;
+  /* 单页也常驻显示 */
+}
+pager.querySelector('[data-act="prev"]').addEventListener('click', ()=>{ page--; layoutPage(); });
+pager.querySelector('[data-act="next"]').addEventListener('click', ()=>{ page++; layoutPage(); });
+const go = ()=>{ const v = parseInt(pager.querySelector('input').value, 10); if(v >= 1){ page = v; layoutPage(); } };
+pager.querySelector('[data-act="go"]').addEventListener('click', go);
+pager.querySelector('input').addEventListener('keydown', e=>{ if(e.key === 'Enter') go(); });
+window.addEventListener('resize', ()=>{ calcPageSize(); layoutPage(); });
+calcPageSize();
+layoutPage();
+</script>
+</body>
+</html>

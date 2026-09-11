@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="auYk7n43wHmaAYX9TDjwy3">
+<head data-page-node-id="nQuapdrldIPDedKortNEqX">
+<meta charset="UTF-8" data-page-node-id="x6rtuDAeX07ia8sxDUJRoT">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="1NoFdkthsylWo2xtnNuhZp">
+<title>曲目库 · 能学慧吉他教室</title>
+<style>
+/* ============================================================
+   曲目库首页 · 上下两区（曲目 / 曲谱集）+ 搜索
+   视觉遵循 design-spec v1.0：纸底 / 咖啡描边盒子 / 橘色强调 / 绿色仅点睛
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{height:100%}
+html{scroll-behavior:smooth}
+body{
+  min-height:100%;
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底 + 格纹底饰（design-spec v2.0 §3） */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow-x:hidden;overflow-y:auto;  /* 允许整页滚动：曲目区可超过一屏 */
+}
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+input{font-family:inherit}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:10px;letter-spacing:2.5px;color:var(--ink-3);text-transform:uppercase;font-weight:500}
+.scroll{overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent}
+.scroll::-webkit-scrollbar{width:4px}
+.scroll::-webkit-scrollbar-thumb{background:var(--hair-2)}
+.scroll::-webkit-scrollbar-track{background:transparent}
+
+/* ============ 导航（复用课程页） ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区 ============ */
+.home{flex:1 0 auto;max-width:1440px;width:100%;margin:0 auto;padding:14px 36px 26px;display:flex;flex-direction:column;gap:14px}
+
+/* ---- 搜索条 + 视角切换 ---- */
+.toolrow{flex:none;display:flex;align-items:center;gap:16px}
+.searchbar{
+  flex:1;max-width:520px;display:flex;align-items:center;gap:10px;
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:9px 16px;transition:box-shadow .25s var(--ease);
+}
+.searchbar:focus-within{box-shadow:0 2px 8px rgba(93,67,38,.12)}
+.searchbar svg{width:15px;height:15px;color:var(--ink-3);flex:none}
+.searchbar input{
+  flex:1;border:none;background:none;outline:none;
+  font-size:13px;color:var(--ink);letter-spacing:.4px;
+}
+.searchbar input::placeholder{color:#b3a58c}
+.searchbar .clr{
+  display:none;font-size:10.5px;letter-spacing:1px;color:var(--ink-3);
+  border:1px solid var(--hair-2);border-radius:4px;padding:2px 8px;transition:all .25s;
+}
+.searchbar .clr:hover{color:var(--orange);border-color:var(--orange)}
+.searchbar.filtering .clr{display:inline-block}
+.toolrow .hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+.viewseg{margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid var(--hair-2);border-radius:4px;overflow:hidden;background:var(--white)}
+.viewseg .lbl{font-size:10px;letter-spacing:1.5px;color:var(--ink-3);padding:0 10px;border-right:1px dashed var(--hair-2)}
+.viewseg button{
+  font-size:11px;letter-spacing:1px;color:var(--ink-3);padding:5px 13px;
+  transition:all .25s;
+}
+.viewseg button + button{border-left:1px solid var(--hair)}
+.viewseg button.on{background:var(--coffee);color:var(--white);font-weight:600}
+
+/* ---- 区块（曲目 / 曲谱集）：均去外框，卡片平铺在格纹底图上 ---- */
+.zone{
+  flex:none;
+  display:flex;flex-direction:column;min-height:0;overflow:visible;
+}
+.zone-head{
+  flex:none;padding:2px 0 0;
+  display:flex;align-items:baseline;gap:12px;position:relative;
+}
+.zone-head h2{font-size:13.5px;font-weight:700;letter-spacing:2px;color:var(--coffee);display:flex;align-items:center;gap:9px;width:62px;flex:none}
+.zone-head h2::before{content:"";width:4px;height:14px;border-radius:1px;flex:none;background:var(--orange)}
+.zone-head::after{display:none}
+.zone-head .meta{font-size:10.5px;color:var(--ink-3);letter-spacing:1px;width:58px;flex:none;white-space:nowrap}
+.zone-head .order{
+  appearance:none;-webkit-appearance:none;
+  font-family:inherit;font-size:10.5px;letter-spacing:1px;font-weight:600;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:3px 22px 3px 9px;
+  background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%237a4a26' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 7px center;
+  cursor:pointer;outline:none;transition:border-color .25s;
+}
+.zone-head .order:hover{border-color:var(--orange)}
+.zone-ops{margin-left:auto;display:flex;gap:9px}
+.zbtn{
+  font-size:11px;letter-spacing:1.5px;font-weight:600;
+  border-radius:4px;padding:5px 14px;transition:all .3s var(--ease);
+  white-space:nowrap;
+}
+.zbtn.ghost{color:var(--coffee);border:1px solid var(--hair-2);background:var(--white)}
+.zbtn.ghost:hover{border-color:var(--orange);color:var(--orange)}
+
+/* ---- 卡片网格 ---- */
+.grid{
+  padding:12px 0;
+  display:grid;
+  grid-template-columns:repeat(8, minmax(0,1fr));  /* 一行 8 张铺满整个盒子宽度 */
+  gap:10px;align-items:stretch;                    /* 同行卡片等高，小间距 */
+}
+.pg-hide{display:none!important}
+/* ---- 翻页器：无框页码式（与合集详情页一致 · 当前页橙色马克笔） ---- */
+.pager{
+  flex:none;display:flex;align-items:center;justify-content:center;gap:4px;
+  padding:2px 0 0;
+}
+.pager .pgbtn{
+  width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;color:var(--coffee);
+  transition:background .25s var(--ease), color .25s var(--ease), opacity .25s;
+}
+.pager .pgbtn svg{width:15px;height:15px}
+.pager .pgbtn:hover:not(:disabled){background:rgba(255,127,0,.12);color:var(--orange)}
+.pager .pgbtn:disabled{opacity:.22;cursor:not-allowed}
+.pager .pgnums{display:flex;align-items:center;gap:2px;margin:0 2px}
+.pager .pgnum{
+  min-width:28px;height:28px;padding:0 6px;border-radius:4px;
+  font-size:12px;letter-spacing:.5px;color:var(--ink-3);
+  display:grid;place-items:center;
+  transition:color .25s var(--ease);
+}
+.pager .pgnum:hover{color:var(--coffee)}
+.pager .pgnum.on{
+  color:var(--ink);font-weight:700;
+  background:linear-gradient(180deg, transparent 60%, rgba(255,127,0,.46) 60%);
+}
+.pager .pgdots{color:var(--hair-2);font-size:12px;padding:0 1px;letter-spacing:1px}
+/* 曲谱集区内的翻页器：无框后与整页留白一致 */
+.zone.sets .pager{padding:6px 0 0}
+.card{
+  text-decoration:none;color:inherit;
+  display:flex;flex-direction:column;height:100%;   /* 等高卡片 */
+  border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.06);
+  padding:8px;transition:all .3s var(--ease);
+}
+.card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(93,67,38,.13)}
+.card .cover{
+  aspect-ratio:1/1;border-radius:4px;position:relative;overflow:hidden;
+  display:grid;place-items:center;
+}
+/* 假封面：木质黑胶纹样（三种底色轮换） */
+.card .cover .disc{position:absolute;inset:9%;border-radius:50%;background:var(--wood);display:grid;place-items:center}
+.card .cover .disc::before{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid rgba(242,234,217,.4)}
+.card .cover .disc::after{content:"";position:absolute;inset:36%;border-radius:50%;background:var(--white)}
+.card .cover.c2 .disc{background:var(--coffee)}
+.card .cover.c3 .disc{background:var(--amber)}
+.card .cover.c4 .disc{background:#6b4d2e}
+.card .cover.c5 .disc{background:#8c5a2b}
+.card .cover.c6 .disc{background:#5c5340}
+/* 随机纹样变体：默认黑胶 / 纹路唱片 / 叠碟（stack 伪元素见下） */
+.card .cover .disc i{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from var(--rot,20deg), rgba(242,234,217,.08) 0 16deg, transparent 16deg 42deg)}
+.card .cover.v-groove .disc{background:transparent;box-shadow:inset 0 0 0 2px rgba(93,67,38,.28)}
+.card .cover.v-groove .disc::before{border-color:rgba(93,67,38,.4);border-style:dashed}
+.card .cover.v-groove .disc i{display:none}
+/* 黑胶中心小橘点 */
+.card .cover .disc .lbl{width:15%;height:15%;border-radius:50%;background:var(--white);position:relative;z-index:1;display:grid;place-items:center}
+.card .cover .disc .lbl i{width:6px;height:6px;border-radius:50%;background:var(--orange)}
+/* 合集封面：叠放小碟 */
+.card .cover.stack::before{
+  content:"";position:absolute;left:8%;right:8%;bottom:6%;height:10px;border-radius:3px;
+  background:rgba(93,67,38,.18);
+}
+.card .cover.stack::after{
+  content:"";position:absolute;left:4%;right:4%;bottom:11%;height:10px;border-radius:3px;
+  background:rgba(93,67,38,.3);
+}
+.card .name{font-size:12.5px;font-weight:600;letter-spacing:.3px;line-height:1.5;margin-top:8px;flex:none;height:1.5em;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.card .meta{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:2px;display:flex;align-items:center;gap:6px;flex:none;white-space:nowrap;overflow:hidden}
+.card .meta .cnt-chip{
+  font-size:9.5px;color:var(--coffee);border:1px solid var(--hair-2);
+  border-radius:3px;padding:0 6px;letter-spacing:.5px;
+}
+/* 区内空态 / 搜索空态 */
+.zone-empty{
+  grid-column:1 / -1;display:none;text-align:center;padding:28px 0 20px;
+  color:var(--ink-3);font-size:12px;letter-spacing:.5px;
+}
+.zone-empty.show{display:block}
+.zone-empty b{color:var(--coffee);letter-spacing:1px}
+/* 全局搜索空态（覆盖两区） */
+.global-empty{
+  flex:1;min-height:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  border:1.5px solid var(--coffee);border-radius:6px;background:var(--glass);
+  box-shadow:0 2px 10px rgba(64,45,20,.08);
+  color:var(--ink-3);font-size:12.5px;letter-spacing:.5px;text-align:center;
+}
+.global-empty.show{display:flex}
+.global-empty .big{font-size:15px;color:var(--ink);font-weight:700;letter-spacing:1px}
+.global-empty .big mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 3px}
+.global-empty button{
+  font-size:11.5px;letter-spacing:1.5px;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:6px 16px;background:var(--white);
+  transition:all .25s;
+}
+.global-empty button:hover{border-color:var(--orange);color:var(--orange)}
+body.searching .zone,body.searching .zone .zone-head{display:flex}
+body.searching .zone{display:flex}
+body.searching .global-empty{display:none}
+.global-empty.show{display:flex}
+.global-empty .big{font-size:15px;color:var(--ink);font-weight:700;letter-spacing:1px}
+.global-empty .big mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 3px}
+.global-empty button{
+  font-size:11.5px;letter-spacing:1.5px;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:6px 16px;background:var(--white);
+  transition:all .25s;
+}
+.global-empty button:hover{border-color:var(--orange);color:var(--orange)}
+
+/* 入场动效 */
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+.rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){.rise{opacity:1;transform:none;animation:none}}
+
+/* ---- 回到顶部（整页可滚动，滚过一屏后出现） ---- */
+.to-top{
+  position:fixed;right:26px;bottom:26px;z-index:80;
+  width:38px;height:38px;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--white);border:1.5px solid var(--coffee);color:var(--coffee);
+  box-shadow:0 4px 14px rgba(60,42,20,.16);
+  opacity:0;transform:translateY(10px);pointer-events:none;
+  transition:opacity .28s var(--ease), transform .28s var(--ease), background .25s, color .25s;
+}
+.to-top.show{opacity:1;transform:none;pointer-events:auto}
+.to-top:hover{background:var(--coffee);color:var(--white)}
+.to-top svg{width:16px;height:16px}
+
+/* ---- 教导主任视角：卡片封面悬停操作层（覆盖在封面下部，不挡标题） ---- */
+.card{position:relative}
+.card .ops{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;
+  display:none;flex-direction:column;gap:1px;
+  background:rgba(251,247,236,.66);
+  border:1px solid rgba(93,67,38,.26);border-radius:5px;
+  padding:3px;
+  backdrop-filter:blur(7px) saturate(1.15);-webkit-backdrop-filter:blur(7px) saturate(1.15);
+  box-shadow:0 6px 18px rgba(60,42,20,.16);
+}
+body.dean .card:hover .ops{display:flex}
+.card .ops button{
+  flex:none;font-size:10px;letter-spacing:.5px;color:var(--coffee);
+  border:none;border-radius:3px;padding:4px 9px;background:transparent;
+  transition:all .2s;white-space:nowrap;cursor:pointer;
+}
+.card .ops button:hover{background:rgba(93,67,38,.1)}
+.card .ops button.op-del:hover{background:rgba(180,69,46,.12);color:#b4452e}
+/* ---- 删除二次确认弹层 ---- */
+.modal-mask{
+  position:fixed;inset:0;z-index:100;display:none;place-items:center;
+  background:rgba(60,42,20,.38);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+}
+.modal-mask.show{display:grid}
+.modal{
+  width:320px;background:var(--white);border:1.5px solid var(--coffee);border-radius:8px;
+  box-shadow:0 12px 32px rgba(60,42,20,.18);padding:20px 22px;
+  animation:modal-pop .25s var(--ease);
+}
+@keyframes modal-pop{from{transform:scale(.94);opacity:0}}
+.modal .modal-title{
+  font-size:14px;font-weight:700;letter-spacing:2px;color:var(--coffee);
+  margin-bottom:10px;padding-bottom:9px;border-bottom:1px dashed var(--hair-2);
+}
+.modal p{font-size:12px;line-height:1.9;color:var(--ink);margin:0 0 16px;letter-spacing:.3px}
+.modal p b{color:#b4452e}
+.modal .modal-ops{display:flex;gap:10px;justify-content:flex-end}
+.mbtn{
+  font-size:11.5px;letter-spacing:1px;padding:5px 16px;border-radius:4px;
+  border:1px solid var(--hair-2);color:var(--ink-3);background:var(--white);
+  transition:all .2s;cursor:pointer;
+}
+.mbtn:hover{border-color:var(--coffee);color:var(--coffee)}
+.mbtn.danger{color:var(--white);background:var(--orange);border-color:var(--orange)}
+.mbtn.danger:hover{background:#b4452e;border-color:#b4452e}
+.dean-toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%, 12px);z-index:99;
+  font-size:11.5px;letter-spacing:.5px;color:var(--coffee);
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:7px 18px;box-shadow:0 6px 18px rgba(60,42,20,.15);
+  opacity:0;pointer-events:none;transition:all .25s var(--ease);
+}
+.dean-toast.show{opacity:1;transform:translate(-50%, 0)}
+
+/* 响应式 */
+
+@media (max-width:1024px){
+  body{overflow:auto;display:block}
+  .home{padding:14px 20px 40px;gap:16px}
+
+  .grid{grid-template-columns:repeat(4,1fr);align-items:start;justify-content:normal}
+  .card{max-width:none}
+}
+@media (max-width:640px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .home{padding:12px 14px 32px}
+  .grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:12px 14px;justify-content:normal}
+  .card{max-width:none}
+  .toolrow{flex-wrap:wrap}
+  .viewseg{margin-left:0}
+  .zone-ops{width:100%;margin:6px 0 0}
+}
+</style>
+</head>
+<body data-page-node-id="gjBRxo1S6woSMXG01rareh">
+
+<!-- ================= 导航 ================= -->
+<nav class="nav" data-page-node-id="MNrEZtKPlSF1xqFeVSUIj3">
+  <div class="nav-inner" data-page-node-id="RjG9Apomo8RyyA5x4eKGYU">
+    <a class="logo" href="#" data-page-node-id="Wjsf7TIq2fdEgVBt1GTgtY">
+      <span class="mark" data-page-node-id="u1CFkXyz0zpQAPlQOD4CEU"></span>
+      能学慧吉他教室
+      <small data-page-node-id="jKEzBy7IAAftkpgN2vHXPU">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="w7xt610NtAAwutizXgjSvQ">
+      <a href="#" data-page-node-id="Q9agKj2iUdAhUiQcUVAOqq">首页</a>
+      <a href="knowledge-home.html" data-page-node-id="gsfsSRCNNbIoOwR984np2a">知识点区</a>
+      <a href="tracks-home.html" class="active" data-page-node-id="rzUJOXeQnw6BE2FED6g2Qj">曲目库</a>
+      <a href="library.html" data-page-node-id="64s2fY4zulN3pfd82qrNMJ">图书馆</a>
+      <a href="#" data-page-node-id="AoVSXxJNmTTKHaBuxNDD1s">作业记录</a>
+    </div>
+    <div class="nav-right" data-page-node-id="Y8lUNaiTrxEO1efnSPd1zb">
+      <div class="avatar" data-page-node-id="YFnDiiZ7XxxhdVzzCkM50B">李</div>
+    </div>
+  </div>
+</nav>
+
+<main class="home" data-page-node-id="3fb4326jqB2p0iZrE86R5f">
+
+  <!-- 搜索条 + 视角切换（演示用） -->
+  <div class="toolrow rise" data-page-node-id="BfHe4e1gQhsANQ29RM7muI">
+    <div class="searchbar" id="searchbar" data-page-node-id="jA07JIJOaSAsFLzqAAPUFc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="ODbh2BRKM8u3P88mVgF3e3"><circle cx="11" cy="11" r="7" data-page-node-id="UEDg8QuGttGcKKCXCGHqNi"/><path d="m20 20-3.5-3.5" data-page-node-id="5cmgGyLEdXG3R9ztPEHoM"/></svg>
+      <input type="text" id="searchInput" placeholder="搜索曲目、曲谱集…" aria-label="搜索曲目和曲谱集" data-page-node-id="9iFsy1LZXtoP9IDBoL92LO">
+      <button type="button" class="clr" id="clrBtn" data-page-node-id="aYXqAcwRU31tcEFk2Bg9jA">清除</button>
+    </div>
+    <span class="hint" data-page-node-id="ROnngBd6iPS78Vi9hqnGyQ">同时搜索曲目与曲谱集 · 结果按更新时间倒序</span>
+    <div class="viewseg" role="group" aria-label="预览视角" data-page-node-id="Gwy0gdFSkufaj5RS7UrFUu">
+      <span class="lbl" data-page-node-id="J7aRCKZEjuqGPzt2g81qnz">预览视角</span>
+      <button type="button" class="on" data-dean="0">老师</button>
+      <button type="button" data-dean="0">学生</button>
+      <button type="button" data-dean="0">游客</button>
+      <button type="button" data-dean="1">教导主任</button>
+    </div>
+  </div>
+
+
+
+  <!-- ============ 上区：曲谱集 ============ -->
+  <section class="zone sets rise d1" data-page-node-id="ZWr8VEbSQ2wZF4GaVRFtC5">
+    <div class="zone-head" data-page-node-id="XNDx993jKeU11JBdS4FkYS">
+      <h2 data-page-node-id="Jg04hM2Lw2MCsK2JKSms4F">曲谱集</h2>
+      <span class="meta num" id="setMeta" data-page-node-id="XcEx7Towot6PsqPrP7Mz14">共 7 套</span>
+      <select class="order" data-page-node-id="y0NkmH0L5pBNNssbc1aLy1" aria-label="排序方式"><option value="new" selected>按更新时间倒序</option><option value="old">按更新时间正序</option><option value="az">按首字母</option></select>
+      <div class="zone-ops teacher-only" style="display:none" data-page-node-id="ML8rzAod4vxbTA3GBH1cgA">
+        <button class="zbtn ghost" onclick="location.href='admin-create-track-collection.html?zone=track'" data-page-node-id="4gATnVlfYnUN5f8RO01m7b">＋ 新建合集</button>
+      </div>
+    </div>
+    <div class="grid" id="setGrid" data-page-node-id="8AKdF3TiggkHhf4ML3suI7">
+      <a class="card" href="track-collection-detail.html" data-kw="周杰伦 专辑 指弹" data-page-node-id="fl3rNC1HFDfHNPRold5C36">
+        <div class="cover stack" data-page-node-id="1dNfYOifFW9GH9jvHnaBPV"><div class="disc" data-page-node-id="rB4OFNrHhY56v9221erigr"><span class="lbl" data-page-node-id="QIpMr2UFjgpXxNz6sGWIz9"><i data-page-node-id="dhhGrsyS59V5eYpqLDkqkz"></i></span></div></div>
+        <div class="name" data-page-node-id="9j4dt6Nxy1ADvkfXSHD8Ed">周杰伦专辑 · 指弹改编</div>
+        <div class="meta" data-page-node-id="eulPFlJj0JVEuorugZhxRW"><span class="cnt-chip num" data-page-node-id="WTJS7yCIgBE3GieE7Tw1Lx">收录 12 首</span><span class="num" data-page-node-id="KjYXz4kx8ZaFTmP1yZMXvN">昨天更新</span></div>
+      </a>
+      <a class="card" href="track-collection-detail.html" data-kw="押尾光太郎 押尾桑 精选" data-page-node-id="7MdtoMMWmA8zw7nGhFp5lP">
+        <div class="cover c2 stack" data-page-node-id="xYwrxNJBR34BubMJUgjGIt"><div class="disc" data-page-node-id="HooGD22J2jodTApHbqD6Zk"><span class="lbl" data-page-node-id="ZxcoOieoJiHDUqSh0POcDR"><i data-page-node-id="yipsts3OBzsqW31yYIsWHk"></i></span></div></div>
+        <div class="name" data-page-node-id="Qatgv7DZtTQlETMAKk88IA">押尾光太郎精选集</div>
+        <div class="meta" data-page-node-id="e70GuQRffUwRVz9aO2s2Ab"><span class="cnt-chip num" data-page-node-id="LeLNwtMEWdWYczAMswWA0C">收录 8 首</span><span class="num" data-page-node-id="D5aalCm6JPLyE4SaCrkfTN">4 天前更新</span></div>
+      </a>
+      <a class="card" href="track-collection-detail.html" data-kw="指弹 入门 30首" data-page-node-id="Kgcvvwo0gi0k2Hcz5ixYRf">
+        <div class="cover c3 stack" data-page-node-id="OMDUlstvNVSEr5jrQz58mO"><div class="disc" data-page-node-id="GwEAzwFChtEQKbe4qT9ZEN"><span class="lbl" data-page-node-id="D6MeDlTAs9Hh2RDLHWxyEA"><i data-page-node-id="YvYqebe2uy0NiRm99kQrxV"></i></span></div></div>
+        <div class="name" data-page-node-id="r3B2MfXB3aAgI2jumn4fbO">指弹入门 30 首</div>
+        <div class="meta" data-page-node-id="b1pE20ro3LPKTyltyPgEUH"><span class="cnt-chip num" data-page-node-id="rdwRy2oyHsU80LFw4Epq08">收录 30 首</span><span class="num" data-page-node-id="3RkphLADNqxna0aAawN9RY">1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-collection-detail.html" data-kw="岸部真明 depapepe 日系" data-page-node-id="xygJn36SNKtSJ7ygbgF2IH">
+        <div class="cover stack" data-page-node-id="QkfdNJsRk2OVdpoRrZbQuS"><div class="disc" data-page-node-id="bkhce9OGVQsijXYrNNP9cJ"><span class="lbl" data-page-node-id="dVguSX8Fjip5SkYSeRIq1G"><i data-page-node-id="gP1kjRIKz9BT13ZqzKEnzV"></i></span></div></div>
+        <div class="name" data-page-node-id="KqkN4N3v8YlDu1LkyWuyOh">日系指弹精选 · 岸部 / Depapepe</div>
+        <div class="meta" data-page-node-id="0zrFIFca42Zg6nOBn67s5C"><span class="cnt-chip num" data-page-node-id="WeLQc3eWwn9dKnyBn5D07v">收录 10 首</span><span class="num" data-page-node-id="wj8DHarUBYlEWnq4xrsOfx">2 周前更新</span></div>
+      </a>
+            <a class="card" href="track-collection-detail.html" data-kw="五月天 精选 指弹">
+        <div class="cover stack"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">五月天精选 · 指弹</div>
+        <div class="meta"><span class="cnt-chip num">收录 9 首</span><span class="num">1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-collection-detail.html" data-kw="宫崎骏 动画 曲集">
+        <div class="cover stack"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">宫崎骏动画曲集</div>
+        <div class="meta"><span class="cnt-chip num">收录 7 首</span><span class="num">2 周前更新</span></div>
+      </a>
+      <a class="card" href="track-collection-detail.html" data-kw="弹唱 扫弦 50首">
+        <div class="cover stack"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">弹唱扫弦 50 首</div>
+        <div class="meta"><span class="cnt-chip num">收录 50 首</span><span class="num">3 周前更新</span></div>
+      </a>
+<div class="zone-empty" id="setEmpty" data-page-node-id="mGnvtAksJhSnGQ2gz0KBD8">曲谱集中未找到与「<b id="setKw" data-page-node-id="2xAO3oc2xYMKqQI844IYxN"></b>」相关的内容</div>
+    </div>
+  <nav class="pager" id="setPager" aria-label="曲谱集分页">
+      <button type="button" class="pgbtn" data-act="prev" aria-label="上一页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
+      </button>
+      <span class="pgnums num" data-nums><!-- JS 渲染 --></span>
+      <button type="button" class="pgbtn" data-act="next" aria-label="下一页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </nav>
+  </section>
+
+  <!-- ============ 下区：曲目 ============ -->
+  <section class="zone tracks rise d2" data-page-node-id="ABOQ1ACtYemlKBsfqV8p9i">
+    <div class="zone-head" data-page-node-id="1ekbIULb0RlzqH7b5WfleN">
+      <h2 data-page-node-id="fMXGA8HLIqljP3JwDG1mNK">曲目</h2>
+      <span class="meta num" id="trackMeta" data-page-node-id="n0dYipUp0kYSIGEJX0Nq6C">共 48 首</span>
+      <select class="order" data-page-node-id="9TkUAqCxvUtUCM8ubhaWny" aria-label="排序方式"><option value="new" selected>按更新时间倒序</option><option value="old">按更新时间正序</option><option value="az">按首字母</option></select>
+      <div class="zone-ops teacher-only" style="display:none" data-page-node-id="iBEWySbs7phQdr12Y8kMRG">
+        <button class="zbtn ghost" onclick="location.href='admin-create-track-point.html?zone=track'" data-page-node-id="ZbD6L7Lj3ZMPfKDVpmrfu8">＋ 新建单课</button>
+      </div>
+    </div>
+    <div class="grid" id="trackGrid" data-page-node-id="WnQ7uz9D7GpkT8hLrLOzTQ">
+      <a class="card" href="track-point-detail.html" data-kw="卡农 指弹 独奏 渐强 副歌" data-page-node-id="4ghuO98ZSlD8UJBkLjL8Tn">
+        <div class="cover" data-page-node-id="48WEwrjAHThgymXBnjIF6G"><div class="disc" data-page-node-id="1QN6AddoCGobnp6rWPK0A1"><span class="lbl" data-page-node-id="Kr19yrh0usSqvc2dJTOvN2"><i data-page-node-id="59a12D6qsS73VNHpHK48og"></i></span></div></div>
+        <div class="name" data-page-node-id="7iTHjneTbyNJBIx8ZVsTab">卡农独奏 · 全曲精讲</div>
+        <div class="meta num" data-page-node-id="I0vHAPmewUFNjSNIHlu1wX"><span data-page-node-id="3ca2jqWfwgVKnUQYUQiZjI">2 天前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="天空之城 指弹 改编" data-page-node-id="uNdgXrRYMdUepwYHidNmrv">
+        <div class="cover c2" data-page-node-id="TcGfGuBcAcHu0Iw5eGSw6u"><div class="disc" data-page-node-id="4AIQYx3JBd70l0xcgzntRa"><span class="lbl" data-page-node-id="OobjWZhxRduMGlNeDqIDZz"><i data-page-node-id="iYIFtb9mAyMk0iW25bbGeY"></i></span></div></div>
+        <div class="name" data-page-node-id="QBYc2Uzivqto0iHCOx26Hm">天空之城 · 指弹改编</div>
+        <div class="meta num" data-page-node-id="OEmJZRSkQdV7Zv9krCrZ2y"><span data-page-node-id="RD428Kc8SShj1z7eIbLwwy">5 天前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="风之诗 wind song 押尾" data-page-node-id="MIQAz4ybLiBXZgaQNl6W18">
+        <div class="cover c3" data-page-node-id="Wkhf3PF5DyXY6KeZ2AyNUi"><div class="disc" data-page-node-id="OESyxCgnzCmKoGXYUFvrYJ"><span class="lbl" data-page-node-id="o0bBD6utxcGWidCr0Vcn8Z"><i data-page-node-id="8nwXRUPK0wocS5guXzjExD"></i></span></div></div>
+        <div class="name" data-page-node-id="qXSx6S0OhfVYO4sAg0Igg7">风之诗 · Wind Song</div>
+        <div class="meta num" data-page-node-id="I71gzfMynsX3PQnmQ78ATZ"><span data-page-node-id="b4JDoveTr5bJ7euG6GeLJP">1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="奇迹的山 岸部真明" data-page-node-id="2Rj1HP6GMhrWuXLrhENMgD">
+        <div class="cover c4" data-page-node-id="GbXkU9CdLbCPBmjO1m3Oob"><div class="disc" data-page-node-id="A93I4trVzFzmxJObdG5FvY"><span class="lbl" data-page-node-id="xrxYnzQWXdJ195f0qtqLvz"><i data-page-node-id="NxvphCMWfl78Et5l6HxcGT"></i></span></div></div>
+        <div class="name" data-page-node-id="iWA5NDZIJlwBfpxRYmYpSG">奇迹的山</div>
+        <div class="meta num" data-page-node-id="gZ6hRIPcSAWLMoCvgX91qc"><span data-page-node-id="ACaFUBI7i0LrpteAIgzIKW">1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="merry christmas mr lawrence" data-page-node-id="7MRnO77VARXhDNnxNHf9M8">
+        <div class="cover c2" data-page-node-id="oLqKbW12PQwYetHMIIc9QJ"><div class="disc" data-page-node-id="XvpoHzj126b1D1vyhWR2pE"><span class="lbl" data-page-node-id="9ThZa7Ql7PdzyuPffrHJJV"><i data-page-node-id="jZm0bmlDDbr7dvUKZ94hHu"></i></span></div></div>
+        <div class="name" data-page-node-id="GHCseyD6SQX19Ag7DNGN8d">Merry Christmas Mr. Lawrence</div>
+        <div class="meta num" data-page-node-id="MREio6szsBGOCI7KifhkE9"><span data-page-node-id="rn11n4xpjHUD0N5mexb1tg">2 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="晴天 周杰伦 前奏" data-page-node-id="GDqhmnwcYrsa5HMB4ww3p6">
+        <div class="cover c3" data-page-node-id="W1OZCY1AY87rBXgz14032j"><div class="disc" data-page-node-id="QTfEKWMKxrEctGp4pFiTD0"><span class="lbl" data-page-node-id="yCu5Me0PGxlKNDmEgPO8DA"><i data-page-node-id="X6tB0Bc8RbJS62sReKbwvR"></i></span></div></div>
+        <div class="name" data-page-node-id="1qrURgIEkJ7f8j2WONuKJA">晴天 · 前奏精讲</div>
+        <div class="meta num" data-page-node-id="LzNKIbqWxIx0IFfRs4MxMC"><span data-page-node-id="C2HyLa4ojekqoCVItUR0Oj">2 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="夜空中最亮的星 独奏" data-page-node-id="BhzpHDuk8O56V0A1qGtGiH">
+        <div class="cover" data-page-node-id="pJpcorfcHwftdcU76EN947"><div class="disc" data-page-node-id="FSbR2rIZG4xv71MYPasGgf"><span class="lbl" data-page-node-id="UPam5T140YfBkcQDdwOa8F"><i data-page-node-id="sGVALLyNsFCkiLlDrhKC3c"></i></span></div></div>
+        <div class="name" data-page-node-id="TbAq8KI7UcXF19SxGVVuYw">夜空中最亮的星 · 独奏</div>
+        <div class="meta num" data-page-node-id="eA0zfbnGRyeYDRB6G0gpWx"><span data-page-node-id="k6Pueh9lNh44AJ4Dy5VO3l">3 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="平凡之路 间奏" data-page-node-id="cpO8YncxZ3pTkMR8QEN2JT">
+        <div class="cover c4" data-page-node-id="VKCwvJmepTsB6i173JHutA"><div class="disc" data-page-node-id="WMupyG2Qj0lxVWAdfZznEd"><span class="lbl" data-page-node-id="JRqrR5r5tO5x4XaFM8KmDP"><i data-page-node-id="7WGOIK4RrBENHunxwnlSGn"></i></span></div></div>
+        <div class="name" data-page-node-id="pYaOWwmhhDe5UmvpI0SpX6">平凡之路 · 间奏</div>
+        <div class="meta num" data-page-node-id="KBwCAMC2PuCJmJXN7OorOD"><span data-page-node-id="mbrYyIALp8kxFFltn3ILuo">3 周前更新</span></div>
+      </a>
+            <a class="card" href="track-point-detail.html" data-kw="千与千寻 always with me 宫崎骏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">千与千寻 · Always With Me</div>
+        <div class="meta num"><span>3 天前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="稻香 周杰伦 前奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">稻香 · 前奏精讲</div>
+        <div class="meta num"><span>6 天前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="突然好想你 五月天 间奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">突然好想你 · 间奏</div>
+        <div class="meta num"><span>1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="月亮代表我的心 独奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">月亮代表我的心 · 独奏</div>
+        <div class="meta num"><span>2 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="起风了 指弹 改编">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">起风了 · 指弹改编</div>
+        <div class="meta num"><span>3 天前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="光年之外 前奏 邓紫棋">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">光年之外 · 前奏精讲</div>
+        <div class="meta num"><span>4 天前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="富士山下 陈奕迅 独奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">富士山下 · 独奏</div>
+        <div class="meta num"><span>5 天前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="小幸运 弹唱 田馥甄">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">小幸运 · 弹唱版</div>
+        <div class="meta num"><span>1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="成都 赵雷 弹唱">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">成都 · 弹唱版</div>
+        <div class="meta num"><span>1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="大鱼 海棠 指弹">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">大鱼 · 指弹改编</div>
+        <div class="meta num"><span>1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="千本樱 指弹 改编">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">千本樱 · 指弹改编</div>
+        <div class="meta num"><span>1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="加州旅馆 hotel california 前奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">加州旅馆 · 前奏</div>
+        <div class="meta num"><span>1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="爱的罗曼史 古典 轮指">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">爱的罗曼史</div>
+        <div class="meta num"><span>1 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="阿尔罕布拉宫 回忆 古典 轮指">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">阿尔罕布拉宫的回忆</div>
+        <div class="meta num"><span>2 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="绿袖子 古典 入门">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">绿袖子 · 古典小品</div>
+        <div class="meta num"><span>2 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="卡伐蒂娜 cavatina 古典">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">卡伐蒂娜 · Cavatina</div>
+        <div class="meta num"><span>2 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="阿斯图里亚斯 古典 轮指">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">阿斯图里亚斯</div>
+        <div class="meta num"><span>2 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="小星星 变奏曲 古典">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">小星星变奏曲</div>
+        <div class="meta num"><span>2 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="那个夏天 千与千寻 宫崎骏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">那个夏天 · 千与千寻</div>
+        <div class="meta num"><span>3 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="邻家的龙猫 宫崎骏 指弹">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">邻家的龙猫</div>
+        <div class="meta num"><span>3 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="海边之城 魔女宅急便 宫崎骏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">海边之城 · 魔女宅急便</div>
+        <div class="meta num"><span>3 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="菊次郎的夏天 summer 久石让">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">菊次郎的夏天</div>
+        <div class="meta num"><span>3 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="卡农 摇滚 版 电琴">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">卡农 · 摇滚版</div>
+        <div class="meta num"><span>3 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="明天会更好 弹唱 合唱">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">明天会更好 · 弹唱</div>
+        <div class="meta num"><span>3 周前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="海阔天空 beyond 前奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">海阔天空 · 前奏</div>
+        <div class="meta num"><span>1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="光辉岁月 beyond 间奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">光辉岁月 · 间奏</div>
+        <div class="meta num"><span>1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="真的爱你 beyond 弹唱">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">真的爱你 · 弹唱</div>
+        <div class="meta num"><span>1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="曾经的你 许巍 弹唱">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">曾经的你 · 弹唱</div>
+        <div class="meta num"><span>1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="蓝莲花 许巍 前奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">蓝莲花 · 前奏</div>
+        <div class="meta num"><span>1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="童年 罗大佑 弹唱">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">童年 · 弹唱</div>
+        <div class="meta num"><span>1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="匆匆那年 王菲 独奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">匆匆那年 · 独奏</div>
+        <div class="meta num"><span>1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="情非得已 庾澄庆 弹唱">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">情非得已 · 弹唱</div>
+        <div class="meta num"><span>1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="温柔 五月天 独奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">温柔 · 五月天 独奏</div>
+        <div class="meta num"><span>2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="知足 五月天 弹唱">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">知足 · 五月天 弹唱</div>
+        <div class="meta num"><span>2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="夜曲 周杰伦 前奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">夜曲 · 前奏</div>
+        <div class="meta num"><span>2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="七里香 周杰伦 指弹">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">七里香 · 指弹</div>
+        <div class="meta num"><span>2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="龙卷风 周杰伦 前奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">龙卷风 · 前奏</div>
+        <div class="meta num"><span>2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="告白气球 周杰伦 弹唱">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">告白气球 · 弹唱</div>
+        <div class="meta num"><span>2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="手写的从前 周杰伦 指弹">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">手写的从前 · 指弹</div>
+        <div class="meta num"><span>3 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="一路向北 周杰伦 前奏">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">一路向北 · 前奏</div>
+        <div class="meta num"><span>3 个月前更新</span></div>
+      </a>
+<div class="zone-empty" id="trackEmpty" data-page-node-id="0XV5a9Is5Akhdm2BZtvwHM">曲目中未找到与「<b id="trackKw" data-page-node-id="GntBg7Si6kLi8LrUFskE7N"></b>」相关的内容</div>
+    </div>
+  <nav class="pager" id="trackPager" aria-label="曲目分页">
+      <button type="button" class="pgbtn" data-act="prev" aria-label="上一页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
+      </button>
+      <span class="pgnums num" data-nums><!-- JS 渲染 --></span>
+      <button type="button" class="pgbtn" data-act="next" aria-label="下一页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </nav>
+  </section>
+
+
+
+  <!-- 全局搜索空态 -->
+  <div class="global-empty" id="globalEmpty">
+    <span class="big">没有找到与「<mark><b id="allKw"></b>」相关的内容</mark></span>
+    <span>换个关键词试试，或清除搜索浏览全部内容</span>
+    <button type="button" id="clrAll">清除搜索</button>
+  </div>
+</main>
+
+<!-- 回到顶部 -->
+<button type="button" class="to-top" id="toTop" aria-label="回到顶部">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+</button>
+
+<script>
+/* ================= 视角切换（老师/学生/游客 = 浏览视角；教导主任 = 管理视角） ================= */
+const vBtns = [...document.querySelectorAll('.viewseg button')];
+function setView(dean){
+  vBtns.forEach(b=>b.classList.toggle('on', (b.dataset.dean === '1') === dean));
+  document.body.classList.toggle('dean', dean);
+  document.querySelectorAll('.teacher-only').forEach(el=>{ el.style.display = dean ? 'flex' : 'none'; });
+}
+vBtns.forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.dean === '1')));
+
+/* ================= 教导主任视角：卡片悬停操作层（查看详情 / 编辑 / 删除） ================= */
+(function(){
+  let toastTimer = null;
+  function toast(msg){
+    let t = document.querySelector('.dean-toast');
+    if(!t){
+      t = document.createElement('div');
+      t.className = 'dean-toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove('show'), 1600);
+  }
+  function bumpMeta(card){
+    const grid = card.closest('.grid');
+    if(!grid) return;
+    const meta = document.getElementById(grid.id === 'setGrid' ? 'setMeta' : 'trackMeta');
+    const left = grid.querySelectorAll('.card').length;
+    if(meta) meta.textContent = meta.textContent.replace(/共 \d+/, '共 ' + left);
+  }
+  document.querySelectorAll('.card').forEach(card=>{
+    const ops = document.createElement('div');
+    ops.className = 'ops';
+    ops.innerHTML =
+      '<button type="button" data-act="view">查看详情</button>' +
+      '<button type="button" data-act="edit">编辑</button>' +
+      '<button type="button" data-act="del" class="op-del">删除</button>';
+    card.querySelector('.cover').appendChild(ops);
+    ops.addEventListener('click', e=>{
+      e.preventDefault(); e.stopPropagation();
+      const act = e.target.dataset && e.target.dataset.act;
+      if(!act) return;
+      if(act === 'del'){
+        /* 二次确认：弹出删除确认层 */
+        pendingCard = card;
+        document.getElementById('delName').textContent = (card.querySelector('.name')||{}).textContent.trim();
+        document.getElementById('delModal').classList.add('show');
+      }else{
+        toast(act === 'view' ? '演示：进入「' + (card.querySelector('.name')||{}).textContent.trim() + '」详情页' : '演示：进入编辑页');
+      }
+    });
+  });
+
+(function(){
+  document.body.insertAdjacentHTML('beforeend', [
+    '<div class="modal-mask" id="delModal" role="dialog" aria-modal="true" aria-label="删除确认">',
+      '<div class="modal">',
+        '<div class="modal-title">删 除 确 认</div>',
+        '<p>确定要删除「<b id="delName"></b>」吗？<br>删除后该内容将不可恢复。</p>',
+        '<div class="modal-ops">',
+          '<button type="button" class="mbtn" id="delCancel">取 消</button>',
+          '<button type="button" class="mbtn danger" id="delOk">确认删除</button>',
+        '</div>',
+      '</div>',
+    '</div>'
+  ].join(''));
+})();
+  /* ---- 删除确认弹层逻辑 ---- */
+  let pendingCard = null;
+  const mask = document.getElementById('delModal');
+  function doDelete(){
+    if(!pendingCard) return;
+    const card = pendingCard; pendingCard = null;
+    mask.classList.remove('show');
+    card.style.transition = 'opacity .25s, transform .25s';
+    card.style.opacity = '0'; card.style.transform = 'scale(.94)';
+    setTimeout(()=>{ card.remove(); bumpMeta(card); layoutAll(); }, 250);
+    toast('演示：已删除「' + (card.querySelector('.name')||{}).textContent.trim() + '」');
+  }
+  document.getElementById('delOk').addEventListener('click', doDelete);
+  document.getElementById('delCancel').addEventListener('click', closeDel);
+  mask.addEventListener('click', e=>{ if(e.target === mask) closeDel(); });
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && mask.classList.contains('show')) closeDel(); });
+  function closeDel(){ pendingCard = null; mask.classList.remove('show'); }
+})();
+
+/* ================= 搜索（同时过滤两区） ================= */
+const input = document.getElementById('searchInput');
+const bar = document.getElementById('searchbar');
+const cards = [...document.querySelectorAll('.card')];
+function applySearch(){
+  const kw = input.value.trim().toLowerCase();
+  bar.classList.toggle('filtering', kw !== '');
+  document.body.classList.toggle('searching', kw !== '');
+  let trackHit = 0, setHit = 0;
+  cards.forEach(c=>{
+    const hit = kw === '' || c.dataset.kw.toLowerCase().includes(kw) || c.querySelector('.name').textContent.toLowerCase().includes(kw);
+    c.style.display = hit ? '' : 'none';
+    if(hit){
+      if(c.closest('#trackGrid')) trackHit++; else setHit++;
+    }
+  });
+  document.getElementById('trackEmpty').classList.toggle('show', trackHit === 0);
+  document.getElementById('setEmpty').classList.toggle('show', setHit === 0);
+  document.getElementById('trackKw').textContent = input.value.trim();
+  document.getElementById('setKw').textContent = input.value.trim();
+  document.getElementById('allKw').textContent = input.value.trim();
+  /* 两区全空 → 全局空态卡片 */
+  const none = trackHit === 0 && setHit === 0;
+  document.getElementById('globalEmpty').classList.toggle('show', none);
+  document.querySelector('.zone.tracks').style.display = none ? 'none' : 'flex';
+  document.querySelector('.zone.sets').style.display   = none ? 'none' : 'flex';
+  /* 搜索变化 → 分页重置回第 1 页 */
+  PAGES.forEach(z=>{ z.page = 1; });
+  layoutAll();
+}
+input.addEventListener('input', applySearch);
+document.getElementById('clrBtn').addEventListener('click', ()=>{ input.value=''; applySearch(); input.focus(); });
+document.getElementById('clrAll').addEventListener('click', ()=>{ input.value=''; applySearch(); input.focus(); });
+
+/* ================= 真实专辑封面（iTunes 公开曲库 · 600×600） ================= */
+const TRACK_IMGS = ['assets/covers/real-01.jpg', 'assets/covers/real-02.jpg', 'assets/covers/real-03.jpg', 'assets/covers/real-04.jpg', 'assets/covers/real-05.jpg', 'assets/covers/real-06.jpg', 'assets/covers/real-07.jpg', 'assets/covers/real-08.jpg', 'assets/covers/real-09.jpg', 'assets/covers/real-10.jpg', 'assets/covers/real-11.jpg', 'assets/covers/real-12.jpg', 'assets/covers/real-13.jpg', 'assets/covers/real-14.jpg', 'assets/covers/real-15.jpg', 'assets/covers/real-16.jpg', 'assets/covers/real-17.jpg', 'assets/covers/real-18.jpg'];
+const SET_IMGS = ['assets/covers/real-13.jpg', 'assets/covers/real-14.jpg', 'assets/covers/real-15.jpg', 'assets/covers/real-16.jpg', 'assets/covers/real-17.jpg', 'assets/covers/real-18.jpg', 'assets/covers/real-12.jpg'];
+function applyImgs(gridSel, imgs){
+  document.querySelectorAll(gridSel + ' .card .cover').forEach((cv, i)=>{
+    cv.classList.remove('stack','v-groove','c2','c3','c4','c5','c6');
+    cv.style.backgroundImage = 'url("' + imgs[i % imgs.length] + '")';
+    cv.style.backgroundSize = 'cover';
+    cv.style.backgroundPosition = 'center';
+    const disc = cv.querySelector('.disc');
+    if(disc) disc.style.display = 'none';
+  });
+}
+applyImgs('#trackGrid', TRACK_IMGS);
+applyImgs('#setGrid', SET_IMGS);
+
+/* ================= 区块计数（按实际卡片数） ================= */
+document.getElementById('trackMeta').textContent = '共 ' + document.querySelectorAll('#trackGrid .card').length + ' 首';
+document.getElementById('setMeta').textContent   = '共 ' + document.querySelectorAll('#setGrid .card').length + ' 套';
+
+/* ================= 分页：无框页码式（当前页橙色马克笔） =================
+   曲谱集：一行 8 张 → 每页 8 个
+   曲目区：整页可滚动，曲目区约 2 屏高度后翻页 → 每页 5 行 × 8 = 40 首
+======================================================================= */
+const SET_SIZE = 8;
+const TRACK_SIZE = 8 * 5;
+const PAGES = [
+  {gridId:'trackGrid', pagerId:'trackPager', size:TRACK_SIZE, page:1},
+  {gridId:'setGrid',   pagerId:'setPager',   size:SET_SIZE,   page:1}
+].map(cfg=>{
+  const grid  = document.getElementById(cfg.gridId);
+  const pager = document.getElementById(cfg.pagerId);
+  const z = {cards:[...grid.querySelectorAll('.card')], pager, page:1, size:cfg.size, nums:pager.querySelector('[data-nums]')};
+  pager.querySelector('[data-act="prev"]').addEventListener('click', ()=>{ z.page--; layoutPage(z); });
+  pager.querySelector('[data-act="next"]').addEventListener('click', ()=>{ z.page++; layoutPage(z); });
+  z.nums.addEventListener('click', e=>{
+    const b = e.target.closest('.pgnum'); if(!b) return;
+    z.page = parseInt(b.dataset.p, 10); layoutPage(z);
+  });
+  return z;
+});
+/* 页码序列：≤7 页全部列出；更多时首尾 + 当前页邻域折叠 */
+function pageSeq(cur, total){
+  if(total <= 7) return Array.from({length:total}, (_,i)=>i+1);
+  const list = [1];
+  const s = Math.max(2, cur-1), e = Math.min(total-1, cur+1);
+  if(s > 2) list.push('…');
+  for(let i=s;i<=e;i++) list.push(i);
+  if(e < total-1) list.push('…');
+  list.push(total);
+  return list;
+}
+function layoutPage(z){
+  const vis = z.cards.filter(c=>c.style.display !== 'none');
+  const total = Math.max(1, Math.ceil(vis.length / z.size));
+  z.page = Math.min(Math.max(1, z.page), total);
+  vis.forEach((c, i)=> c.classList.toggle('pg-hide', !(i >= (z.page-1)*z.size && i < z.page*z.size)));
+  z.nums.innerHTML = pageSeq(z.page, total).map(v=> v === '…'
+    ? '<span class="pgdots">…</span>'
+    : '<button type="button" class="pgnum' + (v === z.page ? ' on' : '') + '" data-p="' + v + '"'
+      + ' aria-label="第 ' + v + ' 页"' + (v === z.page ? ' aria-current="page"' : '') + '>' + v + '</button>'
+  ).join('');
+  z.pager.querySelector('[data-act="prev"]').disabled = z.page <= 1;
+  z.pager.querySelector('[data-act="next"]').disabled = z.page >= total;
+}
+function layoutAll(){ PAGES.forEach(layoutPage); }
+layoutAll();
+
+/* ================= 回到顶部（滚过约一屏后出现） ================= */
+const toTop = document.getElementById('toTop');
+function syncToTop(){ toTop.classList.toggle('show', window.scrollY > innerHeight * 0.6); }
+addEventListener('scroll', syncToTop, {passive:true});
+addEventListener('resize', syncToTop);
+toTop.addEventListener('click', ()=> window.scrollTo({top:0, behavior:'smooth'}));
+syncToTop();
+/* ================= 排序：更新时间倒序(默认)/正序 · 首字母 ================= */
+function relTs(txt){
+  const t = (txt||'').replace(/\s/g,'');
+  if(t.indexOf('今天') > -1) return 1;
+  if(t.indexOf('昨天') > -1) return 24;
+  const m = t.match(/(\d+)(分钟|小时|天|周|个月|月)前/);
+  if(!m) return 1e9;
+  const unit = {'分钟':1/60,'小时':1,'天':24,'周':168,'个月':720,'月':720}[m[2]];
+  return (+m[1]) * unit;
+}
+document.querySelectorAll('.zone-head .order').forEach(sel=>{
+  const zone = sel.closest('.zone');
+  const grid = zone.querySelector('.grid');
+  sel.addEventListener('change', ()=>{
+    const mode = sel.value;
+    const sorted = [...grid.querySelectorAll('.card')].sort((a,b)=>{
+      if(mode === 'az'){
+        return (a.querySelector('.name')||{}).textContent.trim()
+          .localeCompare((b.querySelector('.name')||{}).textContent.trim(), 'zh-CN');
+      }
+      const ta = relTs((a.querySelector('.meta')||{}).textContent);
+      const tb = relTs((b.querySelector('.meta')||{}).textContent);
+      return mode === 'old' ? tb - ta : ta - tb;
+    });
+    sorted.forEach(c=>grid.appendChild(c));
+    const z = PAGES.find(p=>p.gridId === grid.id);
+    if(z){ z.page = 1; layoutPage(z); }
+  });
+});
+</script>
+</body>
+</html>

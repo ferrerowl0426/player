@@ -49,5 +49,8 @@ export const config = {
     publicBaseUrl: process.env.PUBLIC_BUCKET_BASE_URL || (process.env.S3_PUBLIC_ENDPOINT && process.env.S3_BUCKET
       ? `${process.env.S3_PUBLIC_ENDPOINT.replace(/\/$/, '')}/${process.env.S3_BUCKET}`
       : '')
+  },
+  ci: {
+    callbackSecret: process.env.CI_CALLBACK_SECRET || ''
   }
 };

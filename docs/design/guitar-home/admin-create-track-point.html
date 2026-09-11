@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="VU4zWD7pgqWhIrlDwHIP2k">
+<head data-page-node-id="zT5u1BRTd1vgKvGqeVSb5c">
+<meta charset="UTF-8" data-page-node-id="AGoQYbOcaWcjOPFj2ihS9P">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="MhrhRVvIsV4h1NcmNtaIeA">
+<title>新建单课 · 能学慧吉他教室（管理端）</title>
+<style>
+/* ============================================================
+   管理端 · 单课创建页（曲目区 / 知识点区通用，区域由入口 ?zone= 决定）
+   视觉遵循 design-spec v1.0：纸底 / 咖啡描边盒子 / 橘色强调 / 绿色仅点睛
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底 + 格纹底饰（design-spec v2.0 §3） */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow-x:hidden;overflow-y:auto;
+}
+/* 底图：水彩年轮（与课程页同一张） */
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+input,textarea{font-family:inherit}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:10px;letter-spacing:2.5px;color:var(--ink-3);text-transform:uppercase;font-weight:500}
+
+/* ============ 导航 ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:14px}
+.role-tag{
+  font-size:10.5px;letter-spacing:1.5px;color:var(--coffee);
+  border:1px dashed var(--hair-2);border-radius:4px;padding:4px 10px;
+  background:rgba(255,127,0,.12);
+}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区：创建大盒 ============ */
+.admin-wrap{flex:1 0 auto;display:flex;justify-content:center;padding:16px 36px 44px}
+.wizard{
+  width:min(1080px,100%);display:flex;flex-direction:column;
+  padding:6px 8px 0;
+}
+.wiz-head{flex:none;display:flex;align-items:center;gap:14px;padding-bottom:12px;border-bottom:1px dashed var(--hair-2)}
+.wiz-head h1{font-size:20px;font-weight:700;letter-spacing:1px}
+.wiz-head h1 mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 2px}
+.zone-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;letter-spacing:1.5px;color:var(--coffee);font-weight:600;
+  border:1px dashed var(--hair-2);border-radius:4px;padding:3px 11px;
+  background:rgba(255,127,0,.12);white-space:nowrap;
+}
+.zone-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--orange)}
+.wiz-head .eyebrow{margin-left:auto}
+
+/* ---- 表单 ---- */
+.form-body{flex:1;padding:2px 2px 6px}
+.form-cols{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:0 48px;align-items:start}
+.fsec{padding:12px 0 4px}
+.fsec.full{grid-column:1 / -1}
+.fsec-title{display:flex;align-items:baseline;gap:9px;font-size:13px;font-weight:700;letter-spacing:2px;color:var(--coffee);margin-bottom:10px}
+.fsec-title::before{content:"";width:4px;height:13px;border-radius:1px;background:var(--orange);flex:none}
+.fsec-title .note{font-size:10.5px;font-weight:400;letter-spacing:.5px;color:var(--ink-3)}
+/* 重要/必填标注用橙色 */
+.fsec-title .note.req{color:var(--orange);font-weight:600}
+
+.field{margin-bottom:14px}
+.field label{
+  display:flex;align-items:baseline;justify-content:space-between;
+  font-size:11px;font-weight:600;letter-spacing:.8px;color:var(--ink-2);margin-bottom:6px;
+}
+.field label .cnt{font-weight:400;font-size:10.5px;color:var(--ink-3)}
+.field label .cnt.over{color:var(--orange);font-weight:600}
+.field input[type=text],.field textarea{
+  width:100%;padding:9px 13px;
+  background:var(--white);
+  border:1px solid var(--hair-2);border-radius:4px;
+  font-size:13.5px;color:var(--ink);letter-spacing:.3px;
+  transition:border-color .25s var(--ease), box-shadow .25s var(--ease);
+}
+.field textarea{resize:vertical;min-height:86px;line-height:1.7}
+.field input::placeholder,.field textarea::placeholder{color:#b3a58c}
+.field input:hover,.field textarea:hover{border-color:var(--coffee)}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--coffee);box-shadow:0 2px 8px rgba(93,67,38,.1)}
+/* 错误态：橘色强调 */
+.field.error input,.field.error textarea{border-color:var(--orange);box-shadow:0 2px 8px rgba(255,127,0,.16)}
+.err-msg{
+  display:none;margin-top:6px;
+  font-size:11px;letter-spacing:.4px;color:var(--orange);font-weight:600;
+}
+.field.error .err-msg{display:block}
+.err-msg::before{content:"⚠ ";letter-spacing:0}
+
+/* 封面上传（1:1 · 200px · 上传后排版不变） */
+.cover-flex{display:flex;gap:26px;align-items:flex-start}
+.cover-box{
+  width:200px;height:200px;flex:none;aspect-ratio:1;
+  border:1.5px dashed var(--hair-2);border-radius:6px;background:var(--white);
+  display:grid;place-items:center;gap:2px;cursor:pointer;text-align:center;
+  color:var(--ink-3);transition:all .3s var(--ease);overflow:hidden;position:relative;
+}
+.cover-box:hover{border-color:var(--orange);color:var(--coffee)}
+.cover-box svg{width:26px;height:26px}
+.cover-box .t1{font-size:12px;letter-spacing:1px;font-weight:600}
+.cover-box .t2{font-size:10px;letter-spacing:.5px;color:var(--orange)}
+.cover-box.has{border-style:solid;border-color:var(--coffee)}
+/* 删除封面按钮：仅上传后出现，悬停变红；不改变盒子尺寸与排版 */
+.cover-box .cov-rm{
+  position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;
+  display:none;place-items:center;font-size:11px;line-height:1;cursor:pointer;
+  color:var(--coffee);background:var(--white);border:1px solid var(--hair-2);
+  box-shadow:0 1px 4px rgba(93,67,38,.18);transition:all .2s;z-index:2;
+}
+.cover-box .cov-rm:hover{color:#b4452e;border-color:#b4452e;background:rgba(180,69,46,.08)}
+.cover-box.has .cov-rm{display:grid}
+.cover-box .vinyl{
+  position:absolute;inset:0;display:none;
+  background:var(--wood);place-items:center;
+}
+.cover-box.has .vinyl{display:grid}
+.cover-box .vinyl::before{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid rgba(242,234,217,.35)}
+.cover-box .vinyl::after{content:"";position:absolute;inset:34%;border-radius:50%;background:var(--white)}
+.cover-box .vinyl i{position:absolute;inset:0;background:conic-gradient(from 0deg, rgba(242,234,217,.06) 0 18deg, transparent 18deg 40deg)}
+
+/* 封面预览卡：跟随标题 / 封面 / 分段数实时更新（宽度与封面框一致） */
+.pv-card{width:200px;flex:none}
+.pv-cover{
+  aspect-ratio:1/1;border-radius:6px;background:var(--wood);position:relative;
+  display:grid;place-items:center;border:1px solid var(--hair-2);overflow:hidden;
+  box-shadow:0 1px 3px rgba(93,67,38,.1), 0 4px 12px rgba(93,67,38,.06);
+}
+.pv-cover .disc{position:absolute;inset:9%;border-radius:50%;background:var(--wood);display:grid;place-items:center;border:1px solid rgba(242,234,217,.3)}
+.pv-cover .disc::before{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid rgba(242,234,217,.4)}
+.pv-cover .disc .lbl{width:15%;height:15%;border-radius:50%;background:var(--white);display:grid;place-items:center}
+.pv-cover .disc .lbl i{width:6px;height:6px;border-radius:50%;background:var(--orange)}
+.pv-cover.has{background-image:url("assets/covers/real-01.jpg");background-size:cover;background-position:center}
+.pv-cover.has .disc{display:none}
+.pv-card .pv-name{font-size:12.5px;font-weight:600;letter-spacing:.3px;margin-top:8px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-card .pv-meta{font-size:10px;color:var(--ink-3);letter-spacing:.4px;margin-top:2px}
+
+/* 前置内容：搜索选择器（不铺列表框，搜索后按「类型 + 标题」选取） */
+.pre-picker{position:relative;max-width:640px}
+.pick-search{
+  display:flex;align-items:center;gap:6px;
+  border:1px solid var(--hair-2);border-radius:4px;background:var(--white);
+  padding:2px 8px;transition:border-color .25s;
+}
+.pick-search:focus-within{border-color:var(--coffee)}
+.pick-search svg{flex:none;width:11px;height:11px;stroke:var(--ink-3)}
+.pick-search input{
+  border:none;outline:none;background:transparent;
+  font-size:10.5px;letter-spacing:.4px;color:var(--ink);
+  width:138px;padding:2px 0;
+}
+.pick-search input::placeholder{color:var(--ink-3)}
+.pick-search .clr{
+  display:none;font-size:9.5px;letter-spacing:1px;color:var(--coffee);
+  border:none;background:transparent;padding:1px 3px;cursor:pointer;
+}
+.pick-search.has .clr{display:block}
+.pick-search.big{margin-left:0;width:100%;padding:7px 12px;gap:9px;margin-bottom:12px}
+.pick-search.big svg{width:13px;height:13px}
+.pick-search.big input{width:100%;font-size:12.5px;padding:4px 0}
+.pre-drop{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;
+  background:var(--white);border:1px solid var(--hair-2);border-radius:6px;
+  box-shadow:0 10px 26px rgba(60,42,20,.16);
+  max-height:268px;overflow-y:auto;display:none;
+}
+.pre-drop.open{display:block}
+.pre-item{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:9px 14px;text-align:left;font-size:12.5px;color:var(--ink);
+  border-bottom:1px dashed var(--hair);transition:background .2s;
+}
+.pre-item:last-child{border-bottom:none}
+.pre-item:hover:not(.off){background:rgba(255,127,0,.08)}
+.pre-item.off{opacity:.38;cursor:not-allowed}
+.pre-item .ptag{flex:none;font-size:9.5px;letter-spacing:1px;font-weight:600;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.ptag.t-kset{color:#6b4d2e;background:rgba(93,67,38,.1)}
+.ptag.t-kp{color:var(--coffee);background:rgba(255,127,0,.12);border:1px dashed var(--hair-2)}
+.ptag.t-track{color:#4f7d3a;background:rgba(79,125,58,.12)}
+.ptag.t-score{color:#96702a;background:rgba(185,142,62,.16)}
+.pre-item .pnm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pre-item .pmeta{flex:none;font-size:10px;color:var(--ink-3);letter-spacing:.3px}
+.pre-hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:8px}
+
+/* 已选清单 chips：绿色选中语义 · 快捷移除 */
+.pick-count{font-size:11px;color:var(--ink-3);letter-spacing:.5px;margin:2px 0 10px;display:flex;align-items:center}
+.pick-count b{color:#4a6b3f}
+.picked-list{
+  display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;margin:12px 0 16px;
+  /* 高度写死：最多 5 排条目，超出在区域内滚动，不自动撑开 */
+  height:152px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
+}
+.picked-list:empty{display:none}
+.picked-chip{
+  display:inline-flex;align-items:center;gap:8px;max-width:100%;
+  font-size:11px;letter-spacing:.4px;color:#4a6b3f;
+  background:rgba(111,143,99,.08);border:1px solid rgba(111,143,99,.45);border-radius:4px;
+  padding:4px 6px 4px 10px;transition:border-color .25s;
+}
+.picked-chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picked-chip .ptag{margin-right:2px;transform:translateY(-.5px)}
+.picked-chip .rm{
+  flex:none;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;
+  font-size:9px;line-height:1;color:var(--ink-3);
+  border:1px solid transparent;transition:all .2s;
+}
+.picked-chip .rm:hover{color:#b4452e;border-color:#b4452e;background:rgba(180,69,46,.08)}
+.pick-empty{display:none;padding:18px 10px;text-align:center;font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+
+/* P 分段管理（P 无需封面）：浅棕描边 · 淡浅棕头色 */
+.pmanage{border:1px solid #c3ab88;border-radius:6px;background:var(--white);overflow:hidden}
+.pmanage-head{
+  flex:none;padding:10px 14px;border-bottom:1px solid var(--hair);
+  display:flex;align-items:center;gap:10px;background:rgba(160,106,53,.07);
+}
+.pmanage-head .pm-t{font-size:12.5px;font-weight:700;letter-spacing:1.5px;color:var(--coffee)}
+.pmanage-head .pm-note{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px}
+.pm-add{
+  margin-left:auto;font-size:11px;letter-spacing:1.5px;font-weight:600;color:var(--coffee);
+  background:var(--white);border:1px solid var(--hair-2);border-radius:4px;padding:5px 13px;
+  transition:border-color .3s var(--ease),color .3s var(--ease),transform .15s;
+}
+.pm-add:hover{border-color:var(--orange);color:var(--orange)}
+.pm-add:active{transform:translate(1px,1px)}
+.pm-list{max-height:236px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent}
+.pm-list::-webkit-scrollbar{width:4px}
+.pm-list::-webkit-scrollbar-thumb{background:var(--hair-2)}
+.prow{display:grid;grid-template-columns:44px 1fr 218px auto;gap:12px;align-items:center;padding:9px 14px;border-bottom:1px dashed rgba(201,183,149,.4)}
+.prow:last-child{border-bottom:none}
+.prow .pidx{font-size:11.5px;font-weight:700;letter-spacing:1px;color:var(--coffee)}
+.prow .pidx .pmark{font-size:9px;color:var(--ink-3);display:block;letter-spacing:1.5px}
+.prow input.pname{
+  width:100%;padding:6px 11px;background:var(--paper);
+  border:1px solid var(--hair-2);border-radius:4px;font-size:12.5px;color:var(--ink);
+  transition:border-color .25s;
+}
+.prow input.pname:hover{border-color:var(--coffee)}
+.prow input.pname:focus{outline:none;border-color:var(--coffee)}
+.pfile{
+  display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.4px;
+  border:1px dashed var(--hair-2);border-radius:4px;padding:6px 11px;color:var(--ink-3);
+  cursor:pointer;transition:all .25s;white-space:nowrap;overflow:hidden;
+}
+.pfile:hover{border-color:var(--orange);color:var(--coffee)}
+.pfile.has{border-style:solid;border-color:var(--coffee);color:var(--ink-2)}
+.pfile .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pfile svg{width:13px;height:13px;flex:none}
+.pops{display:flex;gap:5px}
+.pops button{
+  width:26px;height:26px;border-radius:4px;border:1px solid var(--hair-2);
+  display:grid;place-items:center;color:var(--coffee);font-size:12px;line-height:1;
+  transition:all .25s;
+}
+.pops button:hover{border-color:var(--orange);color:var(--orange)}
+.pops button:disabled{opacity:.35;cursor:default}
+.pops button:disabled:hover{border-color:var(--hair-2);color:var(--coffee)}
+
+/* 附件资料：与 P 分段管理同格式（pmanage 容器内行） */
+.frow{
+  display:grid;grid-template-columns:34px 1fr auto;gap:14px;align-items:center;
+  padding:8px 14px;border-bottom:1px dashed rgba(201,183,149,.4);
+}
+.frow:last-child{border-bottom:none}
+.frow .fico{
+  width:30px;height:36px;border:1px solid var(--hair-2);background:var(--white);
+  display:grid;place-items:center;font-size:8.5px;letter-spacing:1px;color:var(--coffee);font-weight:600;
+}
+.frow .fico.pdf{color:var(--orange);border-color:rgba(255,127,0,.55)}
+.frow .fname{font-size:12px;letter-spacing:.3px}
+.frow .fmeta{font-size:10px;color:var(--ink-3);margin-top:1px}
+.frow .pops button{width:24px;height:24px;font-size:11px}
+
+/* 底部操作条 */
+.wiz-foot{
+  flex:none;display:flex;align-items:center;gap:14px;
+  padding-top:14px;margin-top:6px;border-top:1px dashed var(--hair-2);
+}
+.btn{
+  font-size:13px;font-weight:600;letter-spacing:3px;text-indent:3px;
+  border-radius:4px;padding:9px 26px;transition:all .3s var(--ease);
+}
+.btn-main{
+  background:var(--coffee);color:var(--white);
+  border:1.5px solid var(--coffee);
+}
+.btn-main:hover{background:var(--coffee);border-color:var(--coffee)}
+.btn-ghost{
+  color:var(--coffee);border:1px solid var(--hair-2);background:var(--white);font-weight:500;
+}
+.btn-ghost:hover{border-color:var(--orange);color:var(--orange)}
+.wiz-foot .spacer{flex:1}
+.foot-hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+
+/* 发布成功提示 */
+.pub-toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%, 12px);z-index:99;
+  font-size:11.5px;letter-spacing:.5px;color:var(--coffee);
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:7px 18px;box-shadow:0 6px 18px rgba(60,42,20,.15);
+  opacity:0;pointer-events:none;transition:all .25s var(--ease);
+}
+.pub-toast.show{opacity:1;transform:translate(-50%, 0)}
+
+/* 入场动效 */
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){
+  .rise{opacity:1;transform:none;animation:none}
+}
+
+/* 响应式 */
+@media (max-width:1024px){
+  body{overflow:auto;display:block}
+  .admin-wrap{padding:16px 20px 40px}
+  .wizard{min-height:auto}
+  .form-body{overflow:visible}
+  .form-cols{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .admin-wrap{padding:12px 14px 32px}
+  .wizard{padding:14px 16px 16px}
+  .prow{grid-template-columns:36px 1fr;grid-auto-rows:auto;row-gap:8px}
+  .prow .pfile{grid-column:1 / -1}
+  .prow .pops{grid-column:1 / -1;justify-content:flex-end}
+}
+</style>
+</head>
+<body data-page-node-id="LkpCqUNeTTqiHHRFVqa03U">
+
+<!-- ================= 导航 ================= -->
+<nav class="nav" data-page-node-id="mNF6mSIvakY8QrDTI8YaLi">
+  <div class="nav-inner" data-page-node-id="4zLJZF765Xh4UsPtADoCkQ">
+    <a class="logo" href="#" data-page-node-id="4N51Kb5ZlWcoOP4HQhoNCP">
+      <span class="mark" data-page-node-id="41CFvzxvpBbD8njEg5naJy"></span>
+      能学慧吉他教室
+      <small data-page-node-id="D7tfLsEKcA2EvCJL0aS1Fk">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="1NHZy16ymP7sxvsnI5JzA2">
+      <a href="#" data-page-node-id="fkqtzaqrjALrRbEbZjtP9i">首页</a>
+      <a href="knowledge-home.html" id="navKp" data-page-node-id="HgaXnAHsgOuRXWQ4fTXjIC">知识点区</a>
+      <a href="tracks-home.html" id="navTrack" data-page-node-id="SUIbWXqpDPHmMTAYVgkoKq">曲目库</a>
+      <a href="library.html" data-page-node-id="au7kWXuqYREeknh4lBMzgG">图书馆</a>
+      <a href="#" data-page-node-id="lhhhND7m5OgFMmsqA34FwC">作业记录</a>
+    </div>
+    <div class="nav-right" data-page-node-id="kNq2qCXEWNDQ9CnuzjGXnr">
+      <div class="avatar" data-page-node-id="CabGaZaCnllUxrdRIV37fU">陈</div>
+    </div>
+  </div>
+</nav>
+
+<main class="admin-wrap" data-page-node-id="oFJBZ7Mg9Yzsiqp6ngdKAL">
+  <div class="wizard rise" data-page-node-id="NviTyfYICpcBjW0bf1LFEL">
+
+    <div class="wiz-head" data-page-node-id="eDosL1gaj3vH5T3N9kx0zc">
+      <h1 data-page-node-id="xIDAhH7hak7EeZFuDFU9MX"><mark data-page-node-id="KEReAtZByPhnRaWn1Bihwl">新建单课</mark></h1>
+      <span class="zone-badge" id="zoneBadge" data-page-node-id="UqaYbcWnNDZyCvguAEGkf3">曲目区</span>
+      <span class="eyebrow" data-page-node-id="ereox16SdAOliQvFRptPDo">CREATE LESSON</span>
+    </div>
+
+    <form class="form-body" id="createForm" autocomplete="off" novalidate data-page-node-id="176IMltu3VlXVd21kYwOuS">
+      <div class="form-cols" data-page-node-id="3HYDe1Ji8b4HMgqvnQyi2E">
+        <div class="fsec" data-page-node-id="xmoSOFFi4vJ7mPyPq73LYG">
+          <div class="fsec-title" data-page-node-id="BiCOBEsLdhy0MXh2ZyL4AZ">基本信息</div>
+          <div class="field" id="fName" data-page-node-id="2R9gGGwXezHIhtd6M9yqcW">
+            <label for="inName" data-page-node-id="bZN9uPU1Qv1IOKGBSesfux">名称 <span class="cnt num" data-page-node-id="sWTq4Se6Dv9YGKLzsXSERu"><span id="nameCnt" data-page-node-id="oA8WmY1KVHGFAFHbZAM06u">0</span>/120</span></label>
+            <input type="text" id="inName" placeholder="如：卡农（Johann Pachelbel · 指弹改编）" maxlength="140" data-page-node-id="V8xSrWkGWUECXdrvIVJ2AV">
+            <div class="err-msg" data-page-node-id="qiJyGIyfBotENhvuh1MG36">请填写名称，不超过 120 字</div>
+          </div>
+          <div class="field" id="fDesc" data-page-node-id="Lk36HDUApvEJqUucV4c3S4">
+            <label for="inDesc" data-page-node-id="rnrYGmmLxada25jyjORXsR">简介 <span class="cnt num" data-page-node-id="Nb6XA4pWYubcKTYFHp76ty"><span id="descCnt" data-page-node-id="mQ1x4xBYzJGhYe4FULqtCE">0</span>/1000</span></label>
+            <textarea id="inDesc" placeholder="本课的教学目标、适合阶段、练习建议…"></textarea>
+            <div class="err-msg" data-page-node-id="cSt1ujqScMY1FQdySMofDz">简介不超过 1000 字</div>
+          </div>
+        </div>
+        <div class="fsec" data-page-node-id="9pYoL2ArJPaRE2LypN84QQ">
+          <div class="fsec-title" data-page-node-id="gScUR2YPf5MRAMmPR9YPd0">封面 <span class="note req" data-page-node-id="jEPcZzt43V3LmYumaCGTZQ">1:1 · 必填 · 分 P 无需封面</span></div>
+          <div class="cover-flex" data-page-node-id="psL8QxBgriir87CiDT5wSg">
+            <div class="cover-box" id="coverBox" role="button" tabindex="0" aria-label="上传封面" data-page-node-id="iZMlU0lukoV1ie4LEPmXm4">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="HMDTwPvPhQrKoEjJLxOgYv"><path d="M12 5v14M5 12h14" data-page-node-id="xOvWNcP96MyE4WGQykENaP"/></svg>
+              <span class="t1" data-page-node-id="qYA5DTjngkNKbE022O2NfH">上传封面</span>
+              <span class="t2" data-page-node-id="Xu8nlzw2bgGxrcJtMpxMa0">比例 1:1 · 必填</span>
+              <div class="vinyl" data-page-node-id="NjMHfylyWnL7rjqng4iSOf"><i data-page-node-id="DGClNVlAuCsOEAPXaFq2dn"></i></div>
+              <button type="button" class="cov-rm" id="coverRm" aria-label="移除封面">✕</button>
+            </div>
+          </div>
+          <div class="field error" id="fCover" style="margin-top:10px" data-page-node-id="DCFYBXpWnPMKRvL8jXVEwj">
+            <div class="err-msg" data-page-node-id="cJMrA1utf9jVFCyzxIOvIc">封面为必填项（1:1 正方形）</div>
+          </div>
+        </div>
+        <div class="fsec" data-page-node-id="PvSecLesson0000000000001">
+          <div class="fsec-title" data-page-node-id="PvTitleLesson000000000001">预览 <span class="note" data-page-node-id="PvNoteLesson000000000001">学员视角 · 实时</span></div>
+          <div class="pv-card" data-page-node-id="PvCardLesson000000000001">
+            <div class="pv-cover" id="pvCover" data-page-node-id="PvCoverLesson00000000001"><div class="disc" data-page-node-id="PvDiscLesson000000000001"><span class="lbl" data-page-node-id="PvLblLesson0000000000001"><i data-page-node-id="PvLbliLesson000000000001"></i></span></div></div>
+            <div class="pv-name" id="pvName" data-page-node-id="PvNameLesson000000000001">未命名单课</div>
+            <div class="pv-meta num" id="pvMeta" data-page-node-id="PvMetaLesson000000000001">单课 · 2 个分段</div>
+          </div>
+        </div>
+
+        <div class="fsec full" data-page-node-id="UHttyHmHVF6ZOG0o3uusRU">
+          <div class="fsec-title" data-page-node-id="p6Srgzuuyf5P3mt1dFVx9u">前置知识点 <span class="note" data-page-node-id="IFV9sp3KI20tGZiPqQ3bzk">可选 · 支持单知识点 / 知识点集 / 单曲目 / 曲谱集</span></div>
+          <p class="pick-count" data-page-node-id="PreCntLessonRow00000001">已选 <b class="num" id="preCnt" data-page-node-id="xCo8qi0C7FsEAwc0Fr8UhQ">0</b> <span data-page-node-id="PreCntUnitLesson0000001">项前置内容</span>
+          </p>
+          <div class="picked-list" id="preChips" aria-label="已选前置内容"></div>
+          <div class="pre-picker" id="prePicker" data-page-node-id="PrePickerLesson0000000001">
+            <label class="pick-search big" id="psearch" data-page-node-id="KAlvUBWNaSvhScIxvFxPcZ">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" data-page-node-id="tyAhZtgHe0nTrQbeOfcRQV"><circle cx="11" cy="11" r="7" data-page-node-id="vgwa6lzbOi3JpBkPLAGy8T"/><path d="M20 20l-3.5-3.5" data-page-node-id="tgSapjeCz4Lokfqiq0S5VR"/></svg>
+              <input type="text" id="psearchInput" placeholder="搜索单知识点 / 知识点集 / 单曲目 / 曲谱集…" aria-label="搜索前置内容" data-page-node-id="8tjNRrRYNg8SnxWNAGVbvH">
+              <button type="button" class="clr" id="psearchClr" data-page-node-id="J5FdcbxHccqAyzsiaA5Gp4">清除</button>
+            </label>
+            <div class="pre-drop" id="preDrop" data-page-node-id="PreDropLesson00000000001"><!-- JS 渲染 --></div>
+          </div>
+          <p class="pre-hint" data-page-node-id="PreHintLesson00000000001">按「类型 + 标题」选取前置内容：知识点集 · 单知识点 · 单曲目 · 曲谱集，如【知识点集】右手基本功系列、【单曲谱】稻香 · 弹唱谱；点击结果加入，已选项置灰</p>
+          <div class="pick-empty" id="pempty" data-page-node-id="b0tnCwG2aSoFvB0krerKSR">未找到匹配的前置内容，换个关键词试试</div>
+        </div>
+
+        <div class="fsec full" data-page-node-id="qsapYgKjtxtsIMebkJ6xKA">
+          <div class="fsec-title" data-page-node-id="kT8v8wu8rjKk0qfP65ibAS">P 分段管理 <span class="note" data-page-node-id="Z1nAjNb97ym1zAHjvi4QLv">逐个上传 P 视频 · 可增删 / 调顺序 · P 无需封面</span></div>
+          <div class="pmanage" data-page-node-id="22yRYfBiRB1htCHrYhtI8p">
+            <div class="pmanage-head" data-page-node-id="W4VCbyH3lOrolEi0xmhMQg">
+              <span class="pm-t" data-page-node-id="riun6Azv8xudEA1AqjxYmv">P 分段</span>
+              <span class="pm-note num" id="pmCount" data-page-node-id="Fj3xy5n3P97hbMFpzKsplx">已添加 2 段</span>
+              <button type="button" class="pm-add" id="pmAdd" data-page-node-id="Hvvc2fWkFp5uQ5HGbkCk7z">＋ 添加分段</button>
+            </div>
+            <div class="pm-list" id="pmList" data-page-node-id="W7FsfZPLKBekSDqNDdmNO5"></div>
+          </div>
+        </div>
+
+        <div class="fsec full" data-page-node-id="eOuiKrZhJtVDSRbQ6HHUMs">
+          <div class="fsec-title" data-page-node-id="d1nzLlEkbiu3ymA0ENa19V">附件资料 <span class="note" data-page-node-id="zAjSElkaN99o129bkyWINH">PDF / GP / MP3 / PNG · 学员逐个下载 · 可调顺序</span></div>
+          <div class="pmanage" data-page-node-id="FileManage00000000000000001">
+            <div class="pmanage-head" data-page-node-id="FileManageHead0000000000001">
+              <span class="pm-t" data-page-node-id="FileManageT0000000000000001">附件</span>
+              <span class="pm-note num" id="fileCount" data-page-node-id="FileManageCnt0000000000001">已添加 2 份</span>
+              <button type="button" class="pm-add" id="fileAdd" data-page-node-id="FileManageAdd000000000001">＋ 添加附件</button>
+            </div>
+            <div class="pm-list" id="fileRows" data-page-node-id="ysmBBECleJOxR4yTfHuu70">
+            <div class="frow" data-page-node-id="6ODGnBNmEeJZWD7bAZ616o">
+              <span class="fico pdf" data-page-node-id="ubr7VBzt7tChJbRdGw0xgk">PDF</span>
+              <div data-page-node-id="exdA9HUiYACnv8ViprMECk"><div class="fname" data-page-node-id="LT9mjBrlhEHZKqlvcEysIJ">副歌段落六线谱（含指法标注）.pdf</div><div class="fmeta num" data-page-node-id="4PyLybs2RSGJdwca6lfoBb">1.2 MB · 已上传</div></div>
+              <span class="pops" data-page-node-id="zZRkEa5AeGXdrmvxQnS2Si">
+                <button type="button" title="上移" data-op="up">↑</button>
+                <button type="button" title="下移" data-op="down">↓</button>
+                <button type="button" title="移除" data-op="del">×</button>
+              </span>
+            </div>
+            <div class="frow" data-page-node-id="R42O4bpOa9zcGbbBTmtVcl">
+              <span class="fico" data-page-node-id="8IoaXyEv3VHP8j4bRIhy49">GP</span>
+              <div data-page-node-id="wcERFJ6ZRPTH6rH4WiFDMp"><div class="fname" data-page-node-id="AauI3ZGHg97JjcCrANCJsG">Guitar Pro 源文件 · 可调速跟练.gp</div><div class="fmeta num" data-page-node-id="qnNNNJPImj4zBkxEfYJESS">860 KB · 已上传</div></div>
+              <span class="pops" data-page-node-id="ZSGYzknq4dFm9ix2rOmK68">
+                <button type="button" title="上移" data-op="up">↑</button>
+                <button type="button" title="下移" data-op="down">↓</button>
+                <button type="button" title="移除" data-op="del">×</button>
+              </span>
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <!-- 底部操作条 -->
+    <div class="wiz-foot" data-page-node-id="Wm0q5Q6diQ0MH1Z8RDTd0Q">
+      <button type="button" class="btn btn-ghost" id="btnBack" data-page-node-id="6Cw9qQbmkBiJzGBejvDqGU">← 返回</button>
+      <span class="foot-hint" id="footHint" data-page-node-id="zJV04giG7NGQM5QFd5ZpUD">曲目区 · 新建单课</span>
+      <span class="spacer" data-page-node-id="vfuBYpoK3XCpfXFBqzfGYj"></span>
+      <button type="button" class="btn btn-ghost" data-page-node-id="Bknyy92vCeWryTUQCuj0Gd">保存草稿</button>
+      <button type="button" class="btn btn-main" id="btnPublish" data-page-node-id="bVIAQQDLgVSucchnqNBsu9">发 布</button>
+    </div>
+
+  </div>
+</main>
+
+<div class="pub-toast" id="pubToast" data-page-node-id="QNHlJwlI2fFEhGkOcdE3sM">发布成功 · 正在返回列表…</div>
+
+<script>
+/* ================= 区域由入口决定：?zone=track（默认）| knowledge ================= */
+const params = new URLSearchParams(location.search);
+const zone = params.get('zone') === 'knowledge' ? 'knowledge' : 'track';
+const IS_KP = zone === 'knowledge';
+const HOME  = IS_KP ? 'knowledge-home.html' : 'tracks-home.html';
+
+/* 页面文案按区适配 */
+document.getElementById('zoneBadge').textContent = IS_KP ? '知识点区' : '曲目区';
+document.getElementById('footHint').textContent  = (IS_KP ? '知识点区' : '曲目区') + ' · 新建单课';
+document.getElementById('navKp').classList.toggle('active', IS_KP);
+document.getElementById('navTrack').classList.toggle('active', !IS_KP);
+if(IS_KP){
+  document.title = '新建知识点 · 能学慧吉他教室（管理端）';
+  document.querySelector('.wiz-head h1 mark').textContent = '新建知识点';
+  document.querySelector('.eyebrow').textContent = 'CREATE KNOWLEDGE';
+  document.getElementById('inName').placeholder = '如：看懂和弦进行——1645 的秘密';
+  document.getElementById('inDesc').placeholder = '这个知识点讲解什么、适合什么阶段、配套练习建议…';
+}
+
+/* ================= 表单交互 ================= */
+/* 字数统计 */
+function bindCount(inputEl, cntEl, fieldEl, max){
+  inputEl.addEventListener('input', ()=>{
+    const n = inputEl.value.length;
+    cntEl.textContent = n;
+    cntEl.parentElement.classList.toggle('over', n > max);
+    if(n > max){ fieldEl.classList.add('error'); } else if(n > 0){ fieldEl.classList.remove('error'); }
+  });
+}
+bindCount(document.getElementById('inName'), document.getElementById('nameCnt'), document.getElementById('fName'), 120);
+bindCount(document.getElementById('inDesc'), document.getElementById('descCnt'), document.getElementById('fDesc'), 1000);
+
+/* 封面（演示：点击切换已上传态 · 删除按钮 · 预览联动） */
+(function(){
+  const boxEl = document.getElementById('coverBox'), fieldEl = document.getElementById('fCover');
+  const toggle = ()=>{
+    boxEl.classList.add('has');
+    fieldEl.classList.remove('error');
+    document.getElementById('pvCover').classList.add('has');
+    updatePreview();
+  };
+  boxEl.addEventListener('click', toggle);
+  boxEl.addEventListener('keydown', e=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); } });
+  /* 删除封面：只清空已上传态，不触发上传切换，排版不变 */
+  document.getElementById('coverRm').addEventListener('click', e=>{
+    e.preventDefault(); e.stopPropagation();
+    boxEl.classList.remove('has');
+    fieldEl.classList.add('error');
+    document.getElementById('pvCover').classList.remove('has');
+    updatePreview();
+  });
+})();
+
+/* ================= 封面预览卡：标题 / 封面 / 分段数实时同步 ================= */
+function updatePreview(){
+  const name = document.getElementById('inName').value.trim();
+  document.getElementById('pvName').textContent = name || (IS_KP ? '未命名知识点' : '未命名单课');
+  const rows = document.querySelectorAll('#pmList .prow').length;
+  document.getElementById('pvMeta').textContent = (IS_KP ? '知识点' : '单课') + ' · ' + rows + ' 个分段';
+}
+document.getElementById('inName').addEventListener('input', updatePreview);
+
+/* ================= 前置内容：搜索选择器（类型 + 标题，不铺列表） ================= */
+const PRE_ITEMS = [
+  {t:'知识点集', c:'t-kset',  nm:'右手基本功系列',              m:'6 个知识点'},
+  {t:'知识点集', c:'t-kset',  nm:'和弦入门必修课',              m:'8 个知识点'},
+  {t:'知识点集', c:'t-kset',  nm:'节奏训练合集',                m:'5 个知识点'},
+  {t:'知识点集', c:'t-kset',  nm:'指弹预备 · 前置必修包',       m:'8 个知识点'},
+  {t:'单知识点', c:'t-kp',    nm:'节拍器训练：从 60 稳到 120',   m:'26 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'看懂和弦进行：1645 的秘密',    m:'26 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'右手指法与触弦角度入门',       m:'28 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'音程与指板地图：告别死记品位', m:'32 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'和弦转换不抢拍：三个锚点手指', m:'24 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'扫弦的力学：手腕 vs 手臂',     m:'25 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'大横按通关：F 和弦的秘密',     m:'26 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'自然泛音：触弦位置与右手配合', m:'18 分钟'},
+  {t:'单曲目',   c:'t-track', nm:'卡农独奏 · 全曲精讲',          m:'13 段'},
+  {t:'单曲目',   c:'t-track', nm:'天空之城 · 指弹改编',          m:'9 段'},
+  {t:'单曲目',   c:'t-track', nm:'奇迹的山',                     m:'11 段'},
+  {t:'单曲目',   c:'t-track', nm:'晴天 · 前奏精讲',              m:'7 段'},
+  {t:'曲谱集',   c:'t-score', nm:'押尾光太郎精选集',             m:'收录 8 首'},
+  {t:'曲谱集',   c:'t-score', nm:'指弹入门 30 首',               m:'收录 30 首'}
+];
+(function setupPre(){
+  const input = document.getElementById('psearchInput');
+  const box   = document.getElementById('psearch');
+  const drop  = document.getElementById('preDrop');
+  const picker= document.getElementById('prePicker');
+  const sel = new Map();
+  function renderChips(){
+    document.getElementById('preCnt').textContent = sel.size;
+    document.getElementById('preChips').innerHTML = [...sel.values()].map(it=>
+      '<span class="picked-chip"><span class="nm"><span class="ptag ' + it.c + '">' + it.t + '</span>' + it.nm + '</span>' +
+      '<button type="button" class="rm" data-rm="' + it.nm + '" aria-label="移除 ' + it.nm + '">✕</button></span>'
+    ).join('');
+  }
+  function renderDrop(){
+    const kw = input.value.trim().toLowerCase();
+    const list = PRE_ITEMS.filter(it=> !kw || (it.t + it.nm).toLowerCase().includes(kw));
+    document.getElementById('pempty').style.display = list.length ? 'none' : 'block';
+    drop.innerHTML = list.map(it=>{
+      const off = sel.has(it.nm);
+      return '<button type="button" class="pre-item' + (off ? ' off' : '') + '" data-nm="' + it.nm + '"' + (off ? ' disabled' : '') + '>' +
+        '<span class="ptag ' + it.c + '">' + it.t + '</span>' +
+        '<span class="pnm">' + it.nm + '</span>' +
+        '<span class="pmeta num">' + it.m + '</span></button>';
+    }).join('');
+    drop.classList.add('open');
+  }
+  input.addEventListener('focus', renderDrop);
+  input.addEventListener('input', ()=>{ box.classList.toggle('has', !!input.value.trim()); renderDrop(); });
+  document.getElementById('psearchClr').addEventListener('click', ()=>{
+    input.value=''; box.classList.remove('has'); renderDrop(); input.focus();
+  });
+  input.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ drop.classList.remove('open'); } });
+  drop.addEventListener('click', e=>{
+    const b = e.target.closest('.pre-item'); if(!b || b.classList.contains('off')) return;
+    const it = PRE_ITEMS.find(x=>x.nm === b.dataset.nm);
+    sel.set(it.nm, it);
+    renderChips(); renderDrop();
+  });
+  document.getElementById('preChips').addEventListener('click', e=>{
+    const rm = e.target.closest('[data-rm]'); if(!rm) return;
+    sel.delete(rm.dataset.rm);
+    renderChips(); renderDrop();
+  });
+  document.addEventListener('click', e=>{ if(!picker.contains(e.target)) drop.classList.remove('open'); });
+})();
+
+/* P 分段管理：增删 + 上下调序 */
+const pmList = document.getElementById('pmList');
+let pSeq = 2;
+function pRowHTML(i, name, file){
+  return `
+  <div class="prow">
+    <span class="pidx num">P${i}<span class="pmark">第 ${i} 段</span></span>
+    <input class="pname" type="text" value="${name}" placeholder="P 名，如：完整示范 · 原速">
+    <button type="button" class="pfile ${file ? 'has' : ''}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0 -4 4m4-4 4 4"/><path d="M5 20h14"/></svg>
+      <span class="fn">${file || '选择视频文件 · 分 P 无需封面'}</span>
+    </button>
+    <span class="pops">
+      <button type="button" title="上移" data-op="up">↑</button>
+      <button type="button" title="下移" data-op="down">↓</button>
+      <button type="button" title="删除" data-op="del">×</button>
+    </span>
+  </div>`;
+}
+function refreshP(){
+  const rows = [...pmList.querySelectorAll('.prow')];
+  rows.forEach((r, i)=>{
+    r.querySelector('.pidx').innerHTML = `P${i+1}<span class="pmark">第 ${i+1} 段</span>`;
+    r.querySelector('[data-op=up]').disabled   = i === 0;
+    r.querySelector('[data-op=down]').disabled = i === rows.length - 1;
+  });
+  document.getElementById('pmCount').textContent = '已添加 ' + rows.length + ' 段';
+  if(document.getElementById('pvMeta')) updatePreview();
+}
+/* 初始假数据：P1 / P2 */
+pmList.innerHTML = pRowHTML(1, '完整示范 · 原速', 'P1-full-demo.mp4 · 412 MB') + pRowHTML(2, 'A 段讲解 · 分句与呼吸', null);
+refreshP();
+
+pmList.addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const row = e.target.closest('.prow');
+  if(btn.classList.contains('pfile')){
+    btn.classList.add('has');
+    btn.querySelector('.fn').textContent = 'P' + (row.querySelector('.pidx').textContent.match(/\d+/)[0]) + '-video.mp4 · 386 MB';
+    return;
+  }
+  const op = btn.dataset.op;
+  if(op === 'del'){ row.remove(); refreshP(); }
+  if(op === 'up'  && row.previousElementSibling){ row.parentNode.insertBefore(row, row.previousElementSibling); refreshP(); }
+  if(op === 'down'&& row.nextElementSibling){ row.parentNode.insertBefore(row.nextElementSibling, row); refreshP(); }
+});
+document.getElementById('pmAdd').addEventListener('click', ()=>{
+  pSeq += 1;
+  pmList.insertAdjacentHTML('beforeend', pRowHTML(pSeq, '', null));
+  refreshP();
+});
+
+/* 附件资料：↑↓ 调序 + 移除 / 添加（演示） */
+const fileRows = document.getElementById('fileRows');
+function refreshF(){
+  const rows = [...fileRows.querySelectorAll('.frow')];
+  rows.forEach((r, i)=>{
+    r.querySelector('[data-op=up]').disabled   = i === 0;
+    r.querySelector('[data-op=down]').disabled = i === rows.length - 1;
+  });
+  document.getElementById('fileCount').textContent = '已添加 ' + rows.length + ' 份';
+}
+fileRows.addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const row = btn.closest('.frow');
+  const op = btn.dataset.op;
+  if(op === 'del'){ row.remove(); }
+  if(op === 'up'  && row.previousElementSibling){ row.parentNode.insertBefore(row, row.previousElementSibling); }
+  if(op === 'down'&& row.nextElementSibling){ row.parentNode.insertBefore(row.nextElementSibling, row); }
+  refreshF();
+});
+document.getElementById('fileAdd').addEventListener('click', ()=>{
+  fileRows.insertAdjacentHTML('beforeend',
+    `<div class="frow"><span class="fico">MP3</span><div><div class="fname">慢速 0.6× 跟练伴奏 · 无主旋律.mp3</div><div class="fmeta num">6.4 MB · 已上传</div></div><span class="pops"><button type="button" title="上移" data-op="up">↑</button><button type="button" title="下移" data-op="down">↓</button><button type="button" title="移除" data-op="del">×</button></span></div>`);
+  fileRows.scrollTop = fileRows.scrollHeight;
+  refreshF();
+});
+refreshF();
+
+/* 返回 / 发布 */
+document.getElementById('btnBack').addEventListener('click', ()=>{ location.href = HOME; });
+document.getElementById('btnPublish').addEventListener('click', ()=>{
+  let ok = true, first = null;
+  const mark = (fieldEl, bad)=>{ fieldEl.classList.toggle('error', bad); if(bad && !first) first = fieldEl; if(bad) ok = false; };
+  mark(document.getElementById('fName'),  document.getElementById('inName').value.trim() === '' || document.getElementById('inName').value.length > 120);
+  mark(document.getElementById('fDesc'),  document.getElementById('inDesc').value.length > 1000);
+  mark(document.getElementById('fCover'), !document.getElementById('coverBox').classList.contains('has'));
+  if(!ok && first){ first.scrollIntoView({behavior:'smooth', block:'center'}); return; }
+  const btn = document.getElementById('btnPublish');
+  btn.textContent = '发布中…'; btn.disabled = true;
+  const toast = document.getElementById('pubToast');
+  toast.classList.add('show');
+  setTimeout(()=>{ location.href = HOME; }, 1200);
+});
+</script>
+</body>
+</html>

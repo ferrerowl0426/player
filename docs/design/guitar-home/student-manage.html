@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="nMk7OfhqKAbszZf1XcT3OZ">
+<head data-page-node-id="DIJbdSMdBgv3Cv1wQiBHIp">
+<meta charset="UTF-8" data-page-node-id="B9wHVoOPInCjV5icZ1SSRR">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="FWc3wftL4lghgb8C1qG7wl">
+<title>学生管理 · 能学慧吉他教室</title>
+<style>
+/* ============================================================
+   学生管理 · 老师 / 管理员复用同一页
+   左：班级 + 学生筛选 · 右：学习记录 + 布置作业
+   视觉遵循 design-spec v1.0：纸底 / 咖啡描边盒子 / 橘色强调 / 绿色仅点睛
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底 + 格纹底饰（design-spec v2.0 §3） */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+input,textarea{font-family:inherit}
+.num{font-variant-numeric:tabular-nums}
+.scroll{overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent}
+.scroll::-webkit-scrollbar{width:4px}
+.scroll::-webkit-scrollbar-thumb{background:var(--hair-2)}
+.scroll::-webkit-scrollbar-track{background:transparent}
+
+/* ============ 导航 ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+/* 班级管理：仅管理员可见 */
+body:not([data-view="dean"]) .dean-only{display:none!important}
+
+/* ============ 主区 ============ */
+.home{flex:1;min-height:0;max-width:1440px;width:100%;margin:0 auto;padding:14px 36px 20px;display:flex;flex-direction:column;gap:12px}
+
+/* ---- 工具行：视角切换 + 提示 ---- */
+.toolrow{flex:none;display:flex;align-items:center;gap:16px}
+.toolrow .hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+.viewseg{margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid var(--hair-2);border-radius:4px;overflow:hidden;background:var(--white)}
+.viewseg .lbl{font-size:10px;letter-spacing:1.5px;color:var(--ink-3);padding:0 10px;border-right:1px dashed var(--hair-2)}
+.viewseg button{font-size:11px;letter-spacing:1px;color:var(--ink-3);padding:5px 13px;transition:all .25s}
+.viewseg button + button{border-left:1px solid var(--hair)}
+.viewseg button.on{background:var(--coffee);color:var(--white);font-weight:600}
+
+/* ---- 三列骨架：筛选 / 记录 / 作业 ---- */
+.cols{flex:1;min-height:0;display:flex;gap:14px}
+
+/* 盒子通用 */
+.zone{
+  border:1.5px solid var(--coffee);border-radius:6px;
+  background:var(--glass);
+  box-shadow:0 2px 10px rgba(64,45,20,.08);
+  display:flex;flex-direction:column;min-height:0;overflow:hidden;
+}
+.zone-head{
+  flex:none;padding:11px 16px 9px;border-bottom:1px solid rgba(93,67,38,.28);
+  display:flex;align-items:baseline;gap:10px;position:relative;flex-wrap:wrap;
+}
+.zone-head h2{font-size:13.5px;font-weight:700;letter-spacing:2px;color:var(--coffee);display:flex;align-items:center;gap:9px}
+.zone-head h2::before{content:"";width:4px;height:14px;border-radius:1px;flex:none;background:var(--orange)}
+.zone-head::after{
+  content:"";position:absolute;left:16px;bottom:-1px;width:64px;height:3px;border-radius:1.5px;
+  background:var(--orange);
+}
+.zone-head .meta{font-size:10.5px;color:var(--ink-3);letter-spacing:1px}
+.zone-ops{margin-left:auto;display:flex;gap:8px;align-items:center}
+.zbtn{
+  font-size:11px;letter-spacing:1.5px;font-weight:600;
+  border-radius:4px;padding:5px 14px;transition:all .3s var(--ease);
+  white-space:nowrap;
+}
+.zbtn.ghost{color:var(--coffee);border:1px solid var(--hair-2);background:var(--white)}
+.zbtn.ghost:hover{border-color:var(--orange);color:var(--orange)}
+
+/* ---- 左列：班级 + 学生 ---- */
+.side{flex:none;width:264px}
+.filters{flex:none;padding:12px 14px 10px;border-bottom:1px dashed var(--hair-2);display:flex;flex-direction:column;gap:10px}
+.f-lbl{font-size:10px;letter-spacing:2px;color:var(--ink-3)}
+/* 班级下拉多选 */
+.cls-dd{position:relative;margin-top:6px}
+.cls-dd-btn{
+  width:100%;display:flex;align-items:center;gap:8px;
+  background:var(--white);border:1px solid var(--hair-2);border-radius:5px;
+  padding:6px 10px;font-size:12px;color:var(--ink);letter-spacing:.4px;
+  transition:border-color .25s;text-align:left;
+}
+.cls-dd-btn:hover,.cls-dd.open .cls-dd-btn{border-color:var(--coffee)}
+.cls-dd-btn .lb{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cls-dd-btn svg{width:12px;height:12px;color:var(--ink-3);flex:none;transition:transform .25s var(--ease)}
+.cls-dd.open .cls-dd-btn svg{transform:rotate(180deg)}
+.cls-dd-panel{
+  display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  box-shadow:0 10px 24px rgba(64,45,20,.16);padding:8px;
+}
+.cls-dd.open .cls-dd-panel{display:block}
+.cls-dd-ops{display:flex;gap:6px;margin-bottom:7px}
+.cls-dd-ops button{
+  flex:1;font-size:10.5px;letter-spacing:1px;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:3px 0;background:var(--white);transition:all .2s;
+}
+.cls-dd-ops button:hover:not(:disabled){border-color:var(--coffee)}
+.cls-dd-ops button:disabled{opacity:.4;cursor:not-allowed}
+.cls-dd-list{display:flex;flex-direction:column;gap:2px;max-height:176px;overflow-y:auto}
+.cls-opt{
+  display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:4px;
+  cursor:pointer;user-select:none;font-size:12px;color:var(--ink-2);letter-spacing:.4px;
+}
+.cls-opt:hover{background:rgba(255,252,242,.85)}
+.cls-opt .cbx{
+  width:14px;height:14px;flex:none;border:1px solid var(--hair-2);border-radius:3px;
+  display:grid;place-items:center;font-size:9px;color:transparent;line-height:1;transition:all .15s;
+}
+.cls-opt.on{color:var(--ink)}
+.cls-opt.on .cbx{background:var(--coffee);border-color:var(--coffee);color:var(--white)}
+.stu-search{
+  display:flex;align-items:center;gap:8px;
+  background:var(--white);border:1px solid var(--hair-2);border-radius:5px;
+  padding:6px 10px;transition:border-color .25s;
+}
+.stu-search:focus-within{border-color:var(--coffee)}
+.stu-search svg{width:13px;height:13px;color:var(--ink-3);flex:none}
+.stu-search input{flex:1;border:none;background:none;outline:none;font-size:12px;color:var(--ink);letter-spacing:.4px;min-width:0}
+.stu-search input::placeholder{color:#b3a58c}
+.stu-list{flex:1;min-height:0;padding:8px}
+.stu-item{
+  width:100%;text-align:left;
+  display:flex;align-items:center;gap:10px;
+  border-radius:5px;padding:8px 10px;margin-bottom:2px;
+  transition:background .2s;
+}
+.stu-item:hover{background:rgba(255,252,242,.75)}
+.stu-item.on{background:rgba(111,143,99,.16);box-shadow:inset 2px 0 0 #6f8f63}
+.stu-item.on .nm{color:#4a6b3f}
+/* 已停用学生：灰底 · 排在列表末尾 */
+.stu-item.dis{background:rgba(93,67,38,.05)}
+.stu-item.dis:hover{background:rgba(93,67,38,.09)}
+.stu-item.dis .ava{border-color:var(--hair-2);color:var(--ink-3);background:rgba(93,67,38,.04)}
+.stu-item.dis .nm{color:var(--ink-3)}
+.stu-item .ava{
+  width:30px;height:30px;border-radius:50%;flex:none;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:11.5px;color:var(--coffee);font-weight:600;
+}
+.stu-item .info{min-width:0;flex:1}
+.stu-item .nm{font-size:12.5px;font-weight:600;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stu-item .cls{font-size:10px;color:var(--ink-3);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stu-item .st{
+  flex:none;font-size:9px;letter-spacing:1px;color:#b4452e;
+  border:1px solid rgba(180,69,46,.45);border-radius:3px;padding:1px 6px;
+}
+.stu-empty{padding:26px 10px;text-align:center;font-size:11px;color:var(--ink-3);letter-spacing:.5px}
+
+/* ---- 中列：历史作业（学生作业时间轴） ---- */
+.main{flex:1.35;min-width:0;display:flex;flex-direction:column;gap:14px}
+.stu-head{flex:none;display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px dashed var(--hair-2);flex-wrap:wrap}
+.stu-head .ava{
+  width:38px;height:38px;border-radius:50%;flex:none;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:14px;color:var(--coffee);font-weight:600;
+}
+.stu-head .nm{font-size:15px;font-weight:700;letter-spacing:1px}
+.stu-head .sub{font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+.tag-dis{
+  font-size:9.5px;letter-spacing:1.5px;color:#b4452e;
+  border:1px solid rgba(180,69,46,.45);border-radius:3px;padding:1px 8px;
+  background:rgba(180,69,46,.05);
+}
+.rec-list{flex:1;min-height:0;padding:6px 14px}
+.hw-date{display:flex;align-items:center;gap:10px;margin:8px 0 4px;font-size:10px;letter-spacing:2px;color:var(--ink-3)}
+.hw-date::after{content:"";flex:1;border-top:1px dashed var(--hair-2)}
+.hw-date b{color:var(--coffee);font-weight:700}
+.hw-item{display:flex;gap:12px;padding:7px 0 9px;border-bottom:1px solid rgba(221,208,180,.55);position:relative}
+.hw-item:last-child{border-bottom:none}
+/* 删除按钮：悬停该条记录时出现（红色警示） */
+.hw-del{
+  flex:none;align-self:flex-start;margin-top:3px;
+  font-size:10px;letter-spacing:1px;color:#b4452e;
+  border:1px solid rgba(180,69,46,.4);border-radius:3px;padding:1px 8px;background:var(--white);
+  opacity:0;transition:all .2s;
+}
+.hw-item:hover .hw-del{opacity:1}
+.hw-del:hover{background:rgba(180,69,46,.08);border-color:#b4452e}
+/* 已删除记录：整条变灰留痕 */
+.hw-item.deleted .hw-tm,.hw-item.deleted .hw-main{filter:grayscale(1);opacity:.45}
+.hw-delnote{
+  margin-top:6px;font-size:10px;letter-spacing:.4px;color:#8a7a60;
+  border-top:1px dashed var(--hair);padding-top:5px;
+}
+.hw-delnote b{color:#8a5a3e;font-weight:600}
+.hw-tm{flex:none;width:42px;padding-top:2px;text-align:center}
+.hw-tm .tm{font-size:13px;font-weight:700;color:var(--coffee);letter-spacing:.5px}
+.hw-tm .lb{font-size:9px;color:var(--ink-3);letter-spacing:1px;margin-top:1px}
+.hw-main{flex:1;min-width:0}
+.hw-from{font-size:11px;color:var(--ink-3);letter-spacing:.4px;margin-bottom:5px}
+.hw-from b{color:var(--ink-2);font-weight:600}
+.hw-msg{
+  font-size:11px;line-height:1.7;color:var(--ink-2);letter-spacing:.3px;
+  background:rgba(93,67,38,.05);border:1px dashed rgba(93,67,38,.28);border-radius:4px;
+  padding:4px 9px;margin-bottom:6px;
+}
+.hw-items{display:flex;flex-wrap:wrap;gap:4px 16px}
+.hw-items .it{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11.5px;font-weight:600;color:var(--ink-2);letter-spacing:.3px;
+}
+.hw-items .it::before{content:"";width:4px;height:4px;border-radius:50%;background:#a06a35;flex:none}
+.rec-empty{padding:40px 10px;text-align:center;font-size:11.5px;color:var(--ink-3);letter-spacing:.5px}
+
+/* ---- 右列：布置作业 ---- */
+.aside{flex:1;min-width:0}
+.push-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 14px 14px;gap:10px}
+/* 停用学员提示（布置区顶部） */
+.push-notice{
+  flex:none;display:none;align-items:center;gap:9px;
+  border:1.5px dashed rgba(180,69,46,.5);border-radius:5px;
+  background:rgba(180,69,46,.05);
+  padding:8px 12px;font-size:11.5px;color:#b4452e;letter-spacing:.4px;line-height:1.7;
+}
+.push-notice.show{display:flex}
+.push-notice b{font-weight:700}
+.seg3{flex:none;display:flex;border:1px solid var(--hair-2);border-radius:4px;overflow:hidden;background:var(--white);width:fit-content}
+.seg3 button{font-size:11px;letter-spacing:1px;color:var(--ink-3);padding:5px 14px;transition:all .25s}
+.seg3 button + button{border-left:1px solid var(--hair)}
+.seg3 button.on{background:var(--coffee);color:var(--white);font-weight:600}
+/* ---- 搜索选择器（仿新建合集的前置选择器） ---- */
+.hw-picker{position:relative;flex:none}
+.hw-scope{
+  flex:none;appearance:none;-webkit-appearance:none;
+  font-family:inherit;font-size:10.5px;letter-spacing:1px;font-weight:600;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:3px 20px 3px 8px;
+  background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%237a4a26' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 6px center;
+  cursor:pointer;outline:none;transition:border-color .25s;
+}
+.hw-scope:hover,.hw-scope:focus{border-color:var(--orange)}
+.hw-drop{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;
+  background:var(--white);border:1px solid var(--hair-2);border-radius:6px;
+  box-shadow:0 10px 26px rgba(60,42,20,.16);
+  max-height:240px;overflow-y:auto;display:none;
+}
+.hw-drop.open{display:block}
+.hw-item{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:9px 13px;text-align:left;font-size:12.5px;color:var(--ink);
+  border-bottom:1px dashed var(--hair);transition:background .2s;
+}
+.hw-item:last-child{border-bottom:none}
+.hw-item:hover:not(.off){background:rgba(255,127,0,.08)}
+.hw-item.off{opacity:.38;cursor:not-allowed}
+.hw-item .ptag{flex:none;font-size:9.5px;letter-spacing:1px;font-weight:600;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.ptag.t-col{color:#6b4d2e;background:rgba(93,67,38,.1)}
+.ptag.t-les{color:#4f7d3a;background:rgba(79,125,58,.12)}
+.ptag.t-par{color:#96702a;background:rgba(185,142,62,.16)}
+.hw-item .hnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hw-item .hmeta{flex:none;font-size:10px;color:var(--ink-3);letter-spacing:.3px}
+.hw-hint{flex:none;font-size:10.5px;color:var(--ink-3);letter-spacing:.4px}
+.msg-box{
+  /* 自适应撑满剩余高度，底部与整体底边对齐；min-height 收窄给已选区让位 */
+  flex:1;min-height:48px;width:100%;resize:none;height:auto;
+  background:var(--white);border:1px solid var(--hair-2);border-radius:5px;
+  padding:8px 11px;font-size:12px;color:var(--ink);letter-spacing:.3px;line-height:1.6;
+  transition:border-color .25s;outline:none;
+}
+.msg-box:focus{border-color:var(--coffee)}
+.msg-box::placeholder{color:#b3a58c}
+.push-foot{flex:none;display:flex;align-items:center;gap:10px}
+.btn-main{
+  background:var(--coffee);
+  color:#f7f1e6;
+  border:1px solid #47331d;
+  border-radius:4px;
+  font-size:12px;font-weight:600;letter-spacing:3px;text-indent:3px;
+  padding:7px 24px;
+  transition:filter .25s var(--ease), transform .15s var(--ease);
+}
+.btn-main:hover{filter:brightness(1.15)}
+.btn-main:active{transform:translateY(1px)}
+.btn-main:disabled{filter:grayscale(.5);cursor:not-allowed;transform:none}
+.push-foot .tip{font-size:10px;color:var(--ink-3);letter-spacing:.5px}
+/* 已选作业（专门区域 · 逐条独立框，不叠加） */
+.picked-box{flex:none;display:none;flex-direction:column;gap:5px}
+.picked-box.show{display:flex}
+.picked-lbl{font-size:10px;letter-spacing:2px;color:var(--ink-3)}
+.picked-lbl b{color:#4a6b3f;font-weight:700}
+#pickedList{
+  display:flex;flex-direction:column;gap:6px;
+  /* 高度写死：恰好 5 条（5×28 + 4×6 = 164），全屏下不出现滚动条 */
+  flex:none;height:164px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
+}
+.picked-empty{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;border:1px dashed var(--hair-2);border-radius:4px;padding:8px 10px;text-align:center}
+.picked-item{
+  /* 条目高度钉死 28px，保证 5 条高度可精确计算 */
+  flex:none;height:28px;display:flex;align-items:center;gap:8px;
+  background:rgba(111,143,99,.10);border:1px solid rgba(111,143,99,.42);border-radius:4px;
+  padding:4px 6px 4px 10px;
+}
+.picked-item .pn{flex:1;min-width:0;font-size:11.5px;color:var(--ink-2);letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.picked-item .pk-kind{flex:none;font-size:9px;letter-spacing:1px;color:#5c7a4e;border:1px solid rgba(111,143,99,.5);border-radius:3px;padding:0 5px}
+.picked-item .pk-del{
+  flex:none;width:18px;height:18px;border-radius:50%;
+  border:1px solid rgba(111,143,99,.5);color:#5c7a4e;
+  font-size:12px;line-height:1;display:grid;place-items:center;transition:all .2s;
+}
+.picked-item .pk-del:hover{background:#b4452e;border-color:#b4452e;color:var(--white)}
+
+/* ---- 引导态遮罩（停用老师 / 无带班老师） ---- */
+.disabled-mask,.noclass-mask{
+  position:fixed;left:0;right:0;bottom:0;top:56px;z-index:60;display:none;
+  place-items:center;background:rgba(242,234,217,.72);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
+body[data-view="disabled"] .disabled-mask,
+body[data-view="noclass"] .noclass-mask{display:grid}
+/* 视角切换器浮在遮罩之上，保证演示时仍可切回 */
+body[data-view="disabled"] .toolrow,
+body[data-view="noclass"] .toolrow{position:relative;z-index:70}
+.disabled-note{
+  width:min(430px,90%);text-align:center;
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:8px;
+  box-shadow:5px 7px 0 rgba(93,67,38,.22), 0 18px 38px rgba(64,45,20,.18);
+  padding:38px 40px 34px;
+}
+.disabled-note .ico{
+  width:52px;height:52px;margin:0 auto 16px;border-radius:50%;
+  border:1.5px solid var(--hair-2);background:rgba(255,127,0,.12);
+  display:grid;place-items:center;color:var(--coffee);
+}
+.disabled-note .ico.calm{background:rgba(93,67,38,.08);border-color:var(--hair-2);color:var(--ink-2)}
+.disabled-note .ico svg{width:24px;height:24px}
+.disabled-note h3{font-size:15px;font-weight:700;letter-spacing:2px;color:var(--coffee);margin-bottom:8px}
+.disabled-note p{font-size:12px;color:var(--ink-2);letter-spacing:.5px;line-height:1.9}
+/* 引导态出口按钮：回到曲目区 */
+.disabled-note .act{
+  display:inline-flex;align-items:center;gap:8px;margin-top:22px;text-decoration:none;
+  font-size:11.5px;font-weight:600;letter-spacing:2px;
+  color:var(--white);background:var(--coffee);border:1.5px solid #47331d;border-radius:4px;
+  padding:8px 20px;transition:filter .25s var(--ease);
+}
+.disabled-note .act:hover{filter:brightness(1.15)}
+.disabled-note .act svg{width:14px;height:14px;flex:none}
+body[data-view="disabled"] .cols{filter:grayscale(.35);opacity:.55;pointer-events:none}
+body[data-view="noclass"] .cols{opacity:.6;pointer-events:none}
+
+/* ---- 弹层（删除历史记录确认 · 停用操作在班级管理） ---- */
+.modal-mask{
+  position:fixed;inset:0;z-index:100;display:none;place-items:center;
+  background:rgba(60,42,20,.38);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+}
+.modal-mask.show{display:grid}
+.modal{
+  width:330px;background:var(--white);border:1.5px solid var(--coffee);border-radius:8px;
+  box-shadow:0 12px 32px rgba(60,42,20,.18);padding:20px 22px;
+  animation:modal-pop .25s var(--ease);
+}
+@keyframes modal-pop{from{transform:scale(.94);opacity:0}}
+.modal .modal-title{
+  font-size:14px;font-weight:700;letter-spacing:2px;color:var(--coffee);
+  margin-bottom:10px;padding-bottom:9px;border-bottom:1px dashed var(--hair-2);
+}
+.modal p{font-size:12px;line-height:1.9;color:var(--ink);margin:0 0 12px;letter-spacing:.3px}
+.modal .del-reason{
+  width:100%;height:64px;resize:none;display:block;
+  background:var(--white);border:1px solid var(--hair-2);border-radius:5px;
+  padding:8px 11px;font-size:12px;color:var(--ink);letter-spacing:.3px;line-height:1.6;
+  outline:none;transition:border-color .25s;margin-bottom:6px;
+}
+.modal .del-reason:focus{border-color:var(--coffee)}
+.modal .del-reason::placeholder{color:#b3a58c}
+.modal .del-err{font-size:10px;color:#b4452e;letter-spacing:.4px;height:14px;margin-bottom:6px}
+.modal .modal-ops{display:flex;gap:10px;justify-content:flex-end}
+.mbtn{
+  font-size:11.5px;letter-spacing:1px;padding:5px 16px;border-radius:4px;
+  border:1px solid var(--hair-2);color:var(--ink-3);background:var(--white);
+  transition:all .2s;cursor:pointer;
+}
+.mbtn:hover{border-color:var(--coffee);color:var(--coffee)}
+/* 危险操作：红色描边扁平（同记录删除按钮形式） */
+.mbtn.danger{
+  color:#b4452e;background:var(--white);
+  border:1px solid rgba(180,69,46,.45);
+}
+.mbtn.danger:hover{background:rgba(180,69,46,.08);border-color:#b4452e;color:#b4452e}
+.dean-toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%, 12px);z-index:99;
+  font-size:11.5px;letter-spacing:.5px;color:var(--coffee);
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:7px 18px;box-shadow:0 6px 18px rgba(60,42,20,.15);
+  opacity:0;pointer-events:none;transition:all .25s var(--ease);
+}
+.dean-toast.show{opacity:1;transform:translate(-50%, 0)}
+
+/* 入场动效 */
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+.rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){.rise{opacity:1;transform:none;animation:none}}
+
+/* 响应式 */
+@media (max-width:1280px){
+  body{overflow:auto;display:block}
+  .home{padding:14px 20px 40px}
+  .cols{flex-direction:column}
+  .side{width:100%}
+  .stu-list{max-height:260px}
+  .main,.aside{min-height:380px}
+}
+@media (max-width:640px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .home{padding:12px 14px 32px}
+  .toolrow{flex-wrap:wrap}
+  .viewseg{margin-left:0}
+}
+</style>
+</head>
+<body data-view="teacher" data-page-node-id="8NE7gghyv4WQjU7v2T7XEw">
+
+<!-- ================= 导航 ================= -->
+<nav class="nav" data-page-node-id="nynDGKRJdMUjRo9VSmFHYk">
+  <div class="nav-inner" data-page-node-id="mVjJBvgUkqYWvuGudfaSwf">
+    <a class="logo" href="#" data-page-node-id="WW1RxykgX8c4j5Ft98YZ6E">
+      <span class="mark" data-page-node-id="KjxLShPtfIz5txRmxJC61r"></span>
+      能学慧吉他教室
+      <small data-page-node-id="bnG1YT3rRz5tGMcZ7M6GHQ">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="Q68XaqJVCUUZPHHuSYKxvb">
+      <a href="#" data-page-node-id="FrJxGbacnqmMGKUHPK09jD">首页</a>
+      <a href="knowledge-home.html" data-page-node-id="8BcyC4AVCmzQoGqpukL49l">知识点区</a>
+      <a href="tracks-home.html" data-page-node-id="VUqAOLRinfo5rcCkCB5RXD">曲目库</a>
+      <a href="library.html" data-page-node-id="wWal31wvTnPao8KYk5EWvd">图书馆</a>
+      <a href="student-manage.html" class="active" data-page-node-id="rBnzzaWDV7vPwxFl6pTnOQ">学生管理</a>
+      <a href="class-manage.html" class="dean-only" data-page-node-id="aV2Pfk5Fm5lOBF0ExzTWnx">班级管理</a>
+    </div>
+    <div class="nav-right" data-page-node-id="TjReGX0V8DThTzX9Jh7QMX">
+      <div class="avatar" data-page-node-id="OykAChWjbn1hqTgm0FjU00">李</div>
+    </div>
+  </div>
+</nav>
+
+<main class="home" data-page-node-id="BTkiG5HaCEXsEbUxPXdA45">
+
+  <!-- 视角切换（演示：老师 / 管理员 / 停用老师） -->
+  <div class="toolrow rise" data-page-node-id="gzDWpkfWSF5db2klXsgWe4">
+    <span class="hint" id="roleHint" data-page-node-id="34wKmv0fVGc2DJQiP3rqst">老师视角 · 班级筛选已锁定为本人的班级（一师多班可多选）</span>
+    <div class="viewseg" role="group" aria-label="预览视角" data-page-node-id="GBMqfhaFY3kKKvZsxiK1zl">
+      <span class="lbl" data-page-node-id="X5bSzqlVhBzy7npk7oak8f">预览视角</span>
+      <button type="button" class="on" data-view="teacher" data-page-node-id="yJyHEZ0igZsdyI99eApsBD">老师</button>
+      <button type="button" data-view="noclass" data-page-node-id="viewNoClsNxde0a">无带班老师</button>
+      <button type="button" data-view="dean" data-page-node-id="lF3ic8kufrghQJASF4GtMX">管理员</button>
+      <button type="button" data-view="disabled" data-page-node-id="5BREa1AiOlzbRmqAp6v53J">停用老师</button>
+    </div>
+  </div>
+
+  <div class="cols rise d1" data-page-node-id="n5oA5fDm56iLF93Zwth3r8">
+
+    <!-- ============ 左：班级 + 学生 ============ -->
+    <section class="zone side" data-page-node-id="3rIlEwMmvU5BDMc4NiPqA1">
+      <div class="zone-head" data-page-node-id="wsYdm1WfRkq7rFMW7TW6YU">
+        <h2 data-page-node-id="T3ZNClveQ3UyBQ5wbH7nSE">选择学生</h2>
+        <span class="meta num" id="stuMeta" data-page-node-id="a7Fg5vOikYVtyPk4EXdy93">共 0 人</span>
+      </div>
+      <div class="filters" data-page-node-id="Z6EYPd9UzbOqxfi9DAXe6M">
+        <div data-page-node-id="GIrYCZyayZQ5ZWgqdI9Hu3">
+          <div class="f-lbl" data-page-node-id="c8QExff9jmzgqANphIM56S">班　级</div>
+          <div class="cls-dd" id="clsDd" data-page-node-id="clsDdNxde0a">
+            <button type="button" class="cls-dd-btn" id="clsDdBtn" aria-haspopup="listbox" aria-expanded="false" data-page-node-id="clsDdBtnNxde0a">
+              <span class="lb" id="clsDdLabel" data-page-node-id="clsDdLabelNxde0a">全部班级</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="clsDdChevNxde0a"><path d="m6 9 6 6 6-6" data-page-node-id="clsDdChevPathNxde0a"/></svg>
+            </button>
+            <div class="cls-dd-panel" id="clsDdPanel" data-page-node-id="clsDdPanelNxde0a">
+              <div class="cls-dd-ops" data-page-node-id="clsDdOpsNxde0a">
+                <button type="button" id="clsAll" data-page-node-id="clsAllNxde0a">全选</button>
+                <button type="button" id="clsNone" data-page-node-id="clsNoneNxde0a">全不选</button>
+              </div>
+              <div class="cls-dd-list" id="clsDdList" role="listbox" aria-multiselectable="true" data-page-node-id="clsDdListNxde0a"><!-- JS 渲染 --></div>
+            </div>
+          </div>
+        </div>
+        <div data-page-node-id="hEKvrhlHNeupEwRtHwc9q2">
+          <div class="f-lbl" data-page-node-id="FRi8m2qhR3ZmCmUrraukdJ">学　生 <span style="letter-spacing:0" data-page-node-id="vSilE5hzpRyLawo3L4LiNf">（支持搜索）</span></div>
+          <div class="stu-search" style="margin-top:6px" data-page-node-id="H7ucQ8HnXIGMEX9RSPbr9I">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="YD6N3Mr2MYzMYHsyfqchR3"><circle cx="11" cy="11" r="7" data-page-node-id="uvYW4dEDl7h2tyoj26SKKL"/><path d="m20 20-3.5-3.5" data-page-node-id="pCq9JUowhu57GuqLRqr4Yi"/></svg>
+            <input type="text" id="stuKw" placeholder="搜索学生昵称…" aria-label="搜索学生" data-page-node-id="04wvbrhFTPqFwpkYejPmGF">
+          </div>
+        </div>
+      </div>
+      <div class="stu-list scroll" id="stuList" data-page-node-id="9MfWTcTl80mECD6b9EF269"><!-- JS 渲染 --></div>
+    </section>
+
+    <!-- ============ 中：学习记录 ============ -->
+    <section class="main" data-page-node-id="GUWBexsPFKlPKtUgyXhiKi">
+      <div class="zone" style="flex:1;min-height:0" data-page-node-id="EfWA3NYl0VgDQEVALDerMl">
+        <div class="zone-head" data-page-node-id="9kMZwvD1OpdYDFuLukzhUV">
+          <h2 data-page-node-id="Qq9Gypam4FSpqO98McznY2">历史作业</h2>
+          <span class="meta num" id="recMeta" data-page-node-id="JBluMhPeiclp3bAfPgGMNQ">—</span>
+        </div>
+        <div class="stu-head" id="stuHead" style="display:none" data-page-node-id="MT2BqXwCgqZ7bNaYoF0AEe">
+          <div class="ava" id="headAva" data-page-node-id="QllGPTRmiqWW93J2AiLaud">陈</div>
+          <div data-page-node-id="iNpNYtsYIffOXV9AZgTba9">
+            <div class="nm" id="headNm" data-page-node-id="doALIF8a6B2UutKJmKLPco">—</div>
+            <div class="sub num" id="headSub" data-page-node-id="RJ27V3cH8wATDS01UHP1pX">—</div>
+          </div>
+          <span class="tag-dis" id="headDis" style="display:none" data-page-node-id="6WsHuXZuxxLUKqF7NGCorP">已停用</span>
+        </div>
+        <div class="rec-list scroll" id="recList" data-page-node-id="EuEFdeFJApVBK7t8jBeibj">
+          <div class="rec-empty" id="recEmpty" data-page-node-id="91GjCsx2UDOjJ6ivM0jIUw">在左侧选择一位学生，查看 TA 的历史作业</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 右：布置作业 ============ -->
+    <section class="aside" data-page-node-id="zg2C0nCCADtDsJdQ89w2v1">
+      <div class="zone" style="height:100%" data-page-node-id="HGpe1RiDNew84RyTxgTFG4">
+        <div class="zone-head" data-page-node-id="DWejv3dNSCsbISNzJ1tahA">
+          <h2 data-page-node-id="ZLhP6xN7uHcaFfhWCEdVjy">布置作业</h2>
+        </div>
+        <div class="push-body" data-page-node-id="Xl71EMGFB84vnNzvqnXJf5">
+          <div class="push-notice" id="pushNotice" role="alert" data-page-node-id="pushNoticeNxde0a"></div>
+          <div class="hw-picker" id="hwPicker" data-page-node-id="hwPickerNxde0a">
+            <div class="stu-search" id="pushSearch" data-page-node-id="pushSearchBoxNxde0a">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="pushSearchIcoNxde0a"><circle cx="11" cy="11" r="7" data-page-node-id="pushSearchC1Nxde0a"/><path d="m20 20-3.5-3.5" data-page-node-id="pushSearchC2Nxde0a"/></svg>
+              <input type="text" id="pushKw" placeholder="搜索合集 / 单课 / 单 P 名称…" aria-label="搜索推送内容" data-page-node-id="pushSearchInpNxde0a">
+              <select class="hw-scope" id="pushScope" aria-label="搜索范围" data-page-node-id="pushScopeNxde0a">
+                <option value="all" selected>范围：不限</option>
+                <option value="collection">合集</option>
+                <option value="lesson">单课</option>
+                <option value="part">单 P</option>
+              </select>
+            </div>
+            <div class="hw-drop" id="pushDrop" data-page-node-id="pushDropNxde0a"><!-- JS 渲染 --></div>
+          </div>
+          <div class="hw-hint" data-page-node-id="hwHintNxde0a">输入关键词搜索后点击结果加入作业 · 最多 5 项</div>
+          <div class="picked-box show" id="pickedBox" data-page-node-id="pickedBoxNxde0a">
+            <div class="picked-lbl" data-page-node-id="pickedLblNxde0a">已选作业 <b class="num" id="pickedCnt" data-page-node-id="pickedCntNxde0a">0/5</b> · 点击 × 可移除</div>
+            <div id="pickedList" data-page-node-id="pickedListNxde0a"><!-- JS 渲染 --></div>
+          </div>
+          <textarea class="msg-box" id="msgBox" placeholder="作业备注 / 给学生的留言（选填）…" aria-label="作业留言"></textarea>
+          <div class="push-foot" data-page-node-id="vvuwNA4m276D50FlB7KKoN">
+            <button class="btn-main" id="pushBtn" data-page-node-id="x4IAp0q3YVu0SsI2D7L3Vh">推送作业</button>
+            <span class="tip" data-page-node-id="N5FBeIFGqY6pfNQolBpyNq">推送后将出现在学员首页「今日作业」</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- 停用老师视角：整页引导 -->
+<div class="disabled-mask" role="alert" data-page-node-id="EzdN3ofjtudXTcCqJBBNKC">
+  <div class="disabled-note" data-page-node-id="6VYVoo9oGO4G7nBLKELigY">
+    <div class="ico" data-page-node-id="XE4RXxSHhbeO1kuBY3uH5Y">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="9uDDw9O1w2N1lto92GTSXK"><circle cx="12" cy="12" r="9" data-page-node-id="KaiTluxWyu4aPN7WbUJYvh"/><path d="M5.6 5.6l12.8 12.8" data-page-node-id="y6hpdC7yhnOXCrkHy0YRfY"/></svg>
+    </div>
+    <h3 data-page-node-id="Lc4PvChEPFVwreEts5P7if">此账号已停用</h3>
+    <p data-page-node-id="hOAA1aWru5HfZjm9Au6Iz1">请联系教导主任获取工作内容。<br data-page-node-id="hGiqcsaky5FvLyhmkMrgYT">停用期间无法查看学生记录与布置作业。</p>
+    <a class="act" href="tracks-home.html" data-page-node-id="disabledActNxde0a">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="disabledActIcoNxde0a"><path d="M19 12H5" data-page-node-id="disabledActP1Nxde0a"/><path d="m11 6-6 6 6 6" data-page-node-id="disabledActP2Nxde0a"/></svg>
+      回到曲目区
+    </a>
+  </div>
+</div>
+
+<!-- 无带班老师视角：整页引导 -->
+<div class="noclass-mask" role="alert" data-page-node-id="noclassMaskNxde0a">
+  <div class="disabled-note" data-page-node-id="noclassNoteNxde0a">
+    <div class="ico calm" data-page-node-id="noclassIcoNxde0a">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="noclassIcoSvgNxde0a"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H10l2 2.5h5.5A2.5 2.5 0 0 1 20 10v6.5A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5Z" data-page-node-id="noclassIcoP1Nxde0a"/><path d="M9.5 13.5h5" data-page-node-id="noclassIcoP2Nxde0a"/></svg>
+    </div>
+    <h3 data-page-node-id="noclassTitleNxde0a">暂无带班班级</h3>
+    <p data-page-node-id="noclassTextNxde0a">你当前没有负责的班级。<br data-page-node-id="noclassTextBrNxde0a">请联系教导主任获取工作内容。</p>
+    <a class="act" href="tracks-home.html" data-page-node-id="noclassActNxde0a">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="noclassActIcoNxde0a"><path d="M19 12H5" data-page-node-id="noclassActP1Nxde0a"/><path d="m11 6-6 6 6 6" data-page-node-id="noclassActP2Nxde0a"/></svg>
+      回到曲目区
+    </a>
+  </div>
+</div>
+
+<!-- 删除历史记录确认 -->
+<div class="modal-mask" id="delModal" role="dialog" aria-modal="true" aria-label="删除历史记录确认" data-page-node-id="delModalNxde0a">
+  <div class="modal" data-page-node-id="delModalBoxNxde0a">
+    <div class="modal-title" data-page-node-id="delModalTitleNxde0a">删 除 记 录</div>
+    <p data-page-node-id="delModalTipNxde0a">确定要删除这条历史作业记录吗？<br data-page-node-id="delModalTipBrNxde0a">删除后不会真正移除，仅整条变灰留痕。</p>
+    <textarea class="del-reason" id="delReason" placeholder="请填写删除原因（如：手滑布置错了）…" aria-label="删除原因" data-page-node-id="delReasonNxde0a"></textarea>
+    <div class="del-err" id="delErr" data-page-node-id="delErrNxde0a"></div>
+    <div class="modal-ops" data-page-node-id="delModalOpsNxde0a">
+      <button type="button" class="mbtn" id="delCancel" data-page-node-id="delCancelNxde0a">取 消</button>
+      <button type="button" class="mbtn danger" id="delOk" data-page-node-id="delOkNxde0a">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="dean-toast" id="toast" data-page-node-id="MeQCykC79G3lHS6oD8quD4"></div>
+
+<script>
+/* ================= 假数据 ================= */
+const CLASSES = ['启蒙一班','启蒙二班','进阶一班','考级班'];
+const BASE_TEACHER_CLASSES = ['启蒙一班','启蒙二班'];   /* 老师本人班级 */
+let TEACHER_CLASSES = BASE_TEACHER_CLASSES.slice();      /* 视角可切换：无带班老师时为空 */
+const STUDENTS = [
+  {nm:'陈一一', cls:'启蒙一班', dis:false,
+   hw:[
+     {d:'9月9日', tm:'20:30', msg:'重点看 P2 的段落衔接，跟练时开节拍器 60。', items:['卡农独奏 · 全曲精讲','卡农 · P2 分段讲解']},
+     {d:'9月6日', tm:'19:12', msg:'', items:['指弹入门 30 首']},
+   ]},
+  {nm:'林小满', cls:'启蒙一班', dis:false,
+   hw:[
+     {d:'9月8日', tm:'19:00', msg:'P2 慢速跟练三遍再提速。', items:['天空之城 · 指弹改编']},
+   ]},
+  {nm:'王梓航', cls:'启蒙一班', dis:false,
+   hw:[
+     {d:'9月7日', tm:'18:30', msg:'跟练时打开节拍器 60。', items:['卡农 · P3 跟练']},
+   ]},
+  {nm:'周予安', cls:'启蒙二班', dis:false, hw:[]},
+  {nm:'吴思远', cls:'启蒙二班', dis:true,
+   hw:[
+     {d:'8月26日', tm:'20:05', msg:'', items:['天空之城 · 指弹改编']},
+   ]},
+  {nm:'郑亦飞', cls:'进阶一班', dis:false,
+   hw:[
+     {d:'9月9日', tm:'21:00', msg:'从千与千寻开始。', items:['宫崎骏动画曲集']},
+   ]},
+  {nm:'刘北辰', cls:'考级班', dis:false, hw:[]},
+  {nm:'赵知夏', cls:'考级班', dis:false, hw:[]},
+];
+/* 推送对象假数据 */
+const PUSH = {
+  collection:[
+    {nm:'周杰伦专辑 · 指弹改编', sub:'合集 · 收录 12 首'},
+    {nm:'指弹入门 30 首',        sub:'合集 · 收录 30 首'},
+    {nm:'宫崎骏动画曲集',        sub:'合集 · 收录 7 首'},
+    {nm:'日系指弹精选',          sub:'合集 · 收录 10 首'},
+  ],
+  lesson:[
+    {nm:'卡农独奏 · 全曲精讲',   sub:'单课 · 3 个 P'},
+    {nm:'天空之城 · 指弹改编',   sub:'单课 · 3 个 P'},
+    {nm:'风之诗 · Wind Song',    sub:'单课 · 2 个 P'},
+    {nm:'奇迹的山',              sub:'单课 · 2 个 P'},
+    {nm:'晴天 · 前奏精讲',       sub:'单课 · 1 个 P'},
+  ],
+  part:[
+    {nm:'卡农 · P1 完整示范',    sub:'所属：卡农独奏 · 全曲精讲'},
+    {nm:'卡农 · P2 分段讲解',    sub:'所属：卡农独奏 · 全曲精讲'},
+    {nm:'天空之城 · P3 跟练',    sub:'所属：天空之城 · 指弹改编'},
+    {nm:'晴天 · P1 前奏演示',    sub:'所属：晴天 · 前奏精讲'},
+  ],
+};
+
+/* ================= 视角切换 ================= */
+const vBtns = [...document.querySelectorAll('.viewseg button')];
+const roleHint = document.getElementById('roleHint');
+function setView(v){
+  vBtns.forEach(b=>b.classList.toggle('on', b.dataset.view === v));
+  document.body.dataset.view = v;
+  /* 无带班老师：本人班级为空（引导态） */
+  TEACHER_CLASSES = (v === 'noclass') ? [] : BASE_TEACHER_CLASSES.slice();
+  picked = new Set(TEACHER_CLASSES);
+  if(v === 'noclass') selected = null;
+  roleHint.textContent = {
+    teacher:'老师视角 · 班级筛选已锁定为本人的班级（一师多班可多选）',
+    noclass:'老师视角（暂无带班） · 请联系教导主任获取工作内容',
+    dean:'管理员视角 · 班级与学生均可自由筛选',
+    disabled:'此账号已停用 · 页面操作已被冻结',
+  }[v];
+  renderClsDd(); renderStuList(); selectStu(selected === null ? null : selected, true);
+}
+vBtns.forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.view)));
+const isDean = ()=>document.body.dataset.view === 'dean';
+
+/* ================= 班级筛选（下拉多选 + 全选/全不选） ================= */
+let picked = new Set(TEACHER_CLASSES);
+const clsDd = document.getElementById('clsDd');
+const clsDdBtn = document.getElementById('clsDdBtn');
+const clsDdList = document.getElementById('clsDdList');
+function availClasses(){ return isDean() ? CLASSES : TEACHER_CLASSES; }
+function renderClsDd(){
+  const list = availClasses();
+  /* 老师视角锁死本人班级且至少保留一个；管理员自由增删 */
+  if(!isDean()){
+    picked = new Set([...picked].filter(c=>TEACHER_CLASSES.includes(c)));
+    if(picked.size === 0) picked = new Set(TEACHER_CLASSES);
+  }else{
+    picked = new Set([...picked].filter(c=>CLASSES.includes(c)));
+  }
+  clsDdList.innerHTML = list.map(c=>
+    '<div class="cls-opt' + (picked.has(c)?' on':'') + '" data-c="' + c + '" role="option" aria-selected="' + picked.has(c) + '">' +
+      '<span class="cbx">✓</span>' + c +
+    '</div>'
+  ).join('');
+  const all = list.length > 0 && list.every(c=>picked.has(c));
+  document.getElementById('clsAll').disabled = all || list.length === 0;
+  document.getElementById('clsNone').disabled = !isDean() || picked.size === 0;
+  const lb = document.getElementById('clsDdLabel');
+  if(!isDean()){
+    lb.textContent = list.length === 0
+      ? '暂无带班班级'
+      : (picked.size === list.length ? '我的全部班级' : [...picked].join('、'));
+  }else if(picked.size === 0){
+    lb.textContent = '未选择班级';
+  }else if(picked.size === list.length){
+    lb.textContent = '全部班级（' + list.length + '）';
+  }else{
+    lb.textContent = [...picked].join('、');
+  }
+}
+clsDdBtn.addEventListener('click', ()=>{
+  clsDd.classList.toggle('open');
+  clsDdBtn.setAttribute('aria-expanded', clsDd.classList.contains('open'));
+});
+document.addEventListener('click', e=>{
+  if(clsDd.classList.contains('open') && !clsDd.contains(e.target)){
+    clsDd.classList.remove('open');
+    clsDdBtn.setAttribute('aria-expanded', 'false');
+  }
+});
+clsDdList.addEventListener('click', e=>{
+  const opt = e.target.closest('.cls-opt'); if(!opt) return;
+  const c = opt.dataset.c;
+  if(picked.has(c)){
+    if(!isDean() && picked.size === 1) return;   /* 老师至少保留一个本人班级 */
+    picked.delete(c);
+  }else picked.add(c);
+  renderClsDd(); renderStuList();
+});
+document.getElementById('clsAll').addEventListener('click', ()=>{
+  picked = new Set(availClasses());
+  renderClsDd(); renderStuList();
+});
+document.getElementById('clsNone').addEventListener('click', ()=>{
+  if(!isDean()) return;                          /* 老师不可全不选 */
+  picked.clear();
+  renderClsDd(); renderStuList();
+});
+
+/* ================= 学生列表（班级过滤 + 搜索） ================= */
+const stuKw = document.getElementById('stuKw');
+let selected = null;
+function visibleStus(){
+  const kw = stuKw.value.trim().toLowerCase();
+  return STUDENTS.map((s,i)=>({s,i}))
+    .filter(({s})=>picked.has(s.cls))
+    .filter(({s})=>!kw || s.nm.toLowerCase().includes(kw))
+    .sort((a,b)=>(a.s.dis?1:0) - (b.s.dis?1:0));   /* 已停用统一排末尾 */
+}
+function renderStuList(){
+  const vis = visibleStus();
+  document.getElementById('stuMeta').textContent = '共 ' + vis.length + ' 人';
+  const box = document.getElementById('stuList');
+  if(!vis.length){
+    box.innerHTML = '<div class="stu-empty">' +
+      (document.body.dataset.view === 'noclass'
+        ? '暂无带班学生<br>请联系教导主任获取工作内容'
+        : '该范围内未找到学生') +
+      '</div>';
+    return;
+  }
+  box.innerHTML = vis.map(({s,i})=>
+    '<button type="button" class="stu-item' + (selected===i?' on':'') + (s.dis?' dis':'') + '" data-i="' + i + '">' +
+      '<span class="ava">' + s.nm[0] + '</span>' +
+      '<span class="info"><span class="nm">' + s.nm + '</span><br><span class="cls">' + s.cls + '</span></span>' +
+      (s.dis ? '<span class="st">停用</span>' : '') +
+    '</button>'
+  ).join('');
+}
+stuKw.addEventListener('input', renderStuList);
+stuKw.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ stuKw.value=''; renderStuList(); } });
+document.getElementById('stuList').addEventListener('click', e=>{
+  const it = e.target.closest('.stu-item'); if(!it) return;
+  selectStu(parseInt(it.dataset.i, 10));
+});
+
+/* ================= 选中学生：渲染头部 / 历史作业 / 作业 ================= */
+function selectStu(i, keep){
+  selected = i;
+  renderStuList();
+  const head = document.getElementById('stuHead');
+  const list = document.getElementById('recList');
+  const empty = document.getElementById('recEmpty');
+  if(i === null){
+    head.style.display = 'none';
+    empty.style.display = 'block';
+    list.querySelectorAll('.hw-date,.hw-item').forEach(n=>n.remove());
+    document.getElementById('recMeta').textContent = '—';
+    return;
+  }
+  const s = STUDENTS[i];
+  head.style.display = 'flex';
+  document.getElementById('headAva').textContent = s.nm[0];
+  document.getElementById('headNm').textContent = s.nm;
+  document.getElementById('headSub').textContent = s.cls + ' · 最近布置 ' + (s.hw.length ? s.hw[0].d : '暂无');
+  document.getElementById('headDis').style.display = s.dis ? '' : 'none';
+  document.getElementById('recMeta').textContent = s.hw.length + ' 次布置';
+  empty.style.display = s.hw.length ? 'none' : 'block';
+  empty.textContent = s.hw.length ? '' : '暂无历史作业';
+  list.querySelectorAll('.hw-date,.hw-item').forEach(n=>n.remove());
+  let lastD = null;
+  s.hw.forEach((h,hi)=>{
+    const dateHead = (h.d !== lastD)
+      ? '<div class="hw-date num"><b>' + h.d + '</b></div>'
+      : '';
+    lastD = h.d;
+    list.insertAdjacentHTML('beforeend', dateHead +
+      '<div class="hw-item' + (h.del ? ' deleted' : '') + '">' +
+        '<span class="hw-tm num"><span class="tm">' + h.tm + '</span><div class="lb">布置</div></span>' +
+        '<span class="hw-main">' +
+          '<div class="hw-from"><b>李弦安</b>老师 布置了 ' + h.items.length + ' 项内容</div>' +
+          (h.msg ? '<div class="hw-msg">留言「' + h.msg + '」</div>' : '') +
+          '<div class="hw-items">' +
+            h.items.map(t=>'<span class="it">' + t + '</span>').join('') +
+          '</div>' +
+          (h.del
+            ? '<div class="hw-delnote">已删除 · 删除人：<b>' + h.del.by + '</b> · 原因：' + h.del.reason + '</div>'
+            : '') +
+        '</span>' +
+        (h.del ? '' : '<button type="button" class="hw-del" data-h="' + hi + '" title="删除这条记录">删除</button>') +
+      '</div>');
+  });
+  /* 已停用的学生不可布置作业 */
+  updatePushLock();
+}
+function updatePushLock(){
+  const s = selected === null ? null : STUDENTS[selected];
+  const lock = !s || s.dis;
+  /* 停用学员提示：老师 / 管理员文案不同 */
+  const notice = document.getElementById('pushNotice');
+  if(s && s.dis){
+    notice.classList.add('show');
+    notice.innerHTML = isDean()
+      ? '该学员账号已停用 · 请前往<b>班级管理</b>启用账号'
+      : '该学员账号已停用 · 请联系<b>教导主任</b>启用账号';
+  }else{
+    notice.classList.remove('show');
+    notice.innerHTML = '';
+  }
+  document.getElementById('hwPicker').style.pointerEvents = lock ? 'none' : '';
+  document.getElementById('hwPicker').style.opacity = lock ? .45 : '';
+  document.getElementById('pushKw').disabled = lock;
+  document.getElementById('msgBox').disabled = lock;
+  document.getElementById('pushBtn').disabled = lock;
+  document.getElementById('pushBtn').style.opacity = lock ? .45 : '';
+}
+updatePushLock();
+
+/* ================= 推送对象（搜索下拉选择 · 范围筛选 · 最多 5 项） ================= */
+const HW_MAX = 5;
+const pushPicked = new Map();   /* key: kind:i → {kind, i} */
+const hwPicker = document.getElementById('hwPicker');
+const pushDrop = document.getElementById('pushDrop');
+const pushKw = document.getElementById('pushKw');
+const pushScope = document.getElementById('pushScope');
+const KIND_LBL = {collection:'合集', lesson:'单课', part:'单 P'};
+const KIND_CLS = {collection:'t-col', lesson:'t-les', part:'t-par'};
+/* 展平全部可搜内容 */
+const PUSH_ALL = Object.entries(PUSH).flatMap(([kind, arr]) => arr.map((o, i) => ({kind, i, o})));
+
+function renderDrop(){
+  const kw = pushKw.value.trim().toLowerCase();
+  const scope = pushScope.value;
+  const full = pushPicked.size >= HW_MAX;
+  const vis = PUSH_ALL.filter(({kind, o}) =>
+    (scope === 'all' || kind === scope) &&
+    (!kw || o.nm.toLowerCase().includes(kw) || o.sub.toLowerCase().includes(kw))
+  );
+  if(!vis.length){
+    pushDrop.innerHTML = '<div class="stu-empty">未找到匹配的内容</div>';
+    return;
+  }
+  pushDrop.innerHTML = vis.map(({kind, i, o})=>{
+    const on = pushPicked.has(kind + ':' + i);
+    const off = on || full;   /* 已选或已满 5 项 → 置灰 */
+    return '<button type="button" class="hw-item' + (off?' off':'') + '" data-kind="' + kind + '" data-i="' + i + '"' + (off?' disabled':'') + '>' +
+      '<span class="ptag ' + KIND_CLS[kind] + '">' + KIND_LBL[kind] + '</span>' +
+      '<span class="hnm">' + o.nm + '</span>' +
+      '<span class="hmeta num">' + (on ? '已选 ✓' : o.sub) + '</span>' +
+    '</button>';
+  }).join('');
+}
+function openDrop(){ pushDrop.classList.add('open'); renderDrop(); }
+function closeDrop(){ pushDrop.classList.remove('open'); }
+pushKw.addEventListener('focus', openDrop);
+pushKw.addEventListener('input', openDrop);
+pushKw.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ pushKw.value=''; closeDrop(); } });
+pushScope.addEventListener('change', openDrop);
+document.addEventListener('click', e=>{ if(!hwPicker.contains(e.target)) closeDrop(); });
+pushDrop.addEventListener('click', e=>{
+  const it = e.target.closest('.hw-item'); if(!it || it.classList.contains('off')) return;
+  const key = it.dataset.kind + ':' + it.dataset.i;
+  if(!pushPicked.has(key) && pushPicked.size < HW_MAX)
+    pushPicked.set(key, {kind:it.dataset.kind, i:parseInt(it.dataset.i, 10)});
+  renderDrop(); renderPicked();
+});
+
+/* ================= 已选作业（专门区域 · 逐条独立框 · 最多 5 项） ================= */
+function renderPicked(){
+  const list = document.getElementById('pickedList');
+  document.getElementById('pickedCnt').textContent = pushPicked.size + '/' + HW_MAX;
+  if(!pushPicked.size){
+    list.innerHTML = '<div class="picked-empty">还没有选择作业内容，用上方搜索添加（最多 ' + HW_MAX + ' 项）</div>';
+    return;
+  }
+  list.innerHTML = [...pushPicked.entries()].map(([key,v])=>
+    '<div class="picked-item">' +
+      '<span class="pk-kind">' + KIND_LBL[v.kind] + '</span>' +
+      '<span class="pn">' + PUSH[v.kind][v.i].nm + '</span>' +
+      '<button type="button" class="pk-del" data-k="' + key + '" aria-label="移除">×</button>' +
+    '</div>'
+  ).join('');
+}
+document.getElementById('pickedList').addEventListener('click', e=>{
+  const d = e.target.closest('.pk-del'); if(!d) return;
+  pushPicked.delete(d.dataset.k);
+  renderDrop(); renderPicked();
+});
+renderPicked();
+
+/* ================= 推送 / 已布置 ================= */
+const toastBox = document.getElementById('toast');
+let toastTimer = null;
+function toast(msg){
+  toastBox.textContent = msg;
+  toastBox.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toastBox.classList.remove('show'), 1800);
+}
+document.getElementById('pushBtn').addEventListener('click', ()=>{
+  if(!pushPicked.size){ toast('请先在上方选择要推送的内容（可搜索、可多选）'); return; }
+  const s = STUDENTS[selected];
+  const items = [...pushPicked.values()].map(v=>PUSH[v.kind][v.i].nm.replace(/ · P\d+.*/, ''));
+  s.hw.unshift({d:'今天', tm:'刚刚', msg:document.getElementById('msgBox').value.trim(), items});
+  document.getElementById('msgBox').value = '';
+  pushPicked.clear();
+  closeDrop(); renderPicked();
+  selectStu(selected, true);
+  toast('演示：已向「' + s.nm + '」推送 ' + items.length + ' 项作业');
+});
+
+/* 停用学生的管理（停用/恢复）移至「班级管理」页，本页仅展示停用状态 */
+
+/* ================= 删除历史记录（灰删留痕 · 老师/管理员均可） ================= */
+const delModal = document.getElementById('delModal');
+const delReason = document.getElementById('delReason');
+const delErr = document.getElementById('delErr');
+let pendingDel = null;   /* {stu, idx} */
+document.getElementById('recList').addEventListener('click', e=>{
+  const d = e.target.closest('.hw-del'); if(!d) return;
+  pendingDel = {stu:selected, idx:parseInt(d.dataset.h, 10)};
+  delReason.value = ''; delErr.textContent = '';
+  delModal.classList.add('show');
+  delReason.focus();
+});
+function closeDelModal(){ pendingDel = null; delModal.classList.remove('show'); }
+document.getElementById('delCancel').addEventListener('click', closeDelModal);
+delModal.addEventListener('click', e=>{ if(e.target === delModal) closeDelModal(); });
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && delModal.classList.contains('show')) closeDelModal(); });
+document.getElementById('delOk').addEventListener('click', ()=>{
+  if(!pendingDel) return closeDelModal();
+  const reason = delReason.value.trim();
+  if(!reason){ delErr.textContent = '请填写删除原因'; delReason.focus(); return; }
+  const h = STUDENTS[pendingDel.stu].hw[pendingDel.idx];
+  h.del = {by: isDean() ? '管理员' : '李弦安（老师）', reason};
+  closeDelModal();
+  selectStu(pendingDel.stu, true);
+  toast('演示：该条记录已删除留痕');
+});
+
+/* ================= 初始化 ================= */
+renderClsDd();
+renderStuList();
+selectStu(0);
+</script>
+</body>
+</html>

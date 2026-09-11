@@ -13,6 +13,7 @@ const CLASS_NAME_MAX_LENGTH = 100;
 const MESSAGE_MAX_LENGTH = 1000;
 const DELETE_REASON_MAX_LENGTH = 200;
 const MAX_ACTIVE_VIDEO_ASSIGNMENTS = 5;
+const ASSIGNMENT_OBJECT_TYPES = new Set(['video', 'track_point', 'track_collection', 'knowledge_point', 'knowledge_collection', 'track_part', 'knowledge_part']);
 const INVALID_TEXT_VALUES = ['null', 'undefined', 'nan'];
 
 function normalizeLoginText(value) {
@@ -118,12 +119,14 @@ function isSuperAdmin(req) {
   return req.admin?.role === 'super_admin';
 }
 
-async function findAdminClassId(adminId) {
+async function findAdminClassIds(adminId) {
   const result = await pool.query(
-    `SELECT id FROM teaching_classes WHERE teacher_id = $1 LIMIT 1`,
+    `SELECT class_id FROM teacher_classes WHERE teacher_id = $1
+     UNION
+     SELECT id FROM teaching_classes WHERE teacher_id = $1`,
     [adminId]
   );
-  return result.rows[0]?.id || null;
+  return result.rows.map((row) => row.class_id || row.id);
 }
 
 async function ensureAdminCanManageUser(req, userId) {
@@ -131,15 +134,15 @@ async function ensureAdminCanManageUser(req, userId) {
     return true;
   }
 
-  const classId = await findAdminClassId(req.admin.adminId);
+  const classIds = await findAdminClassIds(req.admin.adminId);
 
-  if (!classId) {
+  if (classIds.length === 0) {
     return false;
   }
 
   const result = await pool.query(
-    `SELECT id FROM users WHERE id = $1 AND class_id = $2`,
-    [userId, classId]
+    `SELECT id FROM users WHERE id = $1 AND class_id = ANY($2::int[])`,
+    [userId, classIds]
   );
   return result.rowCount > 0;
 }
@@ -166,6 +169,33 @@ async function ensureVideosExist(videoIds) {
   );
 
   return result.rowCount === videoIds.length;
+}
+
+async function usernameExistsInAdmins(username) {
+  const result = await pool.query(
+    `SELECT id FROM admins WHERE username = $1`,
+    [username]
+  );
+
+  return result.rowCount > 0;
+}
+
+async function usernameExistsInSuperAdmins(username) {
+  const result = await pool.query(
+    `SELECT id FROM admins WHERE username = $1 AND role = 'super_admin'`,
+    [username]
+  );
+
+  return result.rowCount > 0;
+}
+
+async function usernameExistsInUsers(username) {
+  const result = await pool.query(
+    `SELECT id FROM users WHERE username = $1`,
+    [username]
+  );
+
+  return result.rowCount > 0;
 }
 
 export const adminRouter = Router();
@@ -199,7 +229,7 @@ adminRouter.post('/login', async (req, res, next) => {
     }
 
     const result = await pool.query(
-      `SELECT id, username, password_hash, role
+      `SELECT id, username, password_hash, role, status
        FROM admins
        WHERE username = $1`,
       [username]
@@ -252,15 +282,15 @@ adminRouter.get('/users', requireAdmin, async (req, res, next) => {
     const params = [];
 
     if (!isSuperAdmin(req)) {
-      const classId = await findAdminClassId(req.admin.adminId);
+      const classIds = await findAdminClassIds(req.admin.adminId);
 
-      if (!classId) {
+      if (classIds.length === 0) {
         res.json({ data: [] });
         return;
       }
 
-      query += ` WHERE class_id = $1`;
-      params.push(classId);
+      query += ` WHERE class_id = ANY($1::int[])`;
+      params.push(classIds);
     }
 
     query += ` ORDER BY created_at DESC`;
@@ -285,6 +315,11 @@ adminRouter.post('/users', requireAdmin, async (req, res, next) => {
       return;
     }
 
+    if (await usernameExistsInAdmins(username)) {
+      res.status(409).json({ message: '不能创建和老师或教导主任同名的学员' });
+      return;
+    }
+
     let classId = normalizeId(req.body.classId);
 
     if (isSuperAdmin(req)) {
@@ -303,19 +338,21 @@ adminRouter.post('/users', requireAdmin, async (req, res, next) => {
         return;
       }
     } else {
-      classId = await findAdminClassId(req.admin.adminId);
+      const classIds = await findAdminClassIds(req.admin.adminId);
 
-      if (!classId) {
+      if (classIds.length === 0) {
         res.status(403).json({ message: '您还没有被分配到班级，无法创建学员' });
         return;
       }
+
+      classId = classIds[0];
     }
 
     const passwordHash = await hashPassword(password);
     const result = await pool.query(
-      `INSERT INTO users (username, password_hash, class_id)
-       VALUES ($1, $2, $3)
-       RETURNING id, username, class_id, is_active, created_at`,
+      `INSERT INTO users (username, account, nickname, password_hash, class_id, status, is_active)
+       VALUES ($1, $1, $1, $2, $3, 'active', TRUE)
+       RETURNING id, username, account, nickname, class_id, status, is_active, created_at`,
       [username, passwordHash, classId]
     );
 
@@ -371,7 +408,7 @@ adminRouter.post('/users/:id/reset-password', requireAdmin, async (req, res, nex
 adminRouter.patch('/users/:id/status', requireAdmin, async (req, res, next) => {
   try {
     const userId = normalizeId(req.params.id);
-    const isActive = Boolean(req.body.isActive);
+    const isActive = req.body.isActive === true || req.body.isActive === 'true';
 
     if (!(await ensureAdminCanManageUser(req, userId))) {
       res.status(403).json({ message: '无权管理该学员' });
@@ -380,7 +417,8 @@ adminRouter.patch('/users/:id/status', requireAdmin, async (req, res, next) => {
 
     const result = await pool.query(
       `UPDATE users
-       SET is_active = $1
+       SET is_active = $1,
+           status = CASE WHEN $1 THEN 'active' ELSE 'disabled' END
        WHERE id = $2
        RETURNING id, username, class_id, is_active, created_at`,
       [isActive, userId]
@@ -475,7 +513,7 @@ adminRouter.delete('/users/:id', requireSuperAdmin, async (req, res, next) => {
 adminRouter.get('/admins', requireSuperAdmin, async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT id, username, role, created_at
+      `SELECT id, username, account, nickname, role, status, created_at
        FROM admins
        ORDER BY created_at DESC`
     );
@@ -505,11 +543,21 @@ adminRouter.post('/admins', requireSuperAdmin, async (req, res, next) => {
       return;
     }
 
+    if (role === 'teacher' && await usernameExistsInSuperAdmins(username)) {
+      res.status(409).json({ message: '不能创建和教导主任同名的老师' });
+      return;
+    }
+
+    if (await usernameExistsInUsers(username)) {
+      res.status(409).json({ message: '不能创建和学员同名的老师或教导主任' });
+      return;
+    }
+
     const passwordHash = await hashPassword(password);
     const result = await pool.query(
-      `INSERT INTO admins (username, password_hash, role)
-       VALUES ($1, $2, $3)
-       RETURNING id, username, role, created_at`,
+      `INSERT INTO admins (username, account, nickname, password_hash, role, status)
+       VALUES ($1, $1, $1, $2, $3, 'active')
+       RETURNING id, username, account, nickname, role, status, created_at`,
       [username, passwordHash, role]
     );
 
@@ -520,6 +568,41 @@ adminRouter.post('/admins', requireSuperAdmin, async (req, res, next) => {
       return;
     }
 
+    next(error);
+  }
+});
+
+// PATCH /api/admin/admins/:id/status
+adminRouter.patch('/admins/:id/status', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const adminId = normalizeId(req.params.id);
+    const status = req.body.status === 'disabled' || req.body.isActive === false || req.body.isActive === 'false' ? 'disabled' : 'active';
+
+    if (!adminId) {
+      sendValidationError(res, '账号 id 无效');
+      return;
+    }
+
+    if (adminId === req.admin.adminId && status === 'disabled') {
+      res.status(400).json({ message: '不能停用当前登录账号' });
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE admins
+       SET status = $1
+       WHERE id = $2
+       RETURNING id, username, account, nickname, role, status, created_at`,
+      [status, adminId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: '账号不存在' });
+      return;
+    }
+
+    res.json({ data: result.rows[0] });
+  } catch (error) {
     next(error);
   }
 });
@@ -835,18 +918,20 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
            ua.operation_id,
            COALESCE(json_agg(
             json_build_object(
-             'id', ua.video_id,
-             'title', COALESCE(NULLIF(ua.assigned_video_title, ''), v.title, '已删除课程'),
+             'id', COALESCE(ua.object_id, ua.video_id),
+             'object_type', ua.object_type,
+             'part_id', ua.part_id,
+             'title', COALESCE(NULLIF(ua.assigned_object_title, ''), NULLIF(ua.assigned_video_title, ''), v.title, '已删除内容'),
              'assignment_id', ua.id,
              'is_deleted', ua.is_deleted,
-             'is_video_deleted', ua.video_id IS NULL OR v.id IS NULL,
+             'is_video_deleted', ua.object_id IS NULL AND ua.video_id IS NULL,
              'delete_reason', ua.delete_reason
            ) ORDER BY ua.created_at DESC
-         ) FILTER (WHERE ua.video_id IS NOT NULL OR ua.assigned_video_title <> ''), '[]'::json) AS videos
+         ) FILTER (WHERE ua.object_id IS NOT NULL OR ua.video_id IS NOT NULL OR ua.assigned_object_title <> ''), '[]'::json) AS videos
        FROM user_assignments ua
-       LEFT JOIN videos v ON v.id = ua.video_id
+       LEFT JOIN videos v ON v.id = COALESCE(ua.object_id, ua.video_id) AND COALESCE(ua.object_type, 'video') = 'video'
         WHERE ua.user_id = $1
-          AND (ua.video_id IS NOT NULL OR ua.assigned_video_title <> '')
+          AND (ua.object_id IS NOT NULL OR ua.video_id IS NOT NULL OR ua.assigned_object_title <> '')
         GROUP BY ua.operation_id
        ),
        operation_messages AS (
@@ -854,7 +939,7 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
            ua.operation_id,
            MAX(ua.message) AS message
          FROM user_assignments ua
-         WHERE ua.user_id = $1 AND ua.video_id IS NULL AND ua.message <> ''
+         WHERE ua.user_id = $1 AND ua.object_type = 'message' AND ua.message <> ''
          GROUP BY ua.operation_id
        )
        SELECT
@@ -873,18 +958,18 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
     );
 
     const activeVideosResult = await pool.query(
-      `SELECT
-         ua.id AS assignment_id,
-         ua.created_at,
-         v.id,
-         v.title,
-         v.description,
-         v.cover_url
+      `SELECT ua.id AS assignment_id, ua.created_at, COALESCE(ua.object_id, ua.video_id) AS id,
+         ua.object_type, ua.part_id,
+         COALESCE(NULLIF(ua.assigned_object_title, ''), NULLIF(ua.assigned_video_title, ''), v.title, t.name, c.name, kp.name, kpc.name, '已删除内容') AS title,
+         COALESCE(v.description, t.description, c.description, kp.description, kpc.description, '') AS description,
+         COALESCE(v.cover_url, t.cover, c.cover, kp.cover, kpc.cover, '') AS cover_url
        FROM user_assignments ua
-       JOIN videos v ON v.id = ua.video_id
-       WHERE ua.user_id = $1
-         AND ua.video_id IS NOT NULL
-         AND ua.is_deleted = FALSE
+       LEFT JOIN videos v ON v.id = COALESCE(ua.object_id, ua.video_id) AND COALESCE(ua.object_type, 'video') = 'video'
+       LEFT JOIN track_points t ON t.id = ua.object_id AND ua.object_type = 'track_point'
+       LEFT JOIN track_collections c ON c.id = ua.object_id AND ua.object_type = 'track_collection'
+       LEFT JOIN knowledge_points kp ON kp.id = ua.object_id AND ua.object_type = 'knowledge_point'
+       LEFT JOIN knowledge_collections kpc ON kpc.id = ua.object_id AND ua.object_type = 'knowledge_collection'
+       WHERE ua.user_id = $1 AND (ua.object_id IS NOT NULL OR ua.video_id IS NOT NULL) AND ua.is_deleted = FALSE
        ORDER BY ua.created_at DESC`,
       [userId]
     );
@@ -893,7 +978,7 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
       `SELECT message, created_at
        FROM user_assignments
        WHERE user_id = $1
-         AND video_id IS NULL
+         AND object_type = 'message'
          AND is_deleted = FALSE
        ORDER BY created_at DESC
        LIMIT 1`,
@@ -917,91 +1002,66 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
 adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, next) => {
   try {
     const userId = normalizeId(req.params.userId);
-    const rawVideoIds = Array.isArray(req.body.videoIds) ? req.body.videoIds : [req.body.videoId];
-    const videoIds = [...new Set(rawVideoIds.map(normalizeId).filter(Boolean))];
     const message = normalizeLoginText(req.body.message);
     const messageError = message ? validateMessage(message) : '';
+    const legacyVideoIds = Array.isArray(req.body.videoIds) ? req.body.videoIds : (req.body.videoId ? [req.body.videoId] : []);
+    const rawObjects = Array.isArray(req.body.objects) ? req.body.objects : [];
+    if (req.body.objectType && req.body.objectId) rawObjects.push({ objectType: req.body.objectType, objectId: req.body.objectId, partId: req.body.partId });
+    legacyVideoIds.forEach((id) => rawObjects.push({ objectType: 'video', objectId: id }));
+    const objects = [...new Map(rawObjects.map((item) => {
+      const objectType = String(item?.objectType || '').trim();
+      return [`${objectType}:${normalizeId(item?.objectId)}:${normalizeId(item?.partId)}`, { objectType, objectId: normalizeId(item?.objectId), partId: normalizeId(item?.partId) }];
+    })).values()].filter((item) => item.objectId);
 
-    if (!userId) {
-      sendValidationError(res, '学员 id 无效');
-      return;
+    if (!userId) return sendValidationError(res, '学员 id 无效');
+    if (objects.length === 0 && !message) return sendValidationError(res, '请选择要推送的内容或填写留言');
+    if (messageError) return sendValidationError(res, messageError);
+    if (!(await ensureAdminCanManageUser(req, userId))) return res.status(403).json({ message: '无权管理该学员' });
+    if (!await findUserById(userId)) return res.status(404).json({ message: '学员不存在' });
+
+    const validated = [];
+    for (const object of objects) {
+      if (!ASSIGNMENT_OBJECT_TYPES.has(object.objectType)) return res.status(400).json({ message: `不支持的推送对象类型：${object.objectType}` });
+      let query;
+      let params;
+      if (object.objectType === 'video') {
+        query = 'SELECT id, title, NULL::int AS part_id, id AS video_id FROM videos WHERE id = $1'; params = [object.objectId];
+      } else if (object.objectType === 'track_point') {
+        query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM track_points WHERE id = $1'; params = [object.objectId];
+      } else if (object.objectType === 'track_collection') {
+        query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM track_collections WHERE id = $1'; params = [object.objectId];
+      } else if (object.objectType === 'knowledge_point') {
+        query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM knowledge_points WHERE id = $1'; params = [object.objectId];
+      } else if (object.objectType === 'knowledge_collection') {
+        query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM knowledge_collections WHERE id = $1'; params = [object.objectId];
+      } else if (object.objectType === 'track_part') {
+        query = 'SELECT tp.id, CONCAT(\'P\', tp.part_no, \' · \', tp.title) AS title, tp.id AS part_id, tp.video_id FROM track_parts tp WHERE tp.id = $1 AND tp.track_id = COALESCE($2, tp.track_id)'; params = [object.partId || object.objectId, object.partId ? object.objectId : null];
+      } else {
+        query = 'SELECT kp.id, CONCAT(\'P\', kp.part_no, \' · \' , kp.title) AS title, kp.id AS part_id, kp.video_id FROM knowledge_parts kp WHERE kp.id = $1 AND kp.knowledge_point_id = COALESCE($2, kp.knowledge_point_id)'; params = [object.partId || object.objectId, object.partId ? object.objectId : null];
+      }
+      const result = await pool.query(query, params);
+      if (!result.rows[0]) return res.status(404).json({ message: `推送对象不存在：${object.objectType} ${object.objectId}` });
+      validated.push({ ...object, ...result.rows[0], objectId: object.objectType.endsWith('_part') ? result.rows[0].part_id : object.objectId });
     }
 
-    if (videoIds.length === 0 && !message) {
-      sendValidationError(res, '请选择要推送的视频或填写留言');
-      return;
-    }
+    const activeResult = await pool.query(`SELECT object_type, object_id, COALESCE(part_id, 0) AS part_id FROM user_assignments WHERE user_id = $1 AND is_deleted = FALSE AND (object_id IS NOT NULL OR video_id IS NOT NULL)`, [userId]);
+    const activeKeys = new Set(activeResult.rows.map((row) => `${row.object_type}:${row.object_id || row.video_id}:${row.part_id || 0}`));
+    const newObjects = validated.filter((item) => !activeKeys.has(`${item.objectType}:${item.objectId}:${item.partId || 0}`));
+    if (newObjects.length > 0 && activeKeys.size + newObjects.length > MAX_ACTIVE_VIDEO_ASSIGNMENTS) return sendValidationError(res, `同一个学员最多只能同时推送 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个对象`);
 
-    if (messageError) {
-      sendValidationError(res, messageError);
-      return;
-    }
-
-    if (!(await ensureAdminCanManageUser(req, userId))) {
-      res.status(403).json({ message: '无权管理该学员' });
-      return;
-    }
-
-    const user = await findUserById(userId);
-
-    if (!user) {
-      res.status(404).json({ message: '学员不存在' });
-      return;
-    }
-
-    if (videoIds.length > 0 && !(await ensureVideosExist(videoIds))) {
-      res.status(404).json({ message: '部分视频不存在' });
-      return;
-    }
-
-    const activeResult = await pool.query(
-      `SELECT video_id
-       FROM user_assignments
-       WHERE user_id = $1
-         AND video_id IS NOT NULL
-         AND is_deleted = FALSE`,
-      [userId]
-    );
-    const activeVideoIds = new Set(activeResult.rows.map((row) => row.video_id));
-    const newVideoIds = videoIds.filter((videoId) => !activeVideoIds.has(videoId));
-
-    if (newVideoIds.length > 0 && activeVideoIds.size + newVideoIds.length > MAX_ACTIVE_VIDEO_ASSIGNMENTS) {
-      sendValidationError(res, `同一个学员最多只能同时推送 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个视频`);
-      return;
-    }
-
-    const operationResult = await pool.query(
-      `SELECT nextval('user_assignments_operation_id_seq') AS operation_id`
-    );
+    const operationResult = await pool.query(`SELECT nextval('user_assignments_operation_id_seq') AS operation_id`);
     const operationId = operationResult.rows[0].operation_id;
     const insertedRows = [];
-
-    if (newVideoIds.length > 0) {
-      const videoResult = await pool.query(
-        `INSERT INTO user_assignments (operation_id, user_id, video_id, message, assigned_by_admin_id, assigned_video_title)
-         SELECT $1, $2, v.id, '', $3, v.title
-         FROM videos v
-         WHERE v.id = ANY($4::int[])
-         RETURNING id, operation_id, user_id, video_id, message, is_deleted, delete_reason, deleted_at, created_at`,
-        [operationId, userId, req.admin.adminId, newVideoIds]
-      );
-      insertedRows.push(...videoResult.rows);
+    for (const item of newObjects) {
+      const result = await pool.query(`INSERT INTO user_assignments (operation_id, user_id, video_id, object_type, object_id, part_id, message, assigned_by_admin_id, assigned_video_title, assigned_object_title) VALUES ($1, $2, $3, $4, $5, $6, '', $7, $8, $8) RETURNING id, operation_id, user_id, video_id, object_type, object_id, part_id, message, is_deleted, delete_reason, deleted_at, created_at`, [operationId, userId, item.video_id || null, item.objectType, item.objectId, item.partId || null, req.admin.adminId, item.title]);
+      insertedRows.push(result.rows[0]);
     }
-
     if (message) {
-      const messageResult = await pool.query(
-        `INSERT INTO user_assignments (operation_id, user_id, video_id, message, assigned_by_admin_id)
-         VALUES ($1, $2, NULL, $3, $4)
-         RETURNING id, operation_id, user_id, video_id, message, is_deleted, delete_reason, deleted_at, created_at`,
-        [operationId, userId, message, req.admin.adminId]
-      );
-      insertedRows.push(...messageResult.rows);
+      const result = await pool.query(`INSERT INTO user_assignments (operation_id, user_id, video_id, object_type, object_id, message, assigned_by_admin_id) VALUES ($1, $2, NULL, 'message', NULL, $3, $4) RETURNING id, operation_id, user_id, video_id, object_type, object_id, message, is_deleted, delete_reason, deleted_at, created_at`, [operationId, userId, message, req.admin.adminId]);
+      insertedRows.push(result.rows[0]);
     }
-
     res.status(201).json({ data: { operationId, rows: insertedRows } });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 });
 
 // POST /api/admin/users/:userId/message

@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+// TODO(M3 cleanup): 旧视频首页仍使用旧 VideoFilters/VideoList/hero/video-section 样式；新 PRD 角色首页完成后删除这套旧入口。
 import VideoFilters from '../components/VideoFilters.js';
 import VideoList from '../components/VideoList.js';
 import { fetchTodayAssignments, fetchUserMe, logoutUser } from '../lib/api.js';
@@ -78,8 +79,12 @@ export default function HomePage() {
     return <p className="empty-text">正在检查学员登录状态...</p>;
   }
 
-  const assignmentsWithVideo = todayAssignments.filter((assignment) => assignment.video_id);
+  const assignmentsWithContent = todayAssignments.filter((assignment) => assignment.object_type && assignment.object_type !== 'message');
   const assignmentsWithMessage = todayAssignments.filter((assignment) => assignment.message);
+
+  function assignmentHref(assignment) {
+    return assignment.navigation_url || (assignment.video_id ? `/videos/${assignment.video_id}` : '#');
+  }
 
   return (
     <>
@@ -108,18 +113,18 @@ export default function HomePage() {
           {assignmentStatus ? <p className="empty-text">{assignmentStatus}</p> : null}
 
           <div className="assignment-block">
-            <h3>推荐视频</h3>
-            {assignmentsWithVideo.length === 0 ? (
-              <p className="empty-text">老师还没有推荐视频</p>
+            <h3>推荐内容</h3>
+            {assignmentsWithContent.length === 0 ? (
+              <p className="empty-text">老师还没有推荐内容</p>
             ) : (
               <div className="assignment-video-grid">
-                {assignmentsWithVideo.map((assignment) => (
-                  <Link className="assignment-video-card" href={`/videos/${assignment.video_id}`} key={assignment.id}>
+                {assignmentsWithContent.map((assignment) => (
+                  <Link className="assignment-video-card" href={assignmentHref(assignment)} key={assignment.id}>
                     <div className="cover-wrap">
-                      <Image src={assignment.video_cover_url} alt={assignment.video_title} fill unoptimized style={{ objectFit: 'cover' }} />
+                      {assignment.cover_url ? <Image src={assignment.cover_url} alt={assignment.title} fill unoptimized style={{ objectFit: 'cover' }} /> : null}
                     </div>
-                    <strong>{assignment.video_title}</strong>
-                    <span>{assignment.video_description || '暂无介绍'}</span>
+                    <strong>{assignment.title || '推荐内容'}</strong>
+                    <span>{assignment.object_type === 'track_part' || assignment.object_type === 'knowledge_part' ? '指定 P 分段' : assignment.object_type}</span>
                   </Link>
                 ))}
               </div>

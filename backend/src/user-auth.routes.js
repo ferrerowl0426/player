@@ -83,45 +83,50 @@ userAuthRouter.post('/logout', (req, res) => {
 // 学员首页的“今日的作业”分成两块：有效视频推送和最新留言。
 userAuthRouter.get('/assignments/today', requireUser, async (req, res, next) => {
   try {
-    const videosResult = await pool.query(
-      `SELECT
-         ua.id,
-         '' AS message,
-         ua.created_at,
-         v.id AS video_id,
-         v.title AS video_title,
+    const assignmentsResult = await pool.query(
+      `SELECT ua.id, ua.message, ua.created_at,
+         COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) AS object_type,
+         COALESCE(ua.object_id, ua.video_id) AS object_id,
+         ua.part_id,
+         COALESCE(NULLIF(ua.assigned_object_title, ''), NULLIF(ua.assigned_video_title, ''), v.title, t.name, c.name, kp.name, kpc.name, parent_t.name, parent_kp.name, '') AS title,
+         COALESCE(v.cover_url, t.cover, c.cover, kp.cover, kpc.cover, parent_t.cover, parent_kp.cover, '') AS cover_url,
          v.description AS video_description,
-         v.cover_url AS video_cover_url,
-         v.created_at AS video_created_at
+         CASE
+           WHEN COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) = 'video' THEN '/videos/' || COALESCE(ua.object_id, ua.video_id)
+           WHEN ua.object_type = 'track_point' THEN '/tracks/' || ua.object_id
+           WHEN ua.object_type = 'track_collection' THEN '/tracks/collections/' || ua.object_id
+           WHEN ua.object_type = 'knowledge_point' THEN '/knowledge/' || ua.object_id
+           WHEN ua.object_type = 'knowledge_collection' THEN '/knowledge/collections/' || ua.object_id
+           WHEN ua.object_type = 'track_part' THEN '/tracks/' || parent_t.id || '?part=' || COALESCE(ua.part_id, ua.object_id)
+           WHEN ua.object_type = 'knowledge_part' THEN '/knowledge/' || parent_kp.id || '?part=' || COALESCE(ua.part_id, ua.object_id)
+           ELSE NULL
+         END AS navigation_url
        FROM user_assignments ua
-       JOIN videos v ON v.id = ua.video_id
-       WHERE ua.user_id = $1
-         AND ua.video_id IS NOT NULL
-         AND ua.is_deleted = FALSE
+       LEFT JOIN videos v ON v.id = COALESCE(ua.object_id, ua.video_id) AND COALESCE(ua.object_type, 'video') = 'video'
+       LEFT JOIN track_points t ON t.id = ua.object_id AND ua.object_type = 'track_point'
+       LEFT JOIN track_collections c ON c.id = ua.object_id AND ua.object_type = 'track_collection'
+       LEFT JOIN knowledge_points kp ON kp.id = ua.object_id AND ua.object_type = 'knowledge_point'
+       LEFT JOIN knowledge_collections kpc ON kpc.id = ua.object_id AND ua.object_type = 'knowledge_collection'
+       LEFT JOIN track_parts tp ON tp.id = COALESCE(ua.part_id, ua.object_id) AND ua.object_type = 'track_part'
+       LEFT JOIN track_points parent_t ON parent_t.id = tp.track_id
+       LEFT JOIN knowledge_parts kpp ON kpp.id = COALESCE(ua.part_id, ua.object_id) AND ua.object_type = 'knowledge_part'
+       LEFT JOIN knowledge_points parent_kp ON parent_kp.id = kpp.knowledge_point_id
+       WHERE ua.user_id = $1 AND ua.is_deleted = FALSE
+         AND (
+           COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) = 'message'
+           OR (COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) = 'video' AND v.id IS NOT NULL)
+           OR (ua.object_type = 'track_point' AND t.id IS NOT NULL)
+           OR (ua.object_type = 'track_collection' AND c.id IS NOT NULL)
+           OR (ua.object_type = 'knowledge_point' AND kp.id IS NOT NULL)
+           OR (ua.object_type = 'knowledge_collection' AND kpc.id IS NOT NULL)
+           OR (ua.object_type = 'track_part' AND tp.id IS NOT NULL AND parent_t.id IS NOT NULL)
+           OR (ua.object_type = 'knowledge_part' AND kpp.id IS NOT NULL AND parent_kp.id IS NOT NULL)
+         )
        ORDER BY ua.created_at DESC`,
       [req.user.userId]
     );
 
-    const messageResult = await pool.query(
-      `SELECT
-         id,
-         message,
-         created_at,
-         NULL AS video_id,
-         NULL AS video_title,
-         NULL AS video_description,
-         NULL AS video_cover_url,
-         NULL AS video_created_at
-       FROM user_assignments
-       WHERE user_id = $1
-         AND video_id IS NULL
-         AND is_deleted = FALSE
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [req.user.userId]
-    );
-
-    const assignments = [...videosResult.rows, ...messageResult.rows];
+    const assignments = assignmentsResult.rows;
     const assignmentDate = assignments[0]?.created_at || null;
 
     res.json({

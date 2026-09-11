@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "storage:clean": "node scripts/clean-orphan-objects.js"
+    "storage:clean": "node scripts/clean-orphan-objects.js",
+    "test:reset": "node scripts/reset-test-environment.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.731.1",

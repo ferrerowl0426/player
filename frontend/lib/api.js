@@ -1,9 +1,9 @@
 function getApiBaseUrl() {
   if (typeof window === 'undefined') {
-    return process.env.SERVER_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3002/api';
+    return process.env.SERVER_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
   }
 
-  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3002/api';
+  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
 }
 
 async function parseJsonResponse(response, fallbackMessage) {
@@ -32,6 +32,18 @@ function buildVideoQuery(filters = {}) {
 
   if (endDate) {
     params.set('endDate', endDate);
+  }
+
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
+function buildKeywordQuery(keyword) {
+  const params = new URLSearchParams();
+  const value = String(keyword || '').trim();
+
+  if (value) {
+    params.set('keyword', value);
   }
 
   const query = params.toString();
@@ -92,6 +104,288 @@ export async function fetchVideoById(id) {
   });
 
   return parseJsonResponse(response, '获取视频详情失败');
+}
+
+// 获取曲目库首页数据，游客也可以访问。
+export async function fetchTrackLibrary(keyword = '') {
+  const response = await fetch(`${getApiBaseUrl()}/tracks${buildKeywordQuery(keyword)}`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取曲目库失败');
+}
+
+// 获取单个曲目详情。
+export async function fetchTrackById(id) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${id}`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取曲目详情失败');
+}
+
+// 获取曲谱集详情。
+export async function fetchCollectionById(id) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/collections/${id}`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取曲谱集详情失败');
+}
+
+// 获取知识点区首页数据。
+export async function fetchKnowledgeLibrary(keyword = '') {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge${buildKeywordQuery(keyword)}`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+  return parseJsonResponse(response, '获取知识点区失败');
+}
+
+export async function fetchKnowledgePointById(id) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${id}`, { credentials: 'include', cache: 'no-store' });
+  return parseJsonResponse(response, '获取知识点详情失败');
+}
+
+export async function fetchKnowledgeCollectionById(id) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/collections/${id}`, { credentials: 'include', cache: 'no-store' });
+  return parseJsonResponse(response, '获取知识点集详情失败');
+}
+
+export async function createKnowledgePoint({ name, description = '', cover = '' }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, description, cover }) });
+  return parseJsonResponse(response, '创建知识点失败');
+}
+
+export async function updateKnowledgePoint({ id, name, description = '', cover = '' }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, description, cover }) });
+  return parseJsonResponse(response, '更新知识点失败');
+}
+
+export async function deleteKnowledgePoint(id) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${id}`, { method: 'DELETE', credentials: 'include' });
+  if (response.status === 204) return { data: null };
+  return parseJsonResponse(response, '删除知识点失败');
+}
+
+export async function createKnowledgePartUpload({ pointId, partNo, title, video }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/upload/create`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNo, title, video: { name: video.name, size: video.size, type: video.type } }) });
+  return parseJsonResponse(response, '创建知识点 P 上传任务失败');
+}
+
+export async function createKnowledgePartUploadUrl({ pointId, uploadId, key, partNumber }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/upload/part-url`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uploadId, key, partNumber }) });
+  return parseJsonResponse(response, '获取知识点 P 分片地址失败');
+}
+
+export async function completeKnowledgePartUpload({ pointId, uploadId, key, parts }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/upload/complete`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uploadId, key, parts }) });
+  return parseJsonResponse(response, '完成知识点 P 上传失败');
+}
+
+export async function abortKnowledgePartUpload({ pointId, uploadId, key }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/upload/abort`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uploadId, key }) });
+  return parseJsonResponse(response, '取消知识点 P 上传失败');
+}
+
+export async function saveKnowledgePart({ pointId, partNo, title, duration, videoKey }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNo, title, duration, videoKey }) });
+  return parseJsonResponse(response, '保存知识点 P 失败');
+}
+
+export async function updateKnowledgePart({ pointId, partId, partNo, title, duration }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/${partId}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNo, title, duration }) });
+  return parseJsonResponse(response, '更新知识点 P 失败');
+}
+
+export async function deleteKnowledgePart({ pointId, partId }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/${partId}`, { method: 'DELETE', credentials: 'include' });
+  if (response.status === 204) return { data: null };
+  return parseJsonResponse(response, '删除知识点 P 失败');
+}
+
+// 创建曲目。
+export async function createTrack({ name, description = '', cover = '' }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, cover })
+  });
+  return parseJsonResponse(response, '创建曲目失败');
+}
+
+// 更新曲目。
+export async function updateTrack({ id, name, description = '', cover = '' }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, cover })
+  });
+  return parseJsonResponse(response, '更新曲目失败');
+}
+
+// 删除曲目。
+export async function deleteTrack(id) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${id}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  });
+
+  if (response.status === 204) {
+    return { data: null };
+  }
+
+  return parseJsonResponse(response, '删除曲目失败');
+}
+
+export async function createTrackCollection({ name, description = '', cover = '' }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/collections`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, cover })
+  });
+  return parseJsonResponse(response, '创建曲谱集失败');
+}
+
+export async function updateTrackCollection({ id, name, description = '', cover = '' }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/collections/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, cover })
+  });
+  return parseJsonResponse(response, '更新曲谱集失败');
+}
+
+export async function deleteTrackCollection(id) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/collections/${id}`, { method: 'DELETE', credentials: 'include' });
+  if (response.status === 204) return { data: null };
+  return parseJsonResponse(response, '删除曲谱集失败');
+}
+
+export async function updateTrackCollectionItems({ id, trackIds }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/collections/${id}/tracks`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trackIds })
+  });
+  return parseJsonResponse(response, '更新曲谱集收录失败');
+}
+
+export async function fetchPrerequisites({ objectType, objectId }) {
+  const response = await fetch(`${getApiBaseUrl()}/prerequisites?objectType=${encodeURIComponent(objectType)}&objectId=${encodeURIComponent(objectId)}`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+  return parseJsonResponse(response, '读取前置内容失败');
+}
+
+export async function savePrerequisites({ objectType, objectId, prerequisites }) {
+  const response = await fetch(`${getApiBaseUrl()}/prerequisites`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objectType, objectId, prerequisites })
+  });
+  return parseJsonResponse(response, '保存前置内容失败');
+}
+
+// 创建 P 分段上传任务。
+export async function createTrackPartUpload({ trackId, partNo, title, video }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts/upload/create`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      partNo,
+      title,
+      video: { name: video.name, size: video.size, type: video.type }
+    })
+  });
+  return parseJsonResponse(response, '创建 P 分段上传任务失败');
+}
+
+export async function createTrackPartUploadUrl({ trackId, uploadId, key, partNumber }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts/upload/part-url`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uploadId, key, partNumber })
+  });
+  return parseJsonResponse(response, '获取 P 分片上传地址失败');
+}
+
+export async function completeTrackPartUpload({ trackId, uploadId, key, parts }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts/upload/complete`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uploadId, key, parts })
+  });
+  return parseJsonResponse(response, '完成 P 分段上传失败');
+}
+
+export async function abortTrackPartUpload({ trackId, uploadId, key }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts/upload/abort`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uploadId, key })
+  });
+  return parseJsonResponse(response, '取消 P 分段上传失败');
+}
+
+export async function saveTrackPart({ trackId, partNo, title, duration, videoKey }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ partNo, title, duration, videoKey })
+  });
+  return parseJsonResponse(response, '保存 P 分段失败');
+}
+
+export async function updateTrackPart({ trackId, partId, partNo, title, duration }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts/${partId}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ partNo, title, duration })
+  });
+  return parseJsonResponse(response, '更新 P 分段失败');
+}
+
+export async function deleteTrackPart({ trackId, partId }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts/${partId}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  });
+
+  if (response.status === 204) {
+    return { data: null };
+  }
+
+  return parseJsonResponse(response, '删除 P 分段失败');
+}
+
+export async function loginByAccount({ username, password }) {
+  const response = await fetch(`${getApiBaseUrl()}/auth/login`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, password })
+  });
+
+  return parseJsonResponse(response, '登录失败');
 }
 
 // 学员登录。后端会设置独立的 HttpOnly Cookie。
@@ -294,17 +588,12 @@ export async function fetchUserAssignments(userId) {
   return parseJsonResponse(response, '获取推送记录失败');
 }
 
-// 老师给指定学员保存一次推送操作，可以同时包含视频和留言。
-export async function createUserAssignment({ userId, videoIds, message = '' }) {
+// 老师给指定学员保存一次推送操作，可以同时包含旧视频和新内容对象。
+export async function createUserAssignment({ userId, videoIds, objects = [], objectType, objectId, partId, message = '' }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${userId}/assignments`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ videoIds, message })
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ videoIds, objects, objectType, objectId, partId, message })
   });
-
   return parseJsonResponse(response, '创建推送失败');
 }
 

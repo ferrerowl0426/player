@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="al2egxCTVvWOmhsYiDBLDu">
+<head data-page-node-id="AZ91jRMu4BDCa8wzn5TXgZ">
+<meta charset="UTF-8" data-page-node-id="EQYWtuo3UxfckOIERHDsxm">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="ugCGbIc92VTd5RqZ5w6gOY">
+<title>图书详情 · 能学慧吉他教室</title>
+<style>
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);
+  background:#ffffff;
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow-x:hidden;overflow-y:auto;
+}
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡（design-spec v2.0 §3） */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+.num{font-variant-numeric:tabular-nums}
+.rise{opacity:0;transform:translateY(14px);animation:rise .7s var(--ease) forwards}
+.d1{animation-delay:.08s}.d2{animation-delay:.16s}
+@keyframes rise{to{opacity:1;transform:none}}
+
+/* ============ 导航（复用图书馆页） ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区 ============ */
+.wrap{flex:1 0 auto;width:100%;max-width:1080px;margin:0 auto;padding:18px 36px 48px}
+.crumb{flex:none;margin-bottom:14px}
+.crumb a{
+  font-size:12px;letter-spacing:1px;color:var(--ink-3);text-decoration:none;transition:color .25s;
+}
+.crumb a:hover{color:var(--orange)}
+
+/* ---- 详情（去外框 · 仿知识点首页平铺） ---- */
+.detail{
+  display:grid;grid-template-columns:300px minmax(0,1fr);gap:36px;align-items:start;
+  padding:6px 0 0;
+}
+/* A4 封面（210:297） */
+.bcover{
+  position:relative;width:300px;aspect-ratio:210/297;border-radius:4px;overflow:hidden;
+  border:1px solid var(--hair-2);
+  background:var(--paper) center/cover no-repeat;
+  box-shadow:0 8px 22px rgba(64,45,20,.22);
+}
+.bcover .pdf-badge{
+  position:absolute;left:10px;bottom:10px;z-index:2;
+  font-size:9px;letter-spacing:1.5px;font-weight:700;color:var(--white);
+  background:rgba(180,69,46,.92);border-radius:3px;padding:2px 7px;
+}
+.binfo{display:flex;flex-direction:column;min-width:0}
+.binfo .chip{
+  align-self:flex-start;font-size:10px;letter-spacing:1.5px;font-weight:600;
+  color:var(--coffee);border:1px solid var(--hair-2);border-radius:3px;
+  padding:1.5px 9px;background:var(--white);margin-bottom:10px;
+}
+.binfo h1{font-size:21px;font-weight:700;letter-spacing:.5px;line-height:1.45}
+.binfo .bmeta{font-size:11.5px;color:var(--ink-3);letter-spacing:.5px;margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.binfo .bmeta i{width:1px;height:11px;background:var(--hair-2)}
+.bsec{margin-top:16px;padding-top:14px;border-top:1px dashed var(--hair-2)}
+.bsec .lbl{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--coffee);margin-bottom:6px}
+/* 简介过长：限高框内滚动 */
+.bsec .desc-scroll{
+  max-height:122px;overflow-y:auto;padding:10px 14px;
+  border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
+  scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
+}
+.bsec .desc-scroll::-webkit-scrollbar{width:4px}
+.bsec .desc-scroll::-webkit-scrollbar-thumb{background:var(--hair-2);border-radius:2px}
+.bsec .desc-scroll p{font-size:12.5px;color:var(--ink-2);line-height:1.9;letter-spacing:.3px}
+.bops{margin-top:auto;padding-top:22px;display:flex;gap:14px}
+.bbtn{
+  font-size:12.5px;letter-spacing:2px;font-weight:600;border-radius:5px;
+  padding:9px 30px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+  transition:all .3s var(--ease);
+}
+.bbtn svg{width:14px;height:14px}
+.bbtn.ghost{color:var(--coffee);border:1.5px solid var(--coffee);background:var(--white)}
+.bbtn.ghost:hover{border-color:var(--orange);color:var(--orange)}
+.bbtn.solid{color:var(--white);background:var(--coffee);border:1.5px solid var(--coffee)}
+.bbtn.solid:hover{background:var(--orange);border-color:var(--orange)}
+
+.rise{opacity:0;transform:translateY(14px);animation:rise .7s var(--ease) forwards}
+@media (max-width:1024px){
+  .wrap{padding:14px 20px 40px}
+  .detail{grid-template-columns:1fr;gap:24px}
+  .bcover{width:min(300px,100%)}
+}
+</style>
+</head>
+<body data-page-node-id="pEIHoKKc6wBkpXmQvpyEWT">
+
+<!-- ================= 导航 ================= -->
+<nav class="nav" data-page-node-id="yXaOU1MSzSxY8GHK9S7oS8">
+  <div class="nav-inner" data-page-node-id="RmX96qTTUATx5W5P9U1Rq3">
+    <a class="logo" href="#" data-page-node-id="94jHwrdKahdLtpwYT6XLcD">
+      <span class="mark" data-page-node-id="BynXRQhQJFsaToCyFpCZJ2"></span>
+      能学慧吉他教室
+      <small data-page-node-id="Eb2wED8D5G3mYdsr6oHx82">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="KdKDGxTKAK6LvEq2rf5MZe">
+      <a href="#" data-page-node-id="Hp8T6x94igQC0OItnFLAbr">首页</a>
+      <a href="knowledge-home.html" data-page-node-id="omPTpwDiVePrAPpHClkGPo">知识点区</a>
+      <a href="tracks-home.html" data-page-node-id="3mwt7EVUXjhBsMV8VqKeoR">曲目库</a>
+      <a href="library.html" class="active" data-page-node-id="IKCwGtBDCHqzrOBYvBQfyb">图书馆</a>
+      <a href="#" data-page-node-id="JBIA9SjzGCYx0Q9B7PmG4b">作业记录</a>
+    </div>
+    <div class="nav-right" data-page-node-id="DR8p4gvWklCM3p6yaAlRjR">
+      <div class="avatar" data-page-node-id="2FlXwtkdtxEG2Di995TMHY">李</div>
+    </div>
+  </div>
+</nav>
+
+<!-- ================= 详情 ================= -->
+<div class="wrap" data-page-node-id="LexyNxGxW1m4WAXxYeUi4B">
+  <div class="crumb rise" data-page-node-id="dYR3Ub4iu589qShCXVpThU"><a href="library.html" id="backLink" data-page-node-id="qF5fjBPyZjvdzAA2c525jf">← 返回图书馆</a></div>
+
+  <div class="detail rise d1" data-page-node-id="xmb010qBn69ekCNcvo88H5">
+    <div class="bcover" id="bCover" data-page-node-id="XonApHF3Ww6YIJ1dOZQn0s">
+      <span class="pdf-badge" data-page-node-id="2tEVAhcRHCgEHYQikvB1x6">PDF</span>
+    </div>
+    <div class="binfo" data-page-node-id="Bd9z9FYrm1qrwC6FXe0lfF">
+      <span class="chip" data-page-node-id="QW0Tml38vYUXHqAKjz9iaH">图书馆 · PDF 资料</span>
+      <h1 id="bTitle" data-page-node-id="V43xG5xGEN0kdfhk9VEHWh">加载中…</h1>
+      <div class="bmeta num" id="bMeta" data-page-node-id="QBV2HHhQ1jrhmwZHJf6rl7"></div>
+      <div class="bsec" data-page-node-id="jVAo4eE9KHRFnjhmH20JDQ">
+        <div class="lbl" data-page-node-id="uG4rUH7YuVBCGAvRiQCV47">简介</div>
+        <div class="desc-scroll" data-page-node-id="zaVMn6lWlmG35dk1Z24H2X"><p id="bDesc" data-page-node-id="PTkKNYqsDCAzQeI2hpfJoU"></p></div>
+      </div>
+      <div class="bops" data-page-node-id="be6ya0BfoC0XUIoG6qkN5J">
+        <a class="bbtn ghost" id="btnPrev" href="#" target="_blank" rel="noopener" data-page-node-id="tJAq2jEQ5iy4pQBFtBRAeq">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" data-page-node-id="7UF0118g4rkhcLDVkgHj5q"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z" data-page-node-id="k7Aj1uscghcGW44RrHhXlT"/><circle cx="12" cy="12" r="2.6" data-page-node-id="mMzb8GFZ8ZLCVr5xyPLp0E"/></svg>
+          预 览
+        </a>
+        <a class="bbtn solid" id="btnDl" href="#" data-page-node-id="1LOU8I4OM7MzlFkqnlpR1F">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" data-page-node-id="Z0xZD2C3qVXZZ8nACd1FA4"><path d="M12 4v11m0 0 4.2-4.2M12 15l-4.2-4.2M4.5 19.5h15" data-page-node-id="ZyDfW3xRQeaaxMlNH4xyWC"/></svg>
+          下 载
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 图书数据（与 library.html 的 DOCS 同源，附加简介） ================= */
+const DOCS = [
+  {nm:'卡农独奏 · 全曲乐谱',    img:'assets/covers/real-01.jpg', pdf:'assets/pdf/doc-01.pdf', meta:'8 页 · 2.4 MB · 2 天前',  by:'陈老师', desc:'卡农全曲六线谱与标准双谱对照，附分段指法标注与换把提示。适合完成第一课后进阶使用，建议配合课程内跟练伴奏分段练习。'},
+  {nm:'天空之城 · 改编笔记',    img:'assets/covers/real-02.jpg', pdf:'assets/pdf/doc-02.pdf', meta:'6 页 · 1.8 MB · 4 天前',  by:'陈老师', desc:'天空之城简化改编谱与改编思路笔记：如何在保留原曲气质的前提下降低把位难度，附每段的可替代指法方案。'},
+  {nm:'风之诗 · 六线谱',        img:'assets/covers/real-03.jpg', pdf:'assets/pdf/doc-03.pdf', meta:'4 页 · 1.2 MB · 5 天前',  by:'教研组', desc:'风之诗完整六线谱，标注了泛音位置与力度记号。曲式短小工整，是练习消音与旋律连贯性的理想曲目。'},
+  {nm:'奇迹的山 · 演奏解析',    img:'assets/covers/real-04.jpg', pdf:'assets/pdf/doc-04.pdf', meta:'12 页 · 3.6 MB · 1 周前', by:'陈老师', desc:'奇迹的山逐段演奏解析：调弦方式、声部层次划分与情绪处理建议，附难点段落的慢速指法图。'},
+  {nm:'Merry Christmas · 乐谱', img:'assets/covers/real-05.jpg', pdf:'assets/pdf/doc-05.pdf', meta:'5 页 · 1.5 MB · 1 周前',  by:'教研组', desc:'Merry Christmas Mr. Lawrence 主题段乐谱，含主旋律与伴奏声部拆分对照，适合作为进阶指弹的第一首完整曲目。'},
+  {nm:'晴天 · 前奏教学讲义',    img:'assets/covers/real-06.jpg', pdf:'assets/pdf/doc-06.pdf', meta:'9 页 · 2.1 MB · 2 周前',  by:'陈老师', desc:'晴天前奏逐小节教学讲义：击勾弦、滑音与打板的组合技巧拆解，附常见错误对照与纠正练习。'},
+  {nm:'指弹入门 · 基础教程',    img:'assets/covers/real-15.jpg', pdf:'assets/pdf/doc-07.pdf', meta:'24 页 · 5.8 MB · 2 周前', by:'教研组', desc:'指弹入门系统教程：从持琴姿势、右手手型到 independence 分指训练，覆盖前 8 课全部课后练习谱例。'},
+  {nm:'和弦转换 · 专项练习册',  img:'assets/covers/real-16.jpg', pdf:'assets/pdf/doc-08.pdf', meta:'10 页 · 2.9 MB · 3 周前', by:'教研组', desc:'针对初学者的和弦转换专项练习册：1645、1564 等常用进行的三种转换路径，配每日 10 分钟跟练表。'},
+  {nm:'节拍器训练 · 指南',      img:'assets/covers/real-17.jpg', pdf:'assets/pdf/doc-09.pdf', meta:'7 页 · 1.1 MB · 3 周前',  by:'陈老师', desc:'节拍器使用指南：如何从 60 BPM 逐级提速、如何练内拍与切分稳定度，附四周提速计划表。'},
+  {nm:'右手技巧 · 讲义合集',    img:'assets/covers/real-18.jpg', pdf:'assets/pdf/doc-10.pdf', meta:'15 页 · 4.2 MB · 1 个月前',by:'陈老师', desc:'右手指法、触弦角度、靠弦与勾弦的讲义合集，配音色对比练习。建议与「右手基本功系列」课程配合使用。'},
+  {nm:'乐理基础 · 图解手册',    img:'assets/covers/real-13.jpg', pdf:'assets/pdf/doc-11.pdf', meta:'18 页 · 4.7 MB · 1 个月前',by:'教研组', desc:'图解式乐理手册：音程、调式、级数与常用和弦构成，全部以吉他指板视角讲解，零基础也能看懂。'},
+  {nm:'考级曲目 · 总表',        img:'assets/covers/real-14.jpg', pdf:'assets/pdf/doc-12.pdf', meta:'3 页 · 0.6 MB · 1 个月前',by:'教研组', desc:'民谣吉他考级 1–7 级曲目总表，含各级自选曲与规定曲对照、本教室推荐完成时间节点。'},
+];
+
+/* ================= 按 ?i= 填充 ================= */
+const idx = Math.min(Math.max(parseInt(new URLSearchParams(location.search).get('i'), 10) || 0, 0), DOCS.length - 1);
+const d = DOCS[idx];
+document.title = d.nm + ' · 图书详情 · 能学慧吉他教室';
+const cover = document.getElementById('bCover');
+cover.style.backgroundImage = 'url("' + d.img + '")';
+document.getElementById('bTitle').textContent = d.nm;
+document.getElementById('bMeta').innerHTML =
+  '<span>' + d.meta.split('·').slice(0, 2).join('·').trim() + '</span><i></i><span>' + d.by + ' 上传</span><i></i><span>PDF 文档</span>';
+document.getElementById('bDesc').textContent = d.desc;
+const prev = document.getElementById('btnPrev'), dl = document.getElementById('btnDl');
+prev.href = d.pdf;
+dl.href = d.pdf;
+dl.setAttribute('download', d.nm + '.pdf');
+</script>
+</body>
+</html>

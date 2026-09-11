@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+// TODO(M3 cleanup): 旧通用视频详情页仍使用 player-page/back-link/prerequisite-section；新版曲目/知识点详情稳定后删除这套旧入口。
 import VideoPlayer from '../../../components/VideoPlayer.js';
 import { fetchAdminMe, fetchUserMe, fetchVideoById } from '../../../lib/api.js';
 import { isGuestMode } from '../../../lib/guest.js';

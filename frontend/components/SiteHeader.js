@@ -80,7 +80,7 @@ export default function SiteHeader() {
 
   function handleEnterGuest() {
     setGuestMode(true);
-    router.replace('/');
+    router.replace('/tracks');
   }
 
   function handleExitGuest() {
@@ -90,7 +90,7 @@ export default function SiteHeader() {
     router.replace('/login');
   }
 
-  return (
+  return isLoginPage ? null : (
     <header className="site-header">
       <a className="logo" href="/">学习播放器</a>
       <nav className="site-nav">
@@ -99,16 +99,20 @@ export default function SiteHeader() {
         ) : identity === 'admin' ? (
           <>
             <a href="/admin">回到首页</a>
+            <a href="/tracks">曲目库</a>
+            <a href="/knowledge">知识点区</a>
             <button type="button" onClick={handleLogout}>退出</button>
           </>
         ) : identity === 'user' ? (
           <>
             <a href="/">回到首页</a>
+            <a href="/tracks">曲目库</a>
+            <a href="/knowledge">知识点区</a>
             <button type="button" onClick={handleLogout}>退出</button>
           </>
         ) : guest ? (
           <>
-            <a href="/">回到首页</a>
+            <a href="/tracks">曲目库</a>
             <button type="button" onClick={handleExitGuest}>去登录</button>
           </>
         ) : isAdminPage ? (

@@ -8,7 +8,12 @@ function toSet(values) {
 }
 
 async function getDatabaseKeys() {
-  const result = await pool.query('SELECT video_url, cover_url FROM videos');
+  const result = await pool.query(`
+    SELECT video_url, cover_url FROM videos
+    UNION ALL
+    SELECT file_url, cover FROM library_resources
+    WHERE file_url <> ''
+  `);
   const keys = [];
 
   for (const row of result.rows) {

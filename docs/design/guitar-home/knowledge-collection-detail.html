@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="VOSHPOHGFnJDTtPtvmJugg">
+<head data-page-node-id="DTsgkZHIoC64VBpPzvgfEu">
+<meta charset="UTF-8" data-page-node-id="sfqcGQZ1M0ChEM2oZTsvU4">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="3wSH3Ir58BE061I77YQvi6">
+<title>知识点合集详情 · 能学慧吉他教室</title>
+<style>
+/* ============================================================
+   合集详情 · 合集标题 / 简介 / 收录单课排列
+   知识点集与曲目集共用此模板；视觉遵循 design-spec v2.0
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  height:100vh;                 /* 一屏内呈现：不整页滚动，超出的单课靠翻页 */
+  font-family:var(--font-body);
+  background:#ffffff;
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失 */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ============ 导航 ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{content:"";position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--coffee)}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区（一屏内：头 / 列表 / 翻页三段式） ============ */
+.home{
+  flex:1;min-height:0;max-width:1200px;width:100%;margin:0 auto;
+  padding:12px 36px 18px;display:flex;flex-direction:column;gap:14px;
+}
+
+/* ---- 面包屑 ---- */
+.crumb{flex:none;display:flex;align-items:center;gap:9px;font-size:11.5px;letter-spacing:.5px;color:var(--ink-3)}
+.crumb a{color:var(--coffee);text-decoration:none;font-weight:600;transition:color .25s}
+.crumb a:hover{color:var(--orange)}
+.crumb .sep{color:var(--hair-2)}
+.crumb .cur{color:var(--ink-2)}
+
+/* ============ 合集头（压缩高度，给列表让出空间） ============ */
+.c-head{
+  flex:none;
+  display:flex;gap:22px;align-items:flex-start;
+  border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 6px 16px rgba(93,67,38,.07);
+  padding:15px 22px;
+}
+.c-cover{flex:none;width:140px}
+.c-cover .cover{
+  width:100%;aspect-ratio:1/1;border-radius:6px;position:relative;overflow:hidden;
+  background:var(--wood);display:grid;place-items:center;
+}
+.c-cover .disc{position:absolute;inset:9%;border-radius:50%;background:var(--coffee);display:grid;place-items:center}
+.c-cover .disc::before{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid rgba(242,234,217,.4)}
+.c-cover .disc::after{content:"";position:absolute;inset:36%;border-radius:50%;background:var(--white)}
+.c-cover .disc i{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from var(--rot,20deg), rgba(242,234,217,.08) 0 16deg, transparent 16deg 42deg)}
+.c-cover .disc .lbl{width:15%;height:15%;border-radius:50%;background:var(--white);position:relative;z-index:1;display:grid;place-items:center}
+.c-cover .disc .lbl i{width:6px;height:6px;border-radius:50%;background:var(--orange)}
+/* 叠碟（合集） */
+.c-cover .stack-l1,.c-cover .stack-l2{position:absolute;left:8%;right:8%;height:10px;border-radius:3px}
+.c-cover .stack-l2{bottom:6%;background:rgba(93,67,38,.18)}
+.c-cover .stack-l1{left:4%;right:4%;bottom:11%;background:rgba(93,67,38,.3)}
+.c-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding-top:1px}
+.c-chip{
+  align-self:flex-start;font-size:9.5px;letter-spacing:2px;font-weight:700;color:var(--white);
+  background:var(--orange);border-radius:3px;padding:2px 9px;
+}
+.c-info h1{font-size:19px;font-weight:700;letter-spacing:1px;line-height:1.35}
+.c-meta{font-size:11px;color:var(--ink-3);letter-spacing:.6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.c-meta .dot{width:3px;height:3px;border-radius:50%;background:var(--hair-2);flex:none}
+.c-desc{
+  font-size:12.5px;line-height:1.9;color:var(--ink-2);letter-spacing:.4px;
+  border-left:3px solid var(--hair-2);padding:1px 0 1px 14px;margin-top:1px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+
+/* ============ 收录单课（固定 2 行 × 6 列 = 每页 12 个，不滚动） ============ */
+.sec{flex:1;min-height:0;display:flex;flex-direction:column;gap:9px}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:0 2px;flex:none}
+.sec-head h2{
+  font-size:15px;font-weight:700;letter-spacing:2px;color:var(--coffee);
+  display:flex;align-items:center;gap:9px;
+}
+.sec-head h2::before{content:"";width:4px;height:15px;border-radius:1px;flex:none;background:var(--orange)}
+.sec-head .meta{font-size:10.5px;color:var(--ink-3);letter-spacing:1px}
+.sec-head .note{margin-left:auto;font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+
+.grid{
+  flex:1;min-height:0;
+  display:grid;gap:13px;
+  grid-template-columns:repeat(6, minmax(0,1fr));
+  grid-template-rows:repeat(2, minmax(0,1fr));   /* 两行铺满可用高度 */
+}
+.card{
+  text-decoration:none;color:inherit;
+  display:flex;flex-direction:column;height:100%;min-height:0;
+  border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.06);
+  padding:8px;transition:all .3s var(--ease);
+}
+.card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(93,67,38,.13)}
+.card .cover{
+  flex:1;min-height:0;border-radius:4px;position:relative;
+  display:grid;place-items:center;
+}
+/* 唱片恒为圆：按封面高度取直径，避免容器非正方时被压扁 */
+.card .disc{height:90%;aspect-ratio:1/1;position:relative;border-radius:50%;background:var(--wood);display:grid;place-items:center}
+.card .disc::before{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid rgba(242,234,217,.4)}
+.card .disc::after{content:"";position:absolute;inset:36%;border-radius:50%;background:var(--white)}
+.card .cover.c2 .disc{background:var(--coffee)}
+.card .cover.c3 .disc{background:var(--amber)}
+.card .cover.c4 .disc{background:#6b4d2e}
+.card .cover.c5 .disc{background:#8c5a2b}
+.card .cover.c6 .disc{background:#5c5340}
+.card .disc i{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from var(--rot,20deg), rgba(242,234,217,.08) 0 16deg, transparent 16deg 42deg)}
+.card .disc .lbl{width:15%;height:15%;border-radius:50%;background:var(--white);position:relative;z-index:1;display:grid;place-items:center}
+.card .disc .lbl i{width:6px;height:6px;border-radius:50%;background:var(--orange)}
+.card .name{font-size:12.5px;font-weight:600;letter-spacing:.3px;line-height:1.5;margin-top:8px;flex:none;height:1.5em;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.card .meta{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:2px;display:flex;align-items:center;gap:6px;flex:none;white-space:nowrap;overflow:hidden}
+.card .meta .cnt-chip{
+  font-size:9.5px;color:var(--coffee);border:1px solid var(--hair-2);
+  border-radius:3px;padding:0 6px;letter-spacing:.5px;
+}
+.card .idx{
+  position:absolute;left:7px;top:7px;z-index:2;
+  font-size:9px;letter-spacing:1px;font-weight:700;color:var(--white);
+  background:rgba(93,67,38,.85);border-radius:3px;padding:2px 7px;
+}
+
+/* ---- 预览视角切换（与曲库 / 图书馆页一致） ---- */
+.viewseg{margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid var(--hair-2);border-radius:4px;overflow:hidden;background:var(--white)}
+.viewseg .lbl{font-size:10px;letter-spacing:1.5px;color:var(--ink-3);padding:0 10px;border-right:1px dashed var(--hair-2)}
+.viewseg button{
+  font-size:11px;letter-spacing:1px;color:var(--ink-3);padding:5px 13px;
+  transition:all .25s;
+}
+.viewseg button + button{border-left:1px solid var(--hair)}
+.viewseg button.on{background:var(--coffee);color:var(--white);font-weight:600}
+
+/* ---- 教导主任视角：卡片封面悬停操作层（查看详情 / 编辑 / 删除） ---- */
+.card .ops{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;
+  display:none;flex-direction:column;gap:1px;
+  background:rgba(251,247,236,.66);
+  border:1px solid rgba(93,67,38,.26);border-radius:5px;
+  padding:3px;
+  backdrop-filter:blur(7px) saturate(1.15);-webkit-backdrop-filter:blur(7px) saturate(1.15);
+  box-shadow:0 6px 18px rgba(60,42,20,.16);
+}
+body.dean .card:hover .ops{display:flex}
+.card .ops button{
+  flex:none;font-size:10px;letter-spacing:.5px;color:var(--coffee);
+  border:none;border-radius:3px;padding:4px 9px;background:transparent;
+  transition:all .2s;white-space:nowrap;cursor:pointer;
+}
+.card .ops button:hover{background:rgba(93,67,38,.1)}
+.card .ops button.op-del:hover{background:rgba(180,69,46,.12);color:#b4452e}
+/* ---- 删除二次确认弹层 ---- */
+.modal-mask{
+  position:fixed;inset:0;z-index:100;display:none;place-items:center;
+  background:rgba(60,42,20,.38);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+}
+.modal-mask.show{display:grid}
+.modal{
+  width:320px;background:var(--white);border:1.5px solid var(--coffee);border-radius:8px;
+  box-shadow:0 12px 32px rgba(60,42,20,.18);padding:20px 22px;
+  animation:modal-pop .25s var(--ease);
+}
+@keyframes modal-pop{from{transform:scale(.94);opacity:0}}
+.modal .modal-title{
+  font-size:14px;font-weight:700;letter-spacing:2px;color:var(--coffee);
+  margin-bottom:10px;padding-bottom:9px;border-bottom:1px dashed var(--hair-2);
+}
+.modal p{font-size:12px;line-height:1.9;color:var(--ink);margin:0 0 16px;letter-spacing:.3px}
+.modal p b{color:#b4452e}
+.modal .modal-ops{display:flex;gap:10px;justify-content:flex-end}
+.mbtn{
+  font-size:11.5px;letter-spacing:1px;padding:5px 16px;border-radius:4px;
+  border:1px solid var(--hair-2);color:var(--ink-3);background:var(--white);
+  transition:all .2s;cursor:pointer;
+}
+.mbtn:hover{border-color:var(--coffee);color:var(--coffee)}
+.mbtn.danger{color:var(--white);background:var(--orange);border-color:var(--orange)}
+.mbtn.danger:hover{background:#b4452e;border-color:#b4452e}
+.dean-toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%, 12px);z-index:99;
+  font-size:11.5px;letter-spacing:.5px;color:var(--coffee);
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:7px 18px;box-shadow:0 6px 18px rgba(60,42,20,.15);
+  opacity:0;pointer-events:none;transition:all .25s var(--ease);
+}
+.dean-toast.show{opacity:1;transform:translate(-50%, 0)}
+
+/* ---- 翻页器：无框 · 居中 · 页码序列 + 橙色马克笔当前页 ---- */
+.pg-hide{display:none!important}
+.pager{
+  flex:none;display:flex;align-items:center;justify-content:center;gap:4px;
+  padding:2px 0 0;
+}
+.pager .pgbtn{
+  width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;color:var(--coffee);
+  transition:background .25s var(--ease), color .25s var(--ease), opacity .25s;
+}
+.pager .pgbtn svg{width:15px;height:15px}
+.pager .pgbtn:hover:not(:disabled){background:rgba(255,127,0,.12);color:var(--orange)}
+.pager .pgbtn:disabled{opacity:.22;cursor:not-allowed}
+.pager .pgnums{display:flex;align-items:center;gap:2px;margin:0 2px}
+.pager .pgnum{
+  min-width:28px;height:28px;padding:0 6px;border-radius:4px;
+  font-size:12px;letter-spacing:.5px;color:var(--ink-3);
+  display:grid;place-items:center;
+  transition:color .25s var(--ease);
+}
+.pager .pgnum:hover{color:var(--coffee)}
+/* 当前页：沿用导航高亮的橙色马克笔 */
+.pager .pgnum.on{
+  color:var(--ink);font-weight:700;
+  background:linear-gradient(180deg, transparent 60%, rgba(255,127,0,.46) 60%);
+}
+.pager .pgdots{color:var(--hair-2);font-size:12px;padding:0 1px;letter-spacing:1px}
+
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+.rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){.rise{opacity:1;transform:none;animation:none}}
+
+/* 窄屏 / 矮屏：放弃一屏固定，恢复自然滚动与正方形封面 */
+@media (max-width:1024px), (max-height:680px){
+  body{height:auto;min-height:100vh;overflow-y:auto;overflow-x:hidden}
+  .home{flex:1 0 auto;padding:14px 20px 32px}
+  .sec{flex:none}
+  .grid{flex:none;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:auto}
+  .card .cover{aspect-ratio:1/1;flex:none}
+  .card .disc{height:auto;aspect-ratio:auto;position:absolute;inset:9%}
+}
+@media (max-width:720px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .home{padding:12px 14px 28px}
+  .c-head{flex-direction:column}
+  .c-cover{width:150px}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+}
+</style>
+</head>
+<body data-page-node-id="W9ZByAC7NEVJwBTJLpA8kz">
+
+<nav class="nav" data-page-node-id="FP0CY10ivLS6y6CSiAW9Gl">
+  <div class="nav-inner" data-page-node-id="E9EymdiERnBzOxeIJpCVYj">
+    <a class="logo" href="#" data-page-node-id="EHh6Trq3YaLVYQPCGmNMXL">
+      <span class="mark" data-page-node-id="E39sStbhF1IBpfQu0Mv2IY"></span>
+      能学慧吉他教室
+      <small data-page-node-id="c0k2fc3JvSA1FIfgLzU3PN">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" id="navLinks" data-page-node-id="sUyNrww8HjqyK1EmhESWJq">
+      <a href="#" data-page-node-id="uRFhGaTr4h7IYI9CSsuo53">首页</a>
+      <a href="knowledge-home.html" data-zone="knowledge" data-page-node-id="1pCt1yvp4j6JqOiGSXZuGB">知识点区</a>
+      <a href="tracks-home.html" data-zone="track" data-page-node-id="7GffZ4CFQbTWBc6JbvOL5T">曲目库</a>
+      <a href="library.html" data-page-node-id="dSiEUwycMiWT0TJ4TVv4Gu">图书馆</a>
+      <a href="#" data-page-node-id="wt53mqVHVrmvIYXA7XhtBm">作业记录</a>
+    </div>
+    <div class="nav-right" data-page-node-id="xJP7Ph3hQHUzJI9NyGBSf7">
+      <div class="avatar" data-page-node-id="zTprGKaKQms9BEDjOG4SDT">李</div>
+    </div>
+  </div>
+</nav>
+
+<main class="home" data-page-node-id="0fEma66irjb1pF8mX7iWR1">
+
+  <!-- 面包屑 -->
+  <div class="crumb rise" data-page-node-id="BMep2JsMaYfBX6vEYGMFB2">
+    <a href="knowledge-home.html" id="backLink" data-page-node-id="LMU8fum9B4qVbvzSJCgR5I">← 返回知识点区</a>
+    <span class="sep" data-page-node-id="BZJR8XFKPhPPINzE1iMtPm">/</span>
+    <span class="cur" id="crumbTitle" data-page-node-id="mJnuSM4SXRops6dHenCusd">右手基本功系列</span>
+  </div>
+
+  <!-- ============ 合集头：封面 + 标题 + 简介 ============ -->
+  <header class="c-head rise d1" data-page-node-id="t72Pab2gsKRjuau8GWvhtu">
+    <div class="c-cover" aria-hidden="true" data-page-node-id="gCieJsMjCeO2nO2ALFszvy">
+      <div class="cover" data-page-node-id="GqBsFS9hc02AGrIsd2F6RZ">
+        <span class="stack-l2" data-page-node-id="gi7fqgQXY5Tkr9QcOCrpgw"></span>
+        <span class="stack-l1" data-page-node-id="KSIdJA2ULoFFho7lWtN1VU"></span>
+        <div class="disc" data-page-node-id="6y8ZOQQ8ynpdLwxwGBjDya"><i data-page-node-id="CgyicByUOtn40y6YEduYAz"></i><span class="lbl" data-page-node-id="DBS9KfRHEt67uQ228boMHn"><i data-page-node-id="8TRzqFioFM9RD0v00nS0Fe"></i></span></div>
+      </div>
+    </div>
+    <div class="c-info" data-page-node-id="qKGrlcMh3liKjoGxNhC4oZ">
+      <span class="c-chip" id="zoneChip" data-page-node-id="VWANGGMiPVV0qzvy0CBkbf">知识点集</span>
+      <h1 id="cTitle" data-page-node-id="7RE5GdJh1PNC4uaoovBcVA">右手基本功系列</h1>
+      <div class="c-meta num" data-page-node-id="0CJuLwJ45XtV5WDaNtk0Se">
+        <span id="metaLes" data-page-node-id="VAiEvtBmHE0gRy9byuNDT8">收录 6 个单课</span><span class="dot" data-page-node-id="tg6j27XdCcYL7umyXvqyDi"></span>
+        <span id="metaP" data-page-node-id="mf2d5A6UYC1QA6nvo6Zvse">共 27 个 P</span><span class="dot" data-page-node-id="L1HnCoSAfwAltTCXCXUxZc"></span>
+        <span data-page-node-id="GuhcSvFFf8liAWFOJFwLFO">昨天更新</span><span class="dot" data-page-node-id="RHska38mZutpGUMaHaxPiw"></span>
+        <span data-page-node-id="ul5R2bmGv2II0Ywp56tTOJ">整理：李弦安</span>
+      </div>
+      <p class="c-desc" id="cDesc" data-page-node-id="kK0LjVwz2uE21FSDM56dIW">从零建立稳定的右手体系：触弦角度、发力方式、音色控制与手指独立性。每个单课都按「示范 → 分解 → 跟练」的顺序编排，每天 15 分钟，两周后你会听到明显变化。</p>
+    </div>
+  </header>
+
+  <!-- ============ 收录单课 ============ -->
+  <section class="sec rise d2" aria-label="收录单课" data-page-node-id="iFcMBWxc8g57iAMjZ9l2WY">
+    <div class="sec-head" data-page-node-id="hDjHTW5BiqerXXjBa4xQTy">
+      <h2 data-page-node-id="TkT2GerDfPt5nPO9KRFWQ8">收录单课</h2>
+      <span class="meta num" id="lesCount" data-page-node-id="1M2GmbuuMoNdssgG2GUnws">6 个</span>
+      <span class="note" data-page-node-id="voswYNpRuwyfqUcdlxHmqf">点击单课进入学习 · 单 P 直达对应段落</span>
+      <div class="viewseg" role="group" aria-label="预览视角" data-page-node-id="lesViewSegNxde0a">
+        <span class="lbl" data-page-node-id="lesViewLblNxde0a">预览视角</span>
+        <button type="button" class="on" data-dean="0" data-page-node-id="lesViewTdean0a">老师</button>
+        <button type="button" data-dean="0" data-page-node-id="lesViewSdean0a">学生</button>
+        <button type="button" data-dean="0" data-page-node-id="lesViewGdean0a">游客</button>
+        <button type="button" data-dean="1" data-page-node-id="lesViewDdean0a">教导主任</button>
+      </div>
+    </div>
+    <div class="grid" id="lesGrid" data-page-node-id="LrIvwzetxi49CsEvBJYimh"><!-- JS 渲染 --></div>
+    <nav class="pager" id="lesPager" aria-label="分页" data-page-node-id="lesPagerNxde0a">
+      <button type="button" class="pgbtn" data-act="prev" aria-label="上一页" data-page-node-id="lesPrevNxde0a">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="lesPrevIcoNxde0a"><path d="M15 5 8 12l7 7" data-page-node-id="lesPrevP1Nxde0a"/></svg>
+      </button>
+      <span class="pgnums num" id="lesNums" data-page-node-id="lesNumsNxde0a"><!-- JS 渲染 --></span>
+      <button type="button" class="pgbtn" data-act="next" aria-label="下一页" data-page-node-id="lesNextNxde0a">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="lesNextIcoNxde0a"><path d="m9 5 7 7-7 7" data-page-node-id="lesNextP1Nxde0a"/></svg>
+      </button>
+    </nav>
+  </section>
+
+</main>
+
+<script>
+/* ================= 合集假数据 ================= */
+const SET = {
+  zone:'knowledge',
+  title:'右手基本功系列',
+  desc:'从零建立稳定的右手体系：触弦角度、发力方式、音色控制与手指独立性。每个单课都按「示范 → 分解 → 跟练」的顺序编排，每天 15 分钟，两周后你会听到明显变化。',
+  updated:'昨天更新',
+  items:[
+    {nm:'认识右手指法 · p i m a 与触弦角度', p:4, len:'18 分钟'},
+    {nm:'靠弦与不靠弦 · 音色的两种底色',     p:5, len:'22 分钟'},
+    {nm:'拇指独立性 · 低音保持训练',         p:4, len:'16 分钟'},
+    {nm:'分解和弦入门 · 五组必练琶音',       p:6, len:'25 分钟'},
+    {nm:'动态控制 · 渐强渐弱与音色层次',     p:3, len:'14 分钟'},
+    {nm:'综合跟练 · 右手基本功每日 15 分钟', p:5, len:'20 分钟'},
+    {nm:'轮指入门 · 三连音与四连音',         p:4, len:'19 分钟'},
+    {nm:'右手消音 · 和弦切换不拖泥带水',     p:3, len:'15 分钟'},
+    {nm:'拨片与指甲 · 两种触弦方案对比',     p:2, len:'11 分钟'},
+    {nm:'扫弦基础 · 手腕发力的正确路径',     p:5, len:'21 分钟'},
+    {nm:'切音与闷音 · 节奏的呼吸感',         p:3, len:'13 分钟'},
+    {nm:'泛音入门 · 自然泛音的触弦点',       p:4, len:'17 分钟'},
+    {nm:'右手常见错误 · 8 个高频问题纠正',   p:6, len:'26 分钟'},
+    {nm:'阶段性自测 · 右手基本功验收',       p:2, len:'12 分钟'},
+  ],
+};
+
+/* ================= 渲染 ================= */
+document.querySelector('#navLinks a[data-zone="knowledge"]').classList.add('active');
+document.getElementById('cTitle').textContent = SET.title;
+document.getElementById('crumbTitle').textContent = SET.title;
+document.getElementById('cDesc').textContent = SET.desc;
+
+const pTotal = SET.items.reduce((s,it)=>s+it.p, 0);
+document.getElementById('metaLes').textContent = '收录 ' + SET.items.length + ' 个单课';
+document.getElementById('metaP').textContent = '共 ' + pTotal + ' 个 P';
+document.getElementById('lesCount').textContent = SET.items.length + ' 个';
+document.getElementById('lesGrid').innerHTML = SET.items.map((it,i)=>
+  '<a class="card" href="track-point-detail.html">' +
+    '<div class="cover c' + (i%5+2) + '">' +
+      '<span class="idx num">' + String(i+1).padStart(2,'0') + '</span>' +
+      '<div class="disc"><i></i><span class="lbl"><i></i></span></div>' +
+    '</div>' +
+    '<div class="name">' + it.nm + '</div>' +
+    '<div class="meta num"><span class="cnt-chip">' + it.p + ' 个 P</span><span>' + it.len + '</span></div>' +
+  '</a>'
+).join('');
+
+/* ================= 分页：每页 2 行 × 6 列 = 12 个（无框页码 · 单页也常驻） ================= */
+const PAGE_SIZE = 12;
+const lesGrid = document.getElementById('lesGrid');
+const lesPager = document.getElementById('lesPager');
+const lesNums = document.getElementById('lesNums');
+const lesCards = [...lesGrid.querySelectorAll('.card')];
+let lesPage = 1;
+
+/* 页码序列：≤7 页全部列出；更多时首尾 + 当前页邻域折叠 */
+function pageSeq(cur, total){
+  if(total <= 7) return Array.from({length:total}, (_,i)=>i+1);
+  const list = [1];
+  const s = Math.max(2, cur-1), e = Math.min(total-1, cur+1);
+  if(s > 2) list.push('…');
+  for(let i=s;i<=e;i++) list.push(i);
+  if(e < total-1) list.push('…');
+  list.push(total);
+  return list;
+}
+function layoutLesPage(){
+  const total = Math.max(1, Math.ceil(lesCards.length / PAGE_SIZE));
+  lesPage = Math.min(Math.max(1, lesPage), total);
+  lesCards.forEach((c,i)=> c.classList.toggle('pg-hide', !(i >= (lesPage-1)*PAGE_SIZE && i < lesPage*PAGE_SIZE)));
+  lesNums.innerHTML = pageSeq(lesPage, total).map(v=> v === '…'
+    ? '<span class="pgdots">…</span>'
+    : '<button type="button" class="pgnum' + (v === lesPage ? ' on' : '') + '" data-p="' + v + '"'
+      + ' aria-label="第 ' + v + ' 页"' + (v === lesPage ? ' aria-current="page"' : '') + '>' + v + '</button>'
+  ).join('');
+  lesPager.querySelector('[data-act="prev"]').disabled = lesPage <= 1;
+  lesPager.querySelector('[data-act="next"]').disabled = lesPage >= total;
+}
+lesPager.querySelector('[data-act="prev"]').addEventListener('click', ()=>{ lesPage--; layoutLesPage(); });
+lesPager.querySelector('[data-act="next"]').addEventListener('click', ()=>{ lesPage++; layoutLesPage(); });
+lesNums.addEventListener('click', e=>{
+  const b = e.target.closest('.pgnum'); if(!b) return;
+  lesPage = parseInt(b.dataset.p, 10); layoutLesPage();
+});
+layoutLesPage();
+
+/* ================= 预览视角（老师/学生/游客 = 浏览视角；教导主任 = 管理视角） ================= */
+const vBtns = [...document.querySelectorAll('.viewseg button')];
+function setView(dean){
+  vBtns.forEach(b=>b.classList.toggle('on', (b.dataset.dean === '1') === dean));
+  document.body.classList.toggle('dean', dean);
+}
+vBtns.forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.dean === '1')));
+
+/* ================= 教导主任视角：卡片悬停操作层（查看详情 / 编辑 / 删除） ================= */
+(function(){
+  let toastTimer = null;
+  function toast(msg){
+    let t = document.querySelector('.dean-toast');
+    if(!t){
+      t = document.createElement('div');
+      t.className = 'dean-toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove('show'), 1600);
+  }
+  function syncCounts(){
+    const left = lesGrid.querySelectorAll('.card').length;
+    document.getElementById('lesCount').textContent = left + ' 个';
+    document.getElementById('metaLes').textContent = '收录 ' + left + ' 个单课';
+  }
+  lesGrid.querySelectorAll('.card').forEach(card=>{
+    const ops = document.createElement('div');
+    ops.className = 'ops';
+    ops.innerHTML =
+      '<button type="button" data-act="view">查看详情</button>' +
+      '<button type="button" data-act="edit">编辑</button>' +
+      '<button type="button" data-act="del" class="op-del">删除</button>';
+    card.querySelector('.cover').appendChild(ops);
+    ops.addEventListener('click', e=>{
+      e.preventDefault(); e.stopPropagation();
+      const act = e.target.dataset && e.target.dataset.act;
+      if(!act) return;
+      if(act === 'del'){
+        pendingCard = card;
+        document.getElementById('delName').textContent = (card.querySelector('.name')||{}).textContent.trim();
+        document.getElementById('delModal').classList.add('show');
+      }else{
+        toast(act === 'view' ? '演示：进入「' + (card.querySelector('.name')||{}).textContent.trim() + '」详情页' : '演示：进入编辑页');
+      }
+    });
+  });
+
+(function(){
+  document.body.insertAdjacentHTML('beforeend', [
+    '<div class="modal-mask" id="delModal" role="dialog" aria-modal="true" aria-label="删除确认">',
+      '<div class="modal">',
+        '<div class="modal-title">删 除 确 认</div>',
+        '<p>确定要删除「<b id="delName"></b>」吗？<br>删除后该内容将不可恢复。</p>',
+        '<div class="modal-ops">',
+          '<button type="button" class="mbtn" id="delCancel">取 消</button>',
+          '<button type="button" class="mbtn danger" id="delOk">确认删除</button>',
+        '</div>',
+      '</div>',
+    '</div>'
+  ].join(''));
+})();
+  /* ---- 删除确认弹层逻辑 ---- */
+  let pendingCard = null;
+  const mask = document.getElementById('delModal');
+  function doDelete(){
+    if(!pendingCard) return;
+    const card = pendingCard; pendingCard = null;
+    mask.classList.remove('show');
+    const nm = (card.querySelector('.name')||{}).textContent.trim();
+    card.style.transition = 'opacity .25s, transform .25s';
+    card.style.opacity = '0'; card.style.transform = 'scale(.94)';
+    setTimeout(()=>{
+      const i = lesCards.indexOf(card);
+      if(i > -1) lesCards.splice(i, 1);
+      card.remove();
+      syncCounts();
+      layoutLesPage();
+    }, 250);
+    toast('演示：已从合集中移除「' + nm + '」');
+  }
+  document.getElementById('delOk').addEventListener('click', doDelete);
+  document.getElementById('delCancel').addEventListener('click', closeDel);
+  mask.addEventListener('click', e=>{ if(e.target === mask) closeDel(); });
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && mask.classList.contains('show')) closeDel(); });
+  function closeDel(){ pendingCard = null; mask.classList.remove('show'); }
+})();
+</script>
+</body>
+</html>

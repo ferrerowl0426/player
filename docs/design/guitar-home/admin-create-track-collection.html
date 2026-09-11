@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="hVQNCdDVRDWHNNY8eQFG2u">
+<head data-page-node-id="VhCaSBGKm6vboKftEECgPN">
+<meta charset="UTF-8" data-page-node-id="0w3eNkrvn5ACp6qdoyFZdK">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="BPgzBrATKFbE3KSf8Qr4DZ">
+<title>新建合集 · 能学慧吉他教室（管理端）</title>
+<style>
+/* ============================================================
+   管理端 · 合集创建页（曲目区=曲谱集 / 知识点区=知识点集，区域由入口 ?zone= 决定）
+   视觉遵循 design-spec v1.0：纸底 / 咖啡描边盒子 / 橘色强调 / 绿色仅点睛
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底 + 格纹底饰（design-spec v2.0 §3） */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow-x:hidden;overflow-y:auto;
+}
+/* 底图：水彩年轮（与课程页同一张） */
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+input,textarea{font-family:inherit}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:10px;letter-spacing:2.5px;color:var(--ink-3);text-transform:uppercase;font-weight:500}
+
+/* ============ 导航 ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:14px}
+.role-tag{
+  font-size:10.5px;letter-spacing:1.5px;color:var(--coffee);
+  border:1px dashed var(--hair-2);border-radius:4px;padding:4px 10px;
+  background:rgba(255,127,0,.12);
+}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区：表单直铺（无外框，整页滚动） ============ */
+.admin-wrap{flex:1 0 auto;display:flex;justify-content:center;padding:16px 36px 44px}
+.wizard{
+  width:min(1080px,100%);display:flex;flex-direction:column;
+  padding:6px 8px 0;
+}
+.wiz-head{flex:none;display:flex;align-items:center;gap:14px;padding-bottom:12px;border-bottom:1px dashed var(--hair-2)}
+.wiz-head h1{font-size:20px;font-weight:700;letter-spacing:1px}
+.wiz-head h1 mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 2px}
+.zone-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;letter-spacing:1.5px;color:var(--coffee);font-weight:600;
+  border:1px dashed var(--hair-2);border-radius:4px;padding:3px 11px;
+  background:rgba(255,127,0,.12);white-space:nowrap;
+}
+.zone-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--orange)}
+.wiz-head .eyebrow{margin-left:auto}
+
+/* ---- 表单 ---- */
+.form-body{flex:1;padding:2px 2px 6px}
+.form-cols{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:0 48px;align-items:start}
+.fsec{padding:12px 0 4px}
+.fsec.full{grid-column:1 / -1}
+.fsec-title{display:flex;align-items:baseline;gap:9px;font-size:13px;font-weight:700;letter-spacing:2px;color:var(--coffee);margin-bottom:10px}
+.fsec-title::before{content:"";width:4px;height:13px;border-radius:1px;background:var(--orange);flex:none}
+.fsec-title .note{font-size:10.5px;font-weight:400;letter-spacing:.5px;color:var(--ink-3)}
+/* 重要/必填标注用橙色 */
+.fsec-title .note.req{color:var(--orange);font-weight:600}
+
+.field{margin-bottom:14px}
+.field label{
+  display:flex;align-items:baseline;justify-content:space-between;
+  font-size:11px;font-weight:600;letter-spacing:.8px;color:var(--ink-2);margin-bottom:6px;
+}
+.field label .cnt{font-weight:400;font-size:10.5px;color:var(--ink-3)}
+.field label .cnt.over{color:var(--orange);font-weight:600}
+.field input[type=text],.field textarea{
+  width:100%;padding:9px 13px;
+  background:var(--white);
+  border:1px solid var(--hair-2);border-radius:4px;
+  font-size:13.5px;color:var(--ink);letter-spacing:.3px;
+  transition:border-color .25s var(--ease), box-shadow .25s var(--ease);
+}
+.field textarea{resize:vertical;min-height:86px;line-height:1.7}
+.field input::placeholder,.field textarea::placeholder{color:#b3a58c}
+.field input:hover,.field textarea:hover{border-color:var(--coffee)}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--coffee);box-shadow:0 2px 8px rgba(93,67,38,.1)}
+/* 错误态：橘色强调 */
+.field.error input,.field.error textarea{border-color:var(--orange);box-shadow:0 2px 8px rgba(255,127,0,.16)}
+.err-msg{
+  display:none;margin-top:6px;
+  font-size:11px;letter-spacing:.4px;color:var(--orange);font-weight:600;
+}
+.field.error .err-msg{display:block}
+.err-msg::before{content:"⚠ ";letter-spacing:0}
+
+/* 封面上传（1:1） */
+.cover-flex{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+.cover-box{
+  width:200px;height:200px;flex:none;aspect-ratio:1;
+  border:1.5px dashed var(--hair-2);border-radius:6px;background:var(--white);
+  display:grid;place-items:center;gap:2px;cursor:pointer;text-align:center;
+  color:var(--ink-3);transition:all .3s var(--ease);overflow:hidden;position:relative;
+}
+.cover-box:hover{border-color:var(--orange);color:var(--coffee)}
+.cover-box svg{width:26px;height:26px}
+.cover-box .t1{font-size:12px;letter-spacing:1px;font-weight:600}
+.cover-box .t2{font-size:10px;letter-spacing:.5px;color:var(--orange)}
+.cover-box.has{border-style:solid;border-color:var(--coffee)}
+/* 删除封面按钮：仅上传后出现，悬停变红；不改变盒子尺寸与排版 */
+.cover-box .cov-rm{
+  position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;
+  display:none;place-items:center;font-size:11px;line-height:1;cursor:pointer;
+  color:var(--coffee);background:var(--white);border:1px solid var(--hair-2);
+  box-shadow:0 1px 4px rgba(93,67,38,.18);transition:all .2s;
+}
+.cover-box .cov-rm:hover{color:#b4452e;border-color:#b4452e;background:rgba(180,69,46,.08)}
+.cover-box.has .cov-rm{display:grid}
+.cover-box .vinyl{
+  position:absolute;inset:0;display:none;
+  background:var(--wood);place-items:center;
+}
+.cover-box.has .vinyl{display:grid}
+.cover-box .vinyl::before{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid rgba(242,234,217,.35)}
+.cover-box .vinyl::after{content:"";position:absolute;inset:34%;border-radius:50%;background:var(--white)}
+.cover-box .vinyl i{position:absolute;inset:0;background:conic-gradient(from 0deg, rgba(242,234,217,.06) 0 18deg, transparent 18deg 40deg)}
+
+/* 封面预览卡：跟随标题 / 封面 / 已选数实时更新（宽度与封面框一致） */
+.pv-card{width:200px;flex:none}
+.pv-cover{
+  aspect-ratio:1/1;border-radius:6px;background:var(--wood);position:relative;
+  display:grid;place-items:center;border:1px solid var(--hair-2);overflow:hidden;
+  box-shadow:0 1px 3px rgba(93,67,38,.1), 0 4px 12px rgba(93,67,38,.06);
+}
+.pv-cover .disc{position:absolute;inset:9%;border-radius:50%;background:var(--wood);display:grid;place-items:center;border:1px solid rgba(242,234,217,.3)}
+.pv-cover .disc::before{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid rgba(242,234,217,.4)}
+.pv-cover .disc .lbl{width:15%;height:15%;border-radius:50%;background:var(--white);display:grid;place-items:center}
+.pv-cover .disc .lbl i{width:6px;height:6px;border-radius:50%;background:var(--orange)}
+.pv-cover.has{background-image:url("assets/covers/real-13.jpg");background-size:cover;background-position:center}
+.pv-cover.has .disc{display:none}
+.pv-card .pv-name{font-size:12.5px;font-weight:600;letter-spacing:.3px;margin-top:8px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-card .pv-meta{font-size:10px;color:var(--ink-3);letter-spacing:.4px;margin-top:2px}
+
+/* 前置知识点：搜索选择器（不铺卡片，搜索后按「类型 + 标题」选取） */
+.pre-picker{position:relative;max-width:640px}
+.pick-search.big{margin-left:0;width:100%;padding:7px 12px;gap:9px;margin-bottom:12px}
+.pick-search.big svg{width:13px;height:13px}
+.pick-search.big input{width:100%;font-size:12.5px;padding:4px 0}
+.pre-drop{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;
+  background:var(--white);border:1px solid var(--hair-2);border-radius:6px;
+  box-shadow:0 10px 26px rgba(60,42,20,.16);
+  max-height:268px;overflow-y:auto;display:none;
+}
+.pre-drop.open{display:block}
+.pre-item{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:9px 14px;text-align:left;font-size:12.5px;color:var(--ink);
+  border-bottom:1px dashed var(--hair);transition:background .2s;
+}
+.pre-item:last-child{border-bottom:none}
+.pre-item:hover:not(.off){background:rgba(255,127,0,.08)}
+.pre-item.off{opacity:.38;cursor:not-allowed}
+.pre-item .ptag{flex:none;font-size:9.5px;letter-spacing:1px;font-weight:600;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.ptag.t-kset{color:#6b4d2e;background:rgba(93,67,38,.1)}
+.ptag.t-kp{color:var(--coffee);background:rgba(255,127,0,.12);border:1px dashed var(--hair-2)}
+.ptag.t-track{color:#4f7d3a;background:rgba(79,125,58,.12)}
+.ptag.t-score{color:#96702a;background:rgba(185,142,62,.16)}
+.pre-item .pnm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pre-item .pmeta{flex:none;font-size:10px;color:var(--ink-3);letter-spacing:.3px}
+.pre-hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:8px}
+.picked-chip .ptag{margin-right:2px;transform:translateY(-.5px)}
+
+/* 从已有单课 / 知识点多选：卡片与知识点区首页同款（一行 8 张 · 每页最多两排 16 个） */
+.pick-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px;align-items:stretch}
+.pick-card{
+  position:relative;border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.06);
+  padding:8px;cursor:pointer;transition:all .3s var(--ease);
+  display:flex;flex-direction:column;
+}
+.pick-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(93,67,38,.13)}
+.pick-card.sel{border-color:#6f8f63;box-shadow:0 0 0 1.5px #6f8f63, 0 4px 12px rgba(93,67,38,.06)}
+.pick-card .pc-cover{aspect-ratio:1/1;border-radius:4px;background:var(--wood);position:relative;display:grid;place-items:center;overflow:hidden}
+.pick-card .pc-cover::before{content:"";position:absolute;inset:18%;border-radius:50%;border:1px solid rgba(242,234,217,.35)}
+.pick-card .pc-cover::after{content:"";position:absolute;inset:38%;border-radius:50%;background:var(--white)}
+.pick-card .pc-cover.v2{background:var(--coffee)}
+.pick-card .pc-cover.v3{background:var(--amber)}
+.pick-card .pc-cover.img{background-size:cover;background-position:center}
+.pick-card .pc-cover.img::before,.pick-card .pc-cover.img::after{display:none}
+.pick-card .pc-name{font-size:12px;letter-spacing:.2px;margin-top:7px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pick-card .pc-meta{font-size:10px;color:var(--ink-3);letter-spacing:.3px}
+.pick-card .pc-check{
+  position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;
+  background:#6f8f63;color:var(--white);display:none;place-items:center;
+  font-size:9.5px;letter-spacing:.3px;
+}
+.pick-card.sel .pc-check{display:grid}
+.pick-count{font-size:11px;color:var(--ink-3);letter-spacing:.5px;margin:2px 0 10px;display:flex;align-items:center}
+.pick-count b{color:#4a6b3f}
+.pick-search{
+  margin-left:auto;display:flex;align-items:center;gap:6px;
+  border:1px solid var(--hair-2);border-radius:4px;background:var(--white);
+  padding:2px 8px;transition:border-color .25s;
+}
+.pick-search:focus-within{border-color:var(--coffee)}
+.pick-search svg{flex:none;width:11px;height:11px;stroke:var(--ink-3)}
+.pick-search input{
+  border:none;outline:none;background:transparent;
+  font-size:10.5px;letter-spacing:.4px;color:var(--ink);
+  width:138px;padding:2px 0;
+}
+.pick-search input::placeholder{color:var(--ink-3)}
+.pick-search .clr{
+  display:none;font-size:9.5px;letter-spacing:1px;color:var(--coffee);
+  border:none;background:transparent;padding:1px 3px;cursor:pointer;
+}
+.pick-search.has .clr{display:block}
+.pick-empty{display:none;padding:26px 10px;text-align:center;font-size:10.5px;color:var(--ink-3);letter-spacing:.5px;
+  border:1px dashed var(--hair-2);border-radius:6px;margin-top:2px}
+.pg-hide{display:none!important}
+
+/* 换页器：无框页码式（与知识点首页一致 · 当前页橙色马克笔） */
+.pager{
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  padding:10px 0 0;
+}
+.pager .pgbtn{
+  width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;color:var(--coffee);
+  transition:background .25s var(--ease), color .25s var(--ease), opacity .25s;
+}
+.pager .pgbtn svg{width:15px;height:15px}
+.pager .pgbtn:hover:not(:disabled){background:rgba(255,127,0,.12);color:var(--orange)}
+.pager .pgbtn:disabled{opacity:.22;cursor:not-allowed}
+.pager .pgnums{display:flex;align-items:center;gap:2px;margin:0 2px}
+.pager .pgnum{
+  min-width:28px;height:28px;padding:0 6px;border-radius:4px;
+  font-size:12px;letter-spacing:.5px;color:var(--ink-3);
+  display:grid;place-items:center;
+  transition:color .25s var(--ease);
+}
+.pager .pgnum:hover{color:var(--coffee)}
+.pager .pgnum.on{
+  color:var(--ink);font-weight:700;
+  background:linear-gradient(180deg, transparent 60%, rgba(255,127,0,.46) 60%);
+}
+.pager .pgdots{color:var(--hair-2);font-size:12px;padding:0 1px;letter-spacing:1px}
+
+/* 已选清单 chips：快捷移除，不必搜索定位 */
+.picked-list{
+  display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;margin:12px 0 16px;
+  /* 高度写死：最多 5 排条目，超出在区域内滚动，不自动撑开 */
+  height:152px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
+}
+.picked-list:empty{display:none}
+.picked-chip{
+  display:inline-flex;align-items:center;gap:8px;max-width:100%;
+  font-size:11px;letter-spacing:.4px;color:#4a6b3f;
+  background:rgba(111,143,99,.08);border:1px solid rgba(111,143,99,.45);border-radius:4px;
+  padding:4px 6px 4px 10px;transition:border-color .25s;
+}
+.picked-chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picked-chip .seq{
+  flex:none;min-width:16px;height:16px;padding:0 3px;border-radius:3px;display:grid;place-items:center;
+  font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--white);
+  background:rgba(111,143,99,.75);
+}
+.picked-chip .mv{
+  flex:none;width:16px;height:16px;border-radius:3px;display:grid;place-items:center;
+  font-size:9px;line-height:1;color:var(--ink-3);
+  border:1px solid transparent;transition:all .2s;
+}
+.picked-chip .mv:hover{color:#4a6b3f;border-color:rgba(111,143,99,.6);background:rgba(111,143,99,.12)}
+.picked-chip .mv:disabled{opacity:.3;cursor:default}
+.picked-chip .mv:disabled:hover{color:var(--ink-3);border-color:transparent;background:none}
+.picked-chip .rm{
+  flex:none;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;
+  font-size:9px;line-height:1;color:var(--ink-3);
+  border:1px solid transparent;transition:all .2s;
+}
+.picked-chip .rm:hover{color:#b4452e;border-color:#b4452e;background:rgba(180,69,46,.08)}
+
+/* 底部操作条 */
+.wiz-foot{
+  flex:none;display:flex;align-items:center;gap:14px;
+  padding-top:14px;margin-top:6px;border-top:1px dashed var(--hair-2);
+}
+.btn{
+  font-size:13px;font-weight:600;letter-spacing:3px;text-indent:3px;
+  border-radius:4px;padding:9px 26px;transition:all .3s var(--ease);
+}
+.btn-main{
+  background:var(--coffee);color:var(--white);
+  border:1.5px solid var(--coffee);
+}
+.btn-main:hover{background:var(--coffee);border-color:var(--coffee)}
+.btn-ghost{
+  color:var(--coffee);border:1px solid var(--hair-2);background:var(--white);font-weight:500;
+}
+.btn-ghost:hover{border-color:var(--orange);color:var(--orange)}
+.wiz-foot .spacer{flex:1}
+.foot-hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+
+/* 发布成功提示 */
+.pub-toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%, 12px);z-index:99;
+  font-size:11.5px;letter-spacing:.5px;color:var(--coffee);
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:7px 18px;box-shadow:0 6px 18px rgba(60,42,20,.15);
+  opacity:0;pointer-events:none;transition:all .25s var(--ease);
+}
+.pub-toast.show{opacity:1;transform:translate(-50%, 0)}
+
+/* 入场动效 */
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){
+  .rise{opacity:1;transform:none;animation:none}
+}
+
+/* 响应式 */
+@media (max-width:1024px){
+  .admin-wrap{padding:16px 20px 40px}
+  .form-cols{grid-template-columns:1fr}
+  .pick-grid{grid-template-columns:repeat(4,1fr)}
+}
+@media (max-width:640px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .admin-wrap{padding:12px 14px 32px}
+  .wizard{padding:14px 16px 16px}
+  .pick-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body data-page-node-id="IzqaC91f5bCH2bHNX6NfNx">
+
+<!-- ================= 导航 ================= -->
+<nav class="nav" data-page-node-id="l1EujepUe79qAABGSOHXYz">
+  <div class="nav-inner" data-page-node-id="LEvR70ZZvYyErAMZxpl4ZF">
+    <a class="logo" href="#" data-page-node-id="ybcCPY1gDTVSMIO3XhLF7t">
+      <span class="mark" data-page-node-id="2ovWiTka3GlLXuCbvh1lfF"></span>
+      能学慧吉他教室
+      <small data-page-node-id="0Ziw05QQ76ILekeV72BnNb">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="sibBURHbl00hAP0rIvXyLF">
+      <a href="#" data-page-node-id="D5p5qpIUiS8eZ8of7wn3tp">首页</a>
+      <a href="knowledge-home.html" id="navKp" data-page-node-id="g9NK0ZJWFHlowUsutnwK7d">知识点区</a>
+      <a href="tracks-home.html" id="navTrack" data-page-node-id="DclGhCWYoavqI8muxGJyus">曲目库</a>
+      <a href="library.html" data-page-node-id="EIvDQZcYJPODLr88Bi5XVo">图书馆</a>
+      <a href="#" data-page-node-id="pOUKvQ6TDGAOWV7bPD4YwJ">作业记录</a>
+    </div>
+    <div class="nav-right" data-page-node-id="QBDrGa71LvXeas2BbrCgFH">
+      <div class="avatar" data-page-node-id="BVhkHX80bLT2OO0Y7OYzRF">陈</div>
+    </div>
+  </div>
+</nav>
+
+<main class="admin-wrap" data-page-node-id="UibsTVEpxneoxlvC5U5GST">
+  <div class="wizard rise" data-page-node-id="CfE9IAYnEFFD9QkfLZPQCi">
+
+    <div class="wiz-head" data-page-node-id="lkaV2kTDakNl02euK1fBJG">
+      <h1 data-page-node-id="E5nh2UHPsYZjTCyeLmy2bX"><mark id="pageTitle" data-page-node-id="gE4BRg3SuB4eyVyBxs7Xqd">新建合集</mark></h1>
+      <span class="zone-badge" id="zoneBadge" data-page-node-id="yGZbLxv2CWz1kP9OkoWf8A">曲目区</span>
+      <span class="eyebrow" id="pageEyebrow" data-page-node-id="MJtqq1EqG2ibKCjwAHJal2">CREATE COLLECTION</span>
+    </div>
+
+    <form class="form-body" id="createForm" autocomplete="off" novalidate data-page-node-id="GUIrCAZwTznWSw78xQ8MRX">
+      <div class="form-cols" data-page-node-id="B5hV8QoDIHtzaVPrxxo5U4">
+        <div class="fsec" data-page-node-id="fStCS0QED2QjTUwOBx4y3w">
+          <div class="fsec-title" data-page-node-id="shZa0FQYjbd2PcrbF05EQo">基本信息</div>
+          <div class="field" id="cName" data-page-node-id="EUhVQBl8ORCELVIi9farHu">
+            <label for="cInName" data-page-node-id="cCGJq7Gznh0R7brFrzdnLD"><span id="nameLabel" data-page-node-id="QLIDmn0x7Cie6Gdkz0Cck5">合集名称</span> <span class="cnt num" data-page-node-id="AYUQiTfTlrcsdjjJg3PEoA"><span id="cNameCnt" data-page-node-id="XoA04abnW7Bf0QQhOd5EZr">0</span>/120</span></label>
+            <input type="text" id="cInName" placeholder="如：周杰伦专辑 · 指弹改编合集" maxlength="140" data-page-node-id="IrlDDjG53SIJydUqGoFIk3">
+            <div class="err-msg" data-page-node-id="ZtTajWIXhn3UTtcuSxplwf">请填写合集名称，不超过 120 字</div>
+          </div>
+          <div class="field" data-page-node-id="E6rH99CZ6QjNIcpB9g5yBV">
+            <label for="cInDesc" data-page-node-id="4UBgfaNA3TD1HBrtWESXBN">简介 <span class="cnt num" data-page-node-id="sF8niYZokrXWzCElVQBrt2"><span id="cDescCnt" data-page-node-id="nIaPJDVMoASDTUBKHTLgDw">0</span>/1000</span></label>
+            <textarea id="cInDesc" id="cDesc" placeholder="这个合集收录哪些曲目、适合什么阶段的学员…"></textarea>
+          </div>
+        </div>
+        <div class="fsec" data-page-node-id="IueDjr7P6bHKfomsMChxRB">
+          <div class="fsec-title" data-page-node-id="XonXmkw4mnerXkPXjplrot">封面 <span class="note req" data-page-node-id="h9FXU1ioynLFp34NYCXS5H">1:1 · 必填</span></div>
+          <div class="cover-flex" data-page-node-id="p1rns2jx0PhtHgPqXtdFb7">
+            <div class="cover-box" id="cCoverBox" role="button" tabindex="0" aria-label="上传封面" data-page-node-id="ID7ze7aZG8vYv9qYCV7nIp">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="6F0wAfONF1YBOEuq4DPFmn"><path d="M12 5v14M5 12h14" data-page-node-id="Q79ZnICaAIr8lkWrgeXzEq"/></svg>
+              <span class="t1" data-page-node-id="fFuF22Q93aQi27kIaKAzaR">上传封面</span>
+              <span class="t2" data-page-node-id="2v6Y9xPuTy1yq2t8rRsDY5">比例 1:1 · 必填</span>
+              <div class="vinyl" data-page-node-id="kEqALlCOTNzvvI5uG6BBkl"><i data-page-node-id="KybwxzeYFCDKRxGXIDF4be"></i></div>
+              <button type="button" class="cov-rm" id="cCoverRm" aria-label="移除封面">✕</button>
+            </div>
+          </div>
+          <div class="field" id="cCover" style="margin-top:10px" data-page-node-id="X0W2xEMBJvgnh1nYqlsDkX">
+            <div class="err-msg" data-page-node-id="Vr3mvj03ruAMGAWsMfmgnF">封面为必填项（1:1 正方形）</div>
+          </div>
+        </div>
+        <div class="fsec" data-page-node-id="PvSec000000000000000001">
+          <div class="fsec-title" data-page-node-id="PvTitle0000000000000001">预览 <span class="note" data-page-node-id="PvNote0000000000000001">学员视角 · 实时</span></div>
+          <div class="pv-card" data-page-node-id="PvCard0000000000000001">
+            <div class="pv-cover" id="pvCover" data-page-node-id="PvCover0000000000000001"><div class="disc" data-page-node-id="PvDisc00000000000000001"><span class="lbl" data-page-node-id="PvLbl000000000000000001"><i data-page-node-id="PvLbli00000000000000001"></i></span></div></div>
+            <div class="pv-name" id="pvName" data-page-node-id="PvName00000000000000001">未命名合集</div>
+            <div class="pv-meta num" id="pvMeta" data-page-node-id="PvMeta00000000000000001">曲目集 · 已选 0 首</div>
+          </div>
+        </div>
+
+        <div class="fsec full" data-page-node-id="PuiRZCVySyQCEuYW7DudY5">
+          <div class="fsec-title" data-page-node-id="Epd1hZiK6uAKF40rH7hPfk">前置知识点 <span class="note" data-page-node-id="8Eq8E3JekGZTXMCcmGw7gI">学员需先掌握这些知识点，再进入本合集学习</span></div>
+          <p class="pick-count" data-page-node-id="425cemAGsVODWLKvqUarrS">已选 <b class="num" id="preCnt" data-page-node-id="uJzYbLeA05VjF9LwQI2fVU">0</b> <span data-page-node-id="mNcBpQ6F4T9ufZkQ3llTbU">个前置知识点</span><span style="font-size:10px;color:var(--ink-3)">· 上方已选条目可点 ✕ 快捷移除</span>
+          </p>
+          <div class="picked-list" id="preChips" aria-label="已选前置知识点"></div>
+          <div class="pre-picker" id="prePicker" data-page-node-id="PrePicker0000000000000001">
+            <label class="pick-search big" id="preSearch" data-page-node-id="lLbXuP9kWqYEhVbQsRnFgA">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+              <input type="text" id="preSearchInput" placeholder="搜索知识点集 / 单知识点 / 曲目集 / 单曲谱…" aria-label="搜索可加入的前置内容">
+              <button type="button" class="clr" id="preSearchClr">清除</button>
+            </label>
+            <div class="pre-drop" id="preDrop" data-page-node-id="PreDrop000000000000000001"><!-- JS 渲染 --></div>
+          </div>
+          <p class="pre-hint" data-page-node-id="PreHint000000000000000001">按「类型 + 标题」选取前置内容：知识点集 · 单知识点 · 曲目集 · 单曲谱，如【曲目集】周杰伦专辑、【单曲谱】稻香 · 弹唱谱；点击结果加入，已选项置灰</p>
+          <div class="pick-empty" id="preEmpty">未找到匹配的内容，换个关键词试试</div>
+        </div>
+<div class="fsec full" data-page-node-id="PuiRZCVySyQCEuYW7DudY3">
+          <div class="fsec-title" id="pickTitle" data-page-node-id="Epd1hZiK6uAKF40rH7hPfj">从已有单课中多选加入 <span class="note" data-page-node-id="8Eq8E3JekGZTXMCcmGw7gH">一首课可同时进入多个合集</span></div>
+          <p class="pick-count" data-page-node-id="425cemAGsVODWLKvqUarrQ">已选 <b class="num" id="pickCnt" data-page-node-id="uJzYbLeA05VjF9LwQI2fVT">0</b> <span id="pickUnit" data-page-node-id="mNcBpQ6F4T9ufZkQ3llTaS">首曲目</span><span style="font-size:10px;color:var(--ink-3)">· 顺序即合集内播放顺序：上方已选条目可点 ↑↓ 调序、✕ 快捷移除</span>
+          </p>
+          <div class="picked-list" id="pickChips" aria-label="已加入合集的内容"></div>
+          <label class="pick-search big" id="pickSearch">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            <input type="text" id="pickSearchInput" placeholder="搜索名称…" aria-label="搜索可加入的内容">
+            <button type="button" class="clr" id="pickSearchClr">清除</button>
+          </label>
+          <div class="pick-grid" id="pickGrid" data-page-node-id="YEZ8tGWEcMkQb6Mmtqo32C"><!-- JS 渲染 --></div>
+          <nav class="pager" id="pickPager" aria-label="合集内容分页">
+            <button type="button" class="pgbtn" data-act="prev" aria-label="上一页">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
+            </button>
+            <span class="pgnums num" data-nums><!-- JS 渲染 --></span>
+            <button type="button" class="pgbtn" data-act="next" aria-label="下一页">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+            </button>
+          </nav>
+          <div class="pick-empty" id="pickEmpty">未找到匹配的内容，换个关键词试试</div>
+        </div>
+
+              </div>
+    </form>
+
+    <!-- 底部操作条 -->
+    <div class="wiz-foot" data-page-node-id="bT5Nx7OqfYCGcpNyqnsXFH">
+      <button type="button" class="btn btn-ghost" id="btnBack" data-page-node-id="Gz80BSDMnKVCxhZfsEAl6c">← 返回</button>
+      <span class="foot-hint" id="footHint" data-page-node-id="w3Uv1S4NHCCikx94ie8nH2">曲目区 · 新建合集</span>
+      <span class="spacer" data-page-node-id="o5pB4eJwV5PLt9GGE1BScH"></span>
+      <button type="button" class="btn btn-ghost" data-page-node-id="C3ITwAiZRHpt00YwW5u4i7">保存草稿</button>
+      <button type="button" class="btn btn-main" id="btnPublish" data-page-node-id="yMxS2ghVYMb0cr44sb71UQ">发 布</button>
+    </div>
+
+  </div>
+</main>
+
+<div class="pub-toast" id="pubToast" data-page-node-id="EAB1rZ1E6pKzODaeh3CHXu">发布成功 · 正在返回列表…</div>
+
+<script>
+/* ================= 区域由入口决定：?zone=track（默认）| knowledge ================= */
+const params = new URLSearchParams(location.search);
+const zone = params.get('zone') === 'knowledge' ? 'knowledge' : 'track';
+const IS_KP = zone === 'knowledge';
+const HOME  = IS_KP ? 'knowledge-home.html' : 'tracks-home.html';
+
+/* ================= 多选卡片数据（JS 渲染 · 真实封面池与知识点首页一致） ================= */
+const COVER_IMGS = ['assets/covers/real-01.jpg', 'assets/covers/real-02.jpg', 'assets/covers/real-03.jpg', 'assets/covers/real-04.jpg', 'assets/covers/real-05.jpg', 'assets/covers/real-06.jpg', 'assets/covers/real-07.jpg', 'assets/covers/real-08.jpg', 'assets/covers/real-09.jpg', 'assets/covers/real-10.jpg', 'assets/covers/real-11.jpg', 'assets/covers/real-12.jpg', 'assets/covers/real-13.jpg', 'assets/covers/real-14.jpg', 'assets/covers/real-15.jpg', 'assets/covers/real-16.jpg', 'assets/covers/real-17.jpg', 'assets/covers/real-18.jpg'];
+const COURSES = [
+  ['卡农独奏 · 全曲精讲', '13 段 · 2 天前'],
+  ['天空之城 · 指弹改编', '9 段 · 5 天前'],
+  ['风之诗 · Wind Song', '7 段 · 1 周前'],
+  ['奇迹的山', '11 段 · 1 周前'],
+  ['Merry Christmas Mr. Lawrence', '8 段 · 2 周前'],
+  ['晴天 · 前奏精讲', '5 段 · 2 周前'],
+  ['夜空中最亮的星 · 独奏', '6 段 · 3 周前'],
+  ['平凡之路 · 间奏', '4 段 · 3 周前'],
+  ['月亮代表我的心 · 独奏', '12 段 · 3 周前'],
+  ['阿尔罕布拉宫的回忆', '10 段 · 1 个月前'],
+  ['爱的罗曼史', '6 段 · 1 个月前'],
+  ['突然好想你 · 前奏', '5 段 · 1 个月前'],
+  ['童话 · 弹唱改编', '8 段 · 1 个月前'],
+  ['七里香 · 间奏精讲', '6 段 · 1 个月前'],
+  ['遇见 · 独奏简化版', '7 段 · 2 个月前'],
+  ['小情歌 · 弹唱改编', '9 段 · 2 个月前'],
+  ['绿袖子 · 古典小品', '5 段 · 2 个月前'],
+  ['泪之卡农 · Lágrima', '4 段 · 2 个月前'],
+  ['虫儿飞 · 双吉他合奏', '6 段 · 3 个月前'],
+  ['送别 · 单音旋律', '3 段 · 3 个月前'],
+  ['欢乐颂 · 单音入门', '4 段 · 4 个月前'],
+  ['生日快乐 · 指弹小品', '3 段 · 4 个月前'],
+  ['茉莉花 · 指弹改编', '6 段 · 5 个月前'],
+  ['小星星 · 变奏练习', '5 段 · 5 个月前']
+];
+const KPS = [
+  ['看懂和弦进行：1645 的秘密', '26 分钟 · 1 周前'],
+  ['右手指法与触弦角度入门', '28 分钟 · 1 周前'],
+  ['音程与指板地图：告别死记品位', '32 分钟 · 2 周前'],
+  ['节拍器训练：从 60 稳到 120', '27 分钟 · 2 周前'],
+  ['和弦转换不抢拍：三个锚点手指', '24 分钟 · 3 周前'],
+  ['右手拨弦两派：靠弦与不靠弦', '21 分钟 · 3 周前'],
+  ['扫弦的力学：手腕 vs 手臂', '25 分钟 · 1 个月前'],
+  ['揉弦三式：指揉 / 臂揉 / 摇滚揉', '23 分钟 · 1 个月前'],
+  ['低音独立性：拇指保持稳定', '22 分钟 · 1 个月前'],
+  ['击勾弦：左手连贯性练习', '20 分钟 · 1 个月前'],
+  ['自然泛音：触弦位置与右手配合', '18 分钟 · 2 个月前'],
+  ['PM 打板：低音与节奏一体', '19 分钟 · 2 个月前'],
+  ['C 调音阶：第一把位全把位图', '30 分钟 · 2 个月前'],
+  ['滑弦与推弦：让旋律会唱歌', '21 分钟 · 2 个月前'],
+  ['六线谱精读：节奏记号全解', '29 分钟 · 3 个月前'],
+  ['大横按通关：F 和弦的秘密', '26 分钟 · 3 个月前'],
+  ['切音与闷音：让节奏有颗粒感', '17 分钟 · 3 个月前'],
+  ['拨片握法与触弦角度', '16 分钟 · 4 个月前'],
+  ['三和弦与七和弦构造', '31 分钟 · 4 个月前'],
+  ['十二平均律与音名唱名', '24 分钟 · 5 个月前']
+];
+function renderGrid(gridId, items){
+  document.getElementById(gridId).innerHTML = items.map(([nm, meta], i)=>(
+    '<div class="pick-card" data-nm="' + nm + '">' +
+      '<span class="pc-check">✓</span>' +
+      '<div class="pc-cover ' + (i % 3 === 1 ? 'v2' : i % 3 === 2 ? 'v3' : '') + '"></div>' +
+      '<div class="pc-name" title="' + nm + '">' + nm + '</div><div class="pc-meta num">' + meta + '</div>' +
+    '</div>'
+  )).join('');
+  document.querySelectorAll('#' + gridId + ' .pc-cover').forEach((cv, i)=>{
+    cv.classList.add('img');
+    cv.style.backgroundImage = 'url("' + COVER_IMGS[i % COVER_IMGS.length] + '")';
+  });
+}
+
+/* 页面文案按区适配 */
+document.getElementById('zoneBadge').textContent = IS_KP ? '知识点区' : '曲目区';
+document.getElementById('footHint').textContent  = IS_KP ? '知识点区 · 新建知识点集' : '曲目区 · 新建合集';
+document.getElementById('navKp').classList.toggle('active', IS_KP);
+document.getElementById('navTrack').classList.toggle('active', !IS_KP);
+if(IS_KP){
+  /* 知识点区：合集 = 知识点集，多选对象 = 已有单知识点 */
+  document.title = '新建知识点集 · 能学慧吉他教室（管理端）';
+  document.getElementById('pageTitle').textContent = '新建知识点集';
+  document.getElementById('pageEyebrow').textContent = 'CREATE KNOWLEDGE SET';
+  document.getElementById('nameLabel').textContent = '知识点集名称';
+  document.getElementById('cInName').placeholder = '如：右手基本功系列';
+  document.getElementById('cInDesc').placeholder = '这个知识点集收录哪些知识点、解决什么问题…';
+  document.getElementById('pickTitle').innerHTML = '从已有单知识点中多选加入 <span class="note">一个知识点可同时进入多个知识点集</span>';
+  document.getElementById('pickUnit').textContent = '个知识点';
+}
+renderGrid('pickGrid', IS_KP ? KPS : COURSES);
+
+/* ================= 表单交互 ================= */
+/* 字数统计 */
+function bindCount(inputEl, cntEl, fieldEl, max){
+  inputEl.addEventListener('input', ()=>{
+    const n = inputEl.value.length;
+    cntEl.textContent = n;
+    cntEl.parentElement.classList.toggle('over', n > max);
+    if(n > max){ fieldEl.classList.add('error'); } else if(n > 0){ fieldEl.classList.remove('error'); }
+  });
+}
+bindCount(document.getElementById('cInName'), document.getElementById('cNameCnt'), document.getElementById('cName'), 120);
+bindCount(document.getElementById('cInDesc'), document.getElementById('cDescCnt'), document.querySelector('.field textarea').parentElement, 1000);
+
+/* 封面（演示：点击切换已上传态） */
+(function(){
+  const boxEl = document.getElementById('cCoverBox'), fieldEl = document.getElementById('cCover');
+  const toggle = ()=>{
+    boxEl.classList.toggle('has');
+    fieldEl.classList.toggle('error', !boxEl.classList.contains('has'));
+    document.getElementById('pvCover').classList.toggle('has', boxEl.classList.contains('has'));
+  };
+  boxEl.addEventListener('click', toggle);
+  boxEl.addEventListener('keydown', e=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); } });
+  /* 删除封面：只清空已上传态，不触发上传切换，排版不变 */
+  document.getElementById('cCoverRm').addEventListener('click', e=>{
+    e.preventDefault(); e.stopPropagation();
+    boxEl.classList.remove('has');
+    fieldEl.classList.add('error');
+    document.getElementById('pvCover').classList.remove('has');
+  });
+})();
+
+/* 多选区通用逻辑：搜索过滤 + 点选 + 已选 chips（上方快捷移除）+ 页码式翻页（每页 2 排 × 8 = 16） */
+function pageSeq(cur, total){
+  if(total <= 7) return Array.from({length:total}, (_,i)=>i+1);
+  const list = [1];
+  const s = Math.max(2, cur-1), e = Math.min(total-1, cur+1);
+  if(s > 2) list.push('…');
+  for(let i=s;i<=e;i++) list.push(i);
+  if(e < total-1) list.push('…');
+  list.push(total);
+  return list;
+}
+function setupPicker(o){
+  const grid  = document.getElementById(o.gridId);
+  const pager = document.getElementById(o.pagerId);
+  const cards = ()=>[...grid.querySelectorAll('.pick-card')];
+  const kw = { v:'' };
+  const z = { page:1, size:16, nums:pager.querySelector('[data-nums]') };
+  const order = [];   /* 已选顺序：合集内单曲的播放顺序即此数组顺序 */
+  function refreshChips(){
+    const box = document.getElementById(o.chipsId);
+    document.getElementById(o.cntId).textContent = order.length;
+    if(typeof updatePreview === 'function') updatePreview();
+    box.innerHTML = order.map((c, i)=>{
+      const nm = c.dataset.nm;
+      return '<span class="picked-chip"><span class="seq num">' + String(i+1).padStart(2,'0') + '</span>' +
+        '<span class="nm">' + nm + '</span>' +
+        '<button type="button" class="mv" data-mv="up" data-nm="' + nm + '" aria-label="上移 ' + nm + '"' + (i===0?' disabled':'') + '>↑</button>' +
+        '<button type="button" class="mv" data-mv="down" data-nm="' + nm + '" aria-label="下移 ' + nm + '"' + (i===order.length-1?' disabled':'') + '>↓</button>' +
+        '<button type="button" class="rm" data-rm="' + nm + '" aria-label="移除 ' + nm + '">✕</button></span>';
+    }).join('');
+    /* 卡片角标显示合集内序号 */
+    cards().forEach(c=>{
+      const i = order.indexOf(c);
+      const check = c.querySelector('.pc-check');
+      if(check) check.textContent = i > -1 ? String(i+1).padStart(2,'0') : '✓';
+    });
+  }
+  function layout(){
+    const vis = cards().filter(c=>c.style.display !== 'none');
+    const total = Math.max(1, Math.ceil(vis.length / z.size));
+    z.page = Math.min(Math.max(1, z.page), total);
+    vis.forEach((c, i)=> c.classList.toggle('pg-hide', !(i >= (z.page-1)*z.size && i < z.page*z.size)));
+    z.nums.innerHTML = pageSeq(z.page, total).map(v=> v === '…'
+      ? '<span class="pgdots">…</span>'
+      : '<button type="button" class="pgnum' + (v === z.page ? ' on' : '') + '" data-p="' + v + '"'
+        + ' aria-label="第 ' + v + ' 页"' + (v === z.page ? ' aria-current="page"' : '') + '>' + v + '</button>'
+    ).join('');
+    pager.querySelector('[data-act="prev"]').disabled = z.page <= 1;
+    pager.querySelector('[data-act="next"]').disabled = z.page >= total;
+  }
+  function applyFilter(){
+    let shown = 0;
+    cards().forEach(card=>{
+      const ok = !kw.v || card.dataset.nm.toLowerCase().includes(kw.v);
+      card.style.display = ok ? '' : 'none';
+      if(ok) shown++;
+    });
+    document.getElementById(o.emptyId).style.display = shown ? 'none' : 'block';
+    z.page = 1;
+    layout();
+  }
+  const input = document.getElementById(o.searchInputId);
+  const box   = document.getElementById(o.searchBoxId);
+  input.addEventListener('input', ()=>{
+    kw.v = input.value.trim().toLowerCase();
+    box.classList.toggle('has', !!kw.v);
+    applyFilter();
+  });
+  document.getElementById(o.clrId).addEventListener('click', ()=>{
+    input.value=''; kw.v=''; box.classList.remove('has'); applyFilter(); input.focus();
+  });
+  input.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ document.getElementById(o.clrId).click(); } });
+  grid.addEventListener('click', e=>{
+    const card = e.target.closest('.pick-card'); if(!card) return;
+    if(card.classList.contains('sel')){
+      card.classList.remove('sel');
+      const i = order.indexOf(card); if(i > -1) order.splice(i, 1);
+    }else{
+      card.classList.add('sel');
+      order.push(card);
+    }
+    refreshChips();
+  });
+  /* chips 在网格上方：✕ 快捷移除 · ↑↓ 调整合集内顺序，即使卡片正被搜索过滤或翻到别的页也能操作 */
+  document.getElementById(o.chipsId).addEventListener('click', e=>{
+    const mv = e.target.closest('[data-mv]');
+    if(mv && !mv.disabled){
+      const i = order.findIndex(c=>c.dataset.nm === mv.dataset.nm);
+      const j = mv.dataset.mv === 'up' ? i-1 : i+1;
+      if(i > -1 && j >= 0 && j < order.length){
+        [order[i], order[j]] = [order[j], order[i]];
+        refreshChips();
+      }
+      return;
+    }
+    const rm = e.target.closest('[data-rm]'); if(!rm) return;
+    const card = order.find(c=>c.dataset.nm === rm.dataset.rm);
+    if(card){ card.classList.remove('sel'); const i = order.indexOf(card); if(i > -1) order.splice(i, 1); refreshChips(); }
+  });
+  pager.querySelector('[data-act="prev"]').addEventListener('click', ()=>{ z.page--; layout(); });
+  pager.querySelector('[data-act="next"]').addEventListener('click', ()=>{ z.page++; layout(); });
+  z.nums.addEventListener('click', e=>{
+    const b = e.target.closest('.pgnum'); if(!b) return;
+    z.page = parseInt(b.dataset.p, 10); layout();
+  });
+  refreshChips();
+  layout();
+}
+setupPicker({gridId:'pickGrid', pagerId:'pickPager', searchInputId:'pickSearchInput', searchBoxId:'pickSearch', clrId:'pickSearchClr', emptyId:'pickEmpty', cntId:'pickCnt', chipsId:'pickChips'});
+
+/* ================= 封面预览卡：标题 / 封面 / 已选数实时同步 ================= */
+function updatePreview(){
+  const name = document.getElementById('cInName').value.trim();
+  document.getElementById('pvName').textContent = name || (IS_KP ? '未命名知识点集' : '未命名合集');
+  document.getElementById('pvMeta').textContent = (IS_KP ? '知识点集' : '曲目集') + ' · 已选 ' + document.getElementById('pickCnt').textContent + ' ' + (IS_KP ? '个知识点' : '首曲目');
+}
+document.getElementById('cInName').addEventListener('input', updatePreview);
+updatePreview();
+
+/* ================= 前置知识点：搜索选择器（类型 + 标题，不铺卡片） ================= */
+const PRE_ITEMS = [
+  {t:'知识点集', c:'t-kset',  nm:'右手基本功系列',              m:'6 个知识点'},
+  {t:'知识点集', c:'t-kset',  nm:'和弦入门必修课',              m:'8 个知识点'},
+  {t:'知识点集', c:'t-kset',  nm:'节奏训练合集',                m:'5 个知识点'},
+  {t:'单知识点', c:'t-kp',    nm:'节拍器训练：从 60 稳到 120',   m:'26 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'大横按通关：F 和弦的秘密',     m:'26 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'看懂和弦进行：1645 的秘密',    m:'26 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'扫弦的力学：手腕 vs 手臂',     m:'25 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'切音与闷音：让节奏有颗粒感',   m:'17 分钟'},
+  {t:'单知识点', c:'t-kp',    nm:'自然泛音：触弦位置与右手配合', m:'18 分钟'},
+  {t:'曲目集',   c:'t-track', nm:'周杰伦专辑',                  m:'12 首曲目'},
+  {t:'曲目集',   c:'t-track', nm:'五月天精选',                  m:'9 首曲目'},
+  {t:'曲目集',   c:'t-track', nm:'经典华语指弹',                m:'10 首曲目'},
+  {t:'单曲谱',   c:'t-score', nm:'稻香 · 弹唱谱',               m:'C 调 · 4 页'},
+  {t:'单曲谱',   c:'t-score', nm:'天空之城 · 指弹谱',           m:'指弹 · 6 页'},
+  {t:'单曲谱',   c:'t-score', nm:'童话 · 弹唱谱',               m:'G 调 · 4 页'},
+  {t:'单曲谱',   c:'t-score', nm:'夜空中最亮的星 · 独奏谱',     m:'独奏 · 5 页'}
+];
+(function setupPre(){
+  const input = document.getElementById('preSearchInput');
+  const box   = document.getElementById('preSearch');
+  const drop  = document.getElementById('preDrop');
+  const picker= document.getElementById('prePicker');
+  const sel = new Map();
+  function renderChips(){
+    document.getElementById('preCnt').textContent = sel.size;
+    document.getElementById('preChips').innerHTML = [...sel.values()].map(it=>
+      '<span class="picked-chip"><span class="nm"><span class="ptag ' + it.c + '">' + it.t + '</span>' + it.nm + '</span>' +
+      '<button type="button" class="rm" data-rm="' + it.nm + '" aria-label="移除 ' + it.nm + '">✕</button></span>'
+    ).join('');
+  }
+  function renderDrop(){
+    const kw = input.value.trim().toLowerCase();
+    const list = PRE_ITEMS.filter(it=> !kw || (it.t + it.nm).toLowerCase().includes(kw));
+    document.getElementById('preEmpty').style.display = list.length ? 'none' : 'block';
+    drop.innerHTML = list.map(it=>{
+      const off = sel.has(it.nm);
+      return '<button type="button" class="pre-item' + (off ? ' off' : '') + '" data-nm="' + it.nm + '"' + (off ? ' disabled' : '') + '>' +
+        '<span class="ptag ' + it.c + '">' + it.t + '</span>' +
+        '<span class="pnm">' + it.nm + '</span>' +
+        '<span class="pmeta num">' + it.m + '</span></button>';
+    }).join('');
+    drop.classList.add('open');
+  }
+  input.addEventListener('focus', renderDrop);
+  input.addEventListener('input', ()=>{ box.classList.toggle('has', !!input.value.trim()); renderDrop(); });
+  document.getElementById('preSearchClr').addEventListener('click', ()=>{
+    input.value=''; box.classList.remove('has'); renderDrop(); input.focus();
+  });
+  input.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ drop.classList.remove('open'); } });
+  drop.addEventListener('click', e=>{
+    const b = e.target.closest('.pre-item'); if(!b || b.classList.contains('off')) return;
+    const it = PRE_ITEMS.find(x=>x.nm === b.dataset.nm);
+    sel.set(it.nm, it);
+    renderChips(); renderDrop();
+  });
+  document.getElementById('preChips').addEventListener('click', e=>{
+    const rm = e.target.closest('[data-rm]'); if(!rm) return;
+    sel.delete(rm.dataset.rm);
+    renderChips(); renderDrop();
+  });
+  document.addEventListener('click', e=>{ if(!picker.contains(e.target)) drop.classList.remove('open'); });
+  renderChips();
+})();
+
+/* 返回 / 发布 */
+document.getElementById('btnBack').addEventListener('click', ()=>{ location.href = HOME; });
+document.getElementById('btnPublish').addEventListener('click', ()=>{
+  let ok = true, first = null;
+  const mark = (fieldEl, bad)=>{ fieldEl.classList.toggle('error', bad); if(bad && !first) first = fieldEl; if(bad) ok = false; };
+  mark(document.getElementById('cName'),  document.getElementById('cInName').value.trim() === '' || document.getElementById('cInName').value.length > 120);
+  mark(document.getElementById('cCover'), !document.getElementById('cCoverBox').classList.contains('has'));
+  if(!ok && first){ first.scrollIntoView({behavior:'smooth', block:'center'}); return; }
+  const btn = document.getElementById('btnPublish');
+  btn.textContent = '发布中…'; btn.disabled = true;
+  document.getElementById('pubToast').classList.add('show');
+  setTimeout(()=>{ location.href = HOME; }, 1200);
+});
+</script>
+</body>
+</html>

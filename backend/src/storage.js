@@ -56,7 +56,9 @@ export function normalizePublicUrl(url) {
     return getPublicUrl(text.replace(/^undefined\//, ''));
   }
 
-  if (text.startsWith('videos/') || text.startsWith('covers/') || text.startsWith('attachments/')) {
+  const publicKeyPrefixes = ['videos/', 'covers/', 'attachments/', 'tracks/', 'knowledge/', 'library/'];
+
+  if (publicKeyPrefixes.some((prefix) => text.startsWith(prefix))) {
     return getPublicUrl(text);
   }
 

@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="eh05GzgsSaUbemfPTh6rKx">
+<head data-page-node-id="oGpusAHgNFVkXyEoNgP6A5">
+<meta charset="UTF-8" data-page-node-id="lI7O90sTdj58EynVY6DOIv">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="d6WjPUMht1m7P6zD47krbI">
+<title>能学慧吉他教室 · 课程详情（笔记纸质版）</title>
+<style>
+/* ============================================================
+   笔记纸质版 · 咖啡/橘/墨色 × 纸张材质 × 学生笔记细节
+   布局与 glass 版一致，仅重设配色与材质；绿色只做点睛
+============================================================ */
+:root{
+  --paper:  #f2ead9;                       /* 奶咖纸底 */
+  --white:  #ffffff;                       /* 纯白 */
+  --ink:    #261d10;                       /* 墨黑 */
+  --ink-2:  #4f4230;                       /* 深咖 */
+  --ink-3:  #7a6a52;                       /* 浅咖灰 */
+  --hair:   #ddd0b4;                       /* 牛皮纸细线 */
+  --hair-2: #c9b795;
+  --coffee: #5d4326;                       /* 咖啡棕（主色） */
+  --orange: #ff7f00;                       /* 橘（强调） */
+  --amber:  #b98e3e;                       /* 棕黄 */
+  --green:  #4f7d3a;                       /* 橄榄绿（只做点睛） */
+  --accent: var(--orange);
+  --wood:   #3a2a18;
+  /* 纸面材质 tokens（微透纸白 + 咖啡细线） */
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-deep: rgba(255, 255, 255, .88);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底 + 格纹底饰（design-spec v2.0 §3） */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  font-weight:400;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow:hidden;   /* 页面级不滚动，功能在一屏内完成 */
+}
+/* 底图：水彩年轮 · 暖调版（左下大年轮+右上迷你年轮呼应 · 已裁除水印） */
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{
+  font-size:10px;letter-spacing:2.5px;color:var(--ink-3);
+  text-transform:uppercase;font-weight:500;
+}
+/* 盒子内滚动条 */
+.scroll{overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent}
+.scroll::-webkit-scrollbar{width:4px}
+.scroll::-webkit-scrollbar-thumb{background:var(--hair-2)}
+.scroll::-webkit-scrollbar-track{background:transparent}
+
+/* ============ 顶部导航（亮白 × 咖啡橘） ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 4px 14px rgba(64,45,20,.12);
+}
+/* 页头底部装饰带：咖啡 → 橘（区分页头与内容区） */
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+/* 激活态：荧光笔涂抹块（与规范 mark 同款），不再压到彩条上 */
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-links a.active:hover{background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%)}
+.nav-right{display:flex;align-items:center;gap:18px}
+/* 搜索框：纸面小方角 */
+/* 头像：咖啡描边圆 + 右上绿色活动点（绿色点睛） */
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;transition:all .25s;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);
+  border:1.5px solid var(--paper);
+}
+.avatar:hover{border-color:var(--orange);color:var(--orange)}
+
+/* ============ 一屏主布局：左列（播放+信息） · 右列（列表+附件） ============ */
+/* 左列宽度 = 播放器宽度（16:9 按视口高度换算），两列边缘对齐成一个整齐版块 */
+.detail{
+  --vres: 354px;   /* 播放器以外的垂直预留（导航+顶部留白+标题框+前置+简介+底部留白） */
+  flex:1;min-height:0;
+  max-width:1440px;width:100%;margin:0 auto;padding:16px 36px 20px;
+  display:grid;
+  grid-template-columns:min(calc((100vh - var(--vres))*16/9),1fr) 260px;
+  gap:36px;align-items:stretch;justify-content:center;
+}
+
+/* ---------- 右列：播放列表 + 附件下载 + 关联图书馆（纸面卡片 · 小圆角） ---------- */
+.side{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:18px;min-height:0}
+.box{
+  border:1.5px solid var(--coffee);border-radius:6px;
+  background:var(--glass);
+  box-shadow:5px 7px 0 rgba(93,67,38,.30), 0 18px 38px rgba(64,45,20,.28);
+  display:flex;flex-direction:column;min-height:0;overflow:hidden;
+}
+.box-head{
+  flex:none;padding:14px 18px 10px;border-bottom:1px solid rgba(93,67,38,.28);
+  display:flex;align-items:baseline;justify-content:space-between;position:relative;
+}
+/* 彩色强调：咖啡标题 + 橘色马克笔下划 */
+.box-head h2{font-size:13.5px;font-weight:700;letter-spacing:2px;color:var(--coffee);display:flex;align-items:center;gap:9px}
+.box-head h2::before{
+  content:"";width:4px;height:14px;border-radius:1px;flex:none;
+  background:var(--orange);
+}
+.box-head::after{
+  content:"";position:absolute;left:18px;bottom:-1px;width:64px;height:3px;border-radius:1.5px;
+  background:var(--orange);
+}
+.box-head .more{font-size:11px;color:var(--ink-3);letter-spacing:1px;text-decoration:none;transition:color .25s}
+.box-head .more:hover{color:var(--ink)}
+/* 播放列表占更高一些 */
+.pl-box{flex:1.45}
+.pl-item{
+  display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;
+  padding:10px 18px;border-bottom:1px solid rgba(201,183,149,.4);cursor:pointer;
+  transition:background .3s var(--ease);
+}
+.pl-item:hover{background:rgba(255,252,242,.65)}
+.pl-item .idx{font-size:11.5px;color:var(--ink-3);letter-spacing:.5px}
+.pl-item .t{font-size:12.5px;letter-spacing:.3px;line-height:1.5}
+.pl-item .len{font-size:11px;color:var(--ink-3);letter-spacing:.5px}
+.pl-item .eq{display:inline-flex;align-items:flex-end;gap:2px;height:11px;margin-right:5px}
+.pl-item .eq i{width:2.5px;background:var(--green);animation:eq 1.1s ease-in-out infinite}
+.pl-item .eq i:nth-child(1){height:5px}
+.pl-item .eq i:nth-child(2){height:10px;animation-delay:.25s}
+.pl-item .eq i:nth-child(3){height:7px;animation-delay:.5s}
+@keyframes eq{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+/* 正在播放：绿色只在这里亮眼 */
+.pl-item.playing{background:rgba(122,166,88,.16)}
+.pl-item.playing .t{font-weight:600;color:var(--green)}
+.pl-item.playing .idx{color:var(--green)}
+.pl-foot{flex:none;padding:9px 18px;border-top:1px solid rgba(201,183,149,.4);font-size:10.5px;color:var(--ink-3);letter-spacing:1px;display:flex;justify-content:space-between}
+
+/* 附件盒子 */
+.file-box{flex:1}
+.frow{
+  display:grid;grid-template-columns:34px 1fr auto;gap:14px;align-items:center;
+  padding:11px 18px;border-bottom:1px solid rgba(201,183,149,.4);
+  transition:background .3s var(--ease);
+}
+a.frow{text-decoration:none;color:inherit;cursor:pointer}
+a.frow:hover{background:rgba(255,252,242,.65)}
+.frow .fico{
+  width:30px;height:38px;border:1px solid var(--hair-2);background:var(--white);
+  display:grid;place-items:center;font-size:8.5px;letter-spacing:1px;color:var(--coffee);font-weight:600;
+}
+.frow .fico.pdf{color:var(--orange);border-color:rgba(255,127,0,.55)}
+.frow .fname{font-size:12.5px;letter-spacing:.3px;line-height:1.45}
+.frow .fmeta{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:1px}
+/* 行内操作：预览 + 下载（附件 / 电子书共用） */
+.frow .fops,.brow .bops{display:flex;gap:6px;flex:none}
+.fbtn{
+  font-size:11px;letter-spacing:1.2px;color:var(--coffee);background:var(--white);
+  border:1px solid var(--hair-2);padding:4px 11px;border-radius:4px;
+  white-space:nowrap;transition:all .25s var(--ease);cursor:pointer;
+}
+a.frow:hover .fbtn{border-color:var(--orange);color:var(--orange)}
+.fbtn.solid{background:var(--coffee);border-color:var(--coffee);color:var(--white)}
+a.frow:hover .fbtn.solid{background:var(--orange);border-color:var(--orange);color:var(--white)}
+
+/* 关联图书馆盒子（紧凑 · 展示课件与电子书的关联状态） */
+.lib-box{flex:none}
+.brow{
+  display:grid;grid-template-columns:32px 1fr auto;gap:12px;align-items:center;
+  padding:11px 16px;border-bottom:1px solid rgba(201,183,149,.4);
+  text-decoration:none;color:inherit;transition:background .3s var(--ease);
+}
+.brow:last-child{border-bottom:none}
+.brow:hover{background:rgba(255,252,242,.65)}
+/* 书脊式封面：橘色书脊 + 竖排书名 */
+.brow .bcover{
+  width:30px;height:42px;background:var(--white);border:1px solid var(--hair-2);
+  border-left:4px solid var(--orange);
+  display:flex;align-items:center;justify-content:center;
+  writing-mode:vertical-rl;letter-spacing:2px;
+  font-size:8.5px;color:var(--coffee);font-weight:600;flex:none;
+}
+.brow .bname{font-size:12px;letter-spacing:.3px;line-height:1.45}
+.brow .bmeta{font-size:10px;color:var(--ink-3);letter-spacing:.4px;margin-top:2px;display:flex;align-items:center;gap:5px}
+.brow .bmeta .link-dot{width:5px;height:5px;background:var(--green);flex:none}   /* 绿色点睛：已关联 */
+.brow:hover .fbtn{border-color:var(--orange);color:var(--orange)}
+.brow:hover .fbtn.solid{background:var(--orange);border-color:var(--orange);color:var(--white)}
+
+/* ---------- 左列：视频 + 控制 + 标题 + 前置知识点 ---------- */
+/* 视频区（16:9 画面 · 棕咖描边） */
+.video-wrap{flex:1;min-height:0;display:grid;place-items:center;padding:12px 0}
+.video{
+  position:relative;aspect-ratio:16/9;
+  height:min(100%,calc(100vh - var(--vres,334px)));
+  max-width:100%;
+  overflow:hidden;border:1.5px solid var(--coffee);border-radius:4px;
+  background:var(--white);   /* 播放器保持不透明纯白 */
+  box-shadow:none;
+  display:grid;place-items:center;
+}
+.video .vart{position:absolute;inset:0;width:100%;height:100%}
+.video-cover{
+  width:clamp(120px,26vh,170px);height:clamp(120px,26vh,170px);border-radius:50%;
+  background:var(--wood);display:grid;place-items:center;position:relative;
+  box-shadow:inset 0 0 0 1px oklch(50% 0.03 55 / .5);
+}
+.video-cover::before{content:"";position:absolute;inset:22%;border-radius:50%;border:1px solid oklch(50% 0.025 55 / .55)}
+.video-cover::after{content:"";position:absolute;inset:38%;border-radius:50%;border:1px solid oklch(50% 0.025 55 / .4)}
+.video-cover .vlabel{width:38%;height:38%;border-radius:50%;background:var(--white);border:1px solid var(--hair);display:grid;place-items:center;z-index:1}
+.video-cover .vlabel i{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.video-cover.spin{animation:spin 12s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.video-badge{
+  position:absolute;top:14px;left:16px;z-index:2;
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:10.5px;letter-spacing:2px;color:var(--coffee);font-weight:600;
+  background:rgba(251,247,236,.92);
+  padding:6px 12px;border:1px solid var(--glass-line);border-radius:4px;
+}
+.video-badge .dot{width:6px;height:6px;background:var(--green);animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+/* ---- Bilibili 风格悬浮极简控制条（绝对定位盖在视频底部，不占独立空间） ---- */
+.vctrl{
+  position:absolute;left:0;right:0;bottom:0;z-index:4;
+  height:48px;padding:0 16px;
+  display:flex;align-items:center;gap:14px;
+  opacity:1;transform:none;
+  transition:opacity .3s var(--ease),transform .3s var(--ease);
+}
+/* 控制条背后的简约半透明灰色色块 */
+.vctrl::before{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:48px;z-index:-1;
+  background:rgba(40,40,40,.55);
+  pointer-events:none;
+}
+/* 播放中且鼠标不在播放器上 → 自动隐藏（透明度 0 + 下滑 4px） */
+.video.playing:not(:hover) .vctrl{opacity:0;transform:translateY(4px)}
+.video:not(.playing) .vctrl{opacity:1;transform:none}
+@media (hover:none){.vctrl{opacity:1;transform:none}}
+/* 图标按钮：24px 白色线性图标，无色块 / 圆角底 / 阴影 */
+.ibtn{
+  flex:none;width:24px;height:24px;padding:0;border:none;background:none;
+  display:grid;place-items:center;cursor:pointer;
+  color:rgba(255,255,255,.9);transition:color .2s;
+}
+.ibtn:hover{color:#fff}
+.ibtn svg{width:24px;height:24px;display:block}
+/* 白色文字按钮（倍速 / 清晰度）：无胶囊无边框 */
+.tbtn{
+  flex:none;border:none;background:none;padding:0;cursor:pointer;
+  font-size:14px;letter-spacing:.5px;line-height:1;
+  color:rgba(255,255,255,.9);transition:color .2s;white-space:nowrap;
+}
+.tbtn:hover{color:#fff}
+/* 时间：最右，12px 等宽数字 */
+.ctime{
+  flex:none;margin-left:2px;font-size:12px;letter-spacing:.4px;
+  color:rgba(255,255,255,.9);font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+/* 进度条：单行内 flex-1；默认 3px，hover 播放器 5px + 12px 圆点滑块 */
+.pbar{
+  flex:1;min-width:60px;height:3px;border-radius:1.5px;
+  background:rgba(255,255,255,.3);position:relative;cursor:pointer;
+  transition:height .2s var(--ease);
+}
+.video:hover .pbar{height:5px}
+.pbar i{
+  position:absolute;left:0;top:0;bottom:0;width:var(--p,42%);
+  background:#fff;border-radius:1.5px;
+}
+.pbar .knob{
+  position:absolute;left:var(--p,42%);top:50%;
+  width:12px;height:12px;border-radius:50%;background:#fff;
+  transform:translate(-50%,-50%) scale(0);
+  transition:transform .2s var(--ease);
+}
+.video:hover .pbar .knob{transform:translate(-50%,-50%) scale(1)}
+/* 悬停时间气泡：小黑框白字 */
+.pbar .tt{
+  position:absolute;bottom:calc(100% + 10px);left:var(--hx,42%);
+  transform:translateX(-50%) translateY(2px);
+  padding:3px 8px;border-radius:4px;
+  background:rgba(20,20,20,.9);color:#fff;
+  font-size:10.5px;letter-spacing:.5px;line-height:1.45;white-space:nowrap;
+  opacity:0;pointer-events:none;
+  transition:opacity .18s var(--ease),transform .18s var(--ease);
+}
+.pbar .tt::after{
+  content:"";position:absolute;left:50%;bottom:-4px;margin-left:-4px;
+  border:4px solid transparent;border-top-color:rgba(20,20,20,.9);
+}
+.pbar:hover .tt{opacity:1;transform:translateX(-50%)}
+/* 倍速 / 清晰度共用弹出菜单：深色半透明底，向上弹出，紧贴按钮上沿 8px */
+.pop-wrap{flex:none;position:relative;display:flex;align-items:center}
+.pmenu{
+  position:absolute;bottom:calc(100% + 8px);left:50%;
+  transform:translateX(-50%) translateY(4px);
+  min-width:128px;padding:4px 0;border-radius:8px;
+  background:rgba(0,0,0,.8);
+  opacity:0;pointer-events:none;
+  transition:opacity .18s var(--ease),transform .18s var(--ease);
+}
+.pop-wrap.menu-on .pmenu{opacity:1;pointer-events:auto;transform:translateX(-50%)}
+.pmenu button{
+  display:flex;align-items:center;gap:8px;width:100%;height:36px;padding:0 14px;
+  border:none;background:none;cursor:pointer;
+  font-size:13px;letter-spacing:.3px;color:#fff;white-space:nowrap;
+  transition:background .15s;
+}
+.pmenu button:hover{background:rgba(255,255,255,.1)}
+.pmenu button .dot{
+  flex:none;width:6px;height:6px;border-radius:50%;
+  background:transparent;
+}
+.pmenu button.on .dot{background:var(--orange)}  /* 当前项：橙色圆点，不做整行高亮 */
+
+/* 轻提示 */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);
+  background:rgba(38,29,16,.9);color:#fdf8ee;
+  font-size:11.5px;letter-spacing:1px;padding:8px 18px;border-radius:4px;
+  opacity:0;pointer-events:none;z-index:200;
+  transition:opacity .3s var(--ease),transform .3s var(--ease);
+}
+.toast.show{opacity:1;transform:translateX(-50%)}
+
+/* ---------- 左列整体：标题+前置+播放+简介 合装一个大框 ---------- */
+.main{
+  grid-column:1;grid-row:1;min-width:0;display:flex;flex-direction:column;min-height:0;
+  border:1.5px solid var(--coffee);border-radius:6px;
+  background:var(--glass);
+  box-shadow:5px 7px 0 rgba(93,67,38,.30), 0 18px 38px rgba(64,45,20,.28);
+  padding:14px 20px 16px;
+}
+
+/* 课程标题（大框内第一段） */
+.course-head{flex:none;padding:0 0 12px}
+.course-head h1{font-size:20px;font-weight:700;letter-spacing:1px;line-height:1.5;display:inline}
+.course-head h1 mark{
+  background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);
+  color:inherit;padding:0 2px;
+}
+
+/* 面包屑（标题上方，紧凑单行） */
+.crumbs{flex:none;display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--ink-3);letter-spacing:.5px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px dashed var(--hair-2)}
+.crumbs a{color:var(--ink-3);text-decoration:none;transition:color .25s}
+.crumbs a:hover{color:var(--orange)}
+.crumbs i{font-style:normal;color:var(--hair-2)}
+
+/* 视频简介（大框内末段 · 素面无纹理 · 盒内滚动） */
+.desc-box{
+  flex:none;border-top:1px dashed var(--hair-2);
+  max-height:96px;overflow-y:auto;padding:10px 4px 0;
+  scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
+}
+.desc-box::-webkit-scrollbar{width:4px}
+.desc-box::-webkit-scrollbar-thumb{background:var(--hair-2)}
+.desc-box p{font-size:12.5px;color:var(--ink-2);line-height:1.8}
+
+/* ---------- 前置知识点（大框内 · 单行 · 老师可设置） ---------- */
+.prereq{
+  flex:none;display:flex;align-items:center;gap:16px;
+  padding:10px 4px;border-top:1px dashed var(--hair-2);
+}
+.prereq .lbl{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--coffee);flex:none}
+.prereq .items{display:flex;align-items:center;gap:18px;flex:1;min-width:0;overflow:hidden}
+.pi{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);white-space:nowrap;cursor:pointer;transition:color .25s}
+.pi:hover{color:var(--ink)}
+.pi i{width:6px;height:6px;flex:none;background:var(--hair-2)}
+.pi .pm{font-size:10.5px;color:var(--ink-3)}
+.prereq .edit{
+  margin-left:auto;flex:none;font-size:10.5px;letter-spacing:1.5px;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:3px 11px;transition:all .3s var(--ease);
+}
+.prereq .edit:hover{border-color:var(--orange);color:var(--orange)}
+
+/* ============ 入场动效 ============ */
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+.rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){
+  .rise{opacity:1;transform:none;animation:none}
+  .video-cover,.pl-item .eq i,.video-badge .dot{animation:none !important}
+}
+
+/* ============ 响应式（小屏恢复页面滚动） ============ */
+@media (max-width:1024px){
+  body{overflow:auto;display:block}
+  .detail{grid-template-columns:1fr;gap:24px;padding-bottom:40px}
+  .main{grid-column:auto;order:-1}
+  .side{grid-column:auto}
+  .pl-box,.file-box,.lib-box{max-height:340px}
+  .video{width:100%;height:auto}
+  .prereq{flex-wrap:wrap}
+  .prereq .items{flex-wrap:wrap;overflow:visible}
+}
+@media (max-width:640px){
+  .detail{padding-left:20px;padding-right:20px}
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .frow{grid-template-columns:34px 1fr}
+  .frow .fdl{display:none}
+  .brow{grid-template-columns:32px 1fr}
+  .brow .bgo{display:none}
+}
+</style>
+</head>
+<body data-page-node-id="ruf1oNRH96JYtxjEQxQY1U">
+
+<!-- ================= 导航 ================= -->
+<nav class="nav" data-page-node-id="FViHxVcyFJ5V7oWwaOnkqg">
+  <div class="nav-inner" data-page-node-id="pRKB08x54LGNERl1iXlKvv">
+    <a class="logo" href="#" data-page-node-id="Pb2i5eqLCbqYo7PUT8eABP">
+      <span class="mark" data-page-node-id="ub5ypeGke21Mzs4qfsYVo0"></span>
+      能学慧吉他教室
+      <small data-page-node-id="YJE8H3dLlgoYKhlHKaHF3k">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="22Fh2QKQr0Vg27MsayqcTK">
+      <a href="#" data-page-node-id="UTMv4vXheznd2BsKc2CFud">首页</a>
+      <a href="#" class="active" data-page-node-id="uEwKxtsNb9SkvEO6eLmE9Z">课程</a>
+      <a href="#" data-page-node-id="9hEg7NzFjF7vVIehnMuQke">曲目</a>
+      <a href="#" data-page-node-id="nLibX9te2QsKVr8Hh5mUbC">图书馆</a>
+      <a href="#" data-page-node-id="kJd3Rw7pXqLmNa5uTcVe2B">作业记录</a>
+    </div>
+    <div class="nav-right" data-page-node-id="Qw5rkYI1tkJdIsGXtGHlni">
+      <div class="avatar" data-page-node-id="TytqxbzaAMtfQUoZSHbVgT">李</div>
+    </div>
+  </div>
+</nav>
+
+<main class="detail" data-page-node-id="2Q0svx3opXS0dVclz3JrO0">
+
+  <!-- ================= 右列：播放列表（内滚）+ 附件下载（内滚） ================= -->
+  <div class="side" data-page-node-id="EATD2pomaoEQKScrCUph3t">
+
+    <!-- 播放列表 -->
+    <div class="box pl-box rise" data-page-node-id="9vs3DRGuav0OLpBF67E0p6">
+      <div class="box-head" data-page-node-id="qgFHBVczPMmtkGeCUeVcsX">
+        <h2 data-page-node-id="GKPlghvIZVg4NCZaRvBwvP">播放列表</h2>
+        <a class="more" href="#" data-page-node-id="qGlqUom7rtiq7ZLoZCdLrw">13 段</a>
+      </div>
+        <div class="scroll" style="flex:1" data-page-node-id="gHJgzufFaccBlB36OKXQzH">
+        <div class="pl-item" data-page-node-id="IKTnUoyM4DInsHFOsFczS7">
+          <span class="idx num" data-page-node-id="dydSiMb70V74aOf8ojGG58">01</span>
+          <div class="t" data-page-node-id="WnDoKtX1z4tJDnwcHr6hhb">课程介绍与曲目欣赏</div>
+          <span class="len num" data-page-node-id="d3N8mix8gowOwvRHf9SzQJ">03:20</span>
+        </div>
+
+        <div class="pl-item" data-page-node-id="3UCdEGwR8Nnz3BE5CIn6N1">
+          <span class="idx num" data-page-node-id="CI3sTrioMd4A9PBiFBPFEn">02</span>
+          <div class="t" data-page-node-id="iWVNX1z2zHA3ygKI7nVa58">完整示范 · 原速</div>
+          <span class="len num" data-page-node-id="sCWtqMntrVE88UONnP186H">02:45</span>
+        </div>
+        <div class="pl-item" data-page-node-id="lQ10bNlYTAHDuYvw8TMeuT">
+          <span class="idx num" data-page-node-id="3l9SgkywqsEA9ihLSQ4p3R">03</span>
+          <div class="t" data-page-node-id="r2ZmmXfAGTj6OATsGLbYMu">完整示范 · 慢速 0.6×</div>
+          <span class="len num" data-page-node-id="5i8tzKQO5DjfWy51zDNBhl">04:10</span>
+        </div>
+
+        <div class="pl-item" data-page-node-id="e6DJqGaEYSByn8YIArxbPE">
+          <span class="idx num" data-page-node-id="bZlz8DV6wJ8cjk6u4qXjsZ">04</span>
+          <div class="t" data-page-node-id="02vPDBZjgpyWaK0hQ9iluv">前奏 · 指法安排</div>
+          <span class="len num" data-page-node-id="AFjDuSxQrHlHe4JmAxIWcU">05:30</span>
+        </div>
+        <div class="pl-item" data-page-node-id="34vgq9bNC3eCo55qXdR3UP">
+          <span class="idx num" data-page-node-id="NDFkPOZocckMAFxl9vXh7N">05</span>
+          <div class="t" data-page-node-id="NJpBYzFgF5ayN5kioDrdk7">A 段讲解 · 分句与呼吸</div>
+          <span class="len num" data-page-node-id="hn49rMBqaLjG750ga0n8kO">07:15</span>
+        </div>
+        <div class="pl-item" data-page-node-id="bDFDYatLrPfjn7zcvRsEuk">
+          <span class="idx num" data-page-node-id="CGDnV2JZ4MFjRc8ROgjohB">06</span>
+          <div class="t" data-page-node-id="xOq9PO0yECVA5kGNxiBCdi">B 段讲解 · 低音走向</div>
+          <span class="len num" data-page-node-id="z6cgBRJeabRTPmdZp8W9qL">06:40</span>
+        </div>
+        <div class="pl-item playing" data-page-node-id="ZFN9jMa1YNwzBA9go27THS">
+          <span class="idx num" data-page-node-id="UJuqBO2QfYDCTvS7HjIS6I"><span class="eq" aria-hidden="true" data-page-node-id="3bd4llAJgeLVDDSkd2oqQo"><i data-page-node-id="0YosIWOSzd4SK7qMqF2Pox"></i><i data-page-node-id="7t2uMaCUTCifhyOHtHCzqA"></i><i data-page-node-id="BV2j1lJRiFxwKRgYUroDgg"></i></span></span>
+          <div class="t" data-page-node-id="90CW3irJWBfAedvlQa1hDt">副歌 · 渐强与情绪推起</div>
+          <span class="len num" data-page-node-id="kuTSDVuGRwG9Kq6px7RsSa">08:05</span>
+        </div>
+        <div class="pl-item" data-page-node-id="1Ll5ZXQpUSxbUwKVfSAdtc">
+          <span class="idx num" data-page-node-id="M7SIB0ksxPyjZ50elV5RCX">08</span>
+          <div class="t" data-page-node-id="27Z8rFcyG39tsBrrKUm2dL">副歌 · 和弦转换细节</div>
+          <span class="len num" data-page-node-id="T9HD4sKW95mKQdrkJqaMve">05:50</span>
+        </div>
+        <div class="pl-item" data-page-node-id="BVbSn7LGhUaAcfaywecqAK">
+          <span class="idx num" data-page-node-id="XBhTroeShx3I8nNiGz3ttz">09</span>
+          <div class="t" data-page-node-id="12TRKI4iXMtN8WoEEFW10k">桥段 · 泛音触弦角度</div>
+          <span class="len num" data-page-node-id="tWI0xlJ41TkUVpE7v6X0Bn">06:20</span>
+        </div>
+
+        <div class="pl-item" data-page-node-id="eDvvWSu7gZcwjqlYg4sdUJ">
+          <span class="idx num" data-page-node-id="zNgoRYUztesuUe5XMXpa1Z">10</span>
+          <div class="t" data-page-node-id="wRDTXMkqNrJgmE7hM04jXA">跟练 · 分段慢速循环</div>
+          <span class="len num" data-page-node-id="hLxUMmGzLO0iVoXTiPwhSE">10:00</span>
+        </div>
+        <div class="pl-item" data-page-node-id="q78rgizea6yR0N0b8Dwa0Z">
+          <span class="idx num" data-page-node-id="o17nPC7ObQh1pa4qLnBCxN">11</span>
+          <div class="t" data-page-node-id="gcMwTA8nu674CDqivAVgjS">跟练 · 原速伴奏</div>
+          <span class="len num" data-page-node-id="sSU4a5wzAgsOirOAXpOtRE">03:30</span>
+        </div>
+        <div class="pl-item" data-page-node-id="RluyaCz20xKuxTIf0kOstk">
+          <span class="idx num" data-page-node-id="mIFsOEqK21pxtK1p7BTk9H">12</span>
+          <div class="t" data-page-node-id="joVscooIuoS94UQdnkcTXJ">常见错误纠正</div>
+          <span class="len num" data-page-node-id="ododYQvACPldJ7TVcKmynY">05:15</span>
+        </div>
+        <div class="pl-item" data-page-node-id="o9ydysMrfqvXesqrST8sLH">
+          <span class="idx num" data-page-node-id="3MjulBreQrkqCYA4AvEOM1">13</span>
+          <div class="t" data-page-node-id="OCnmzBTr9rD6amo2iaf8RU">课后作业与下次预告</div>
+          <span class="len num" data-page-node-id="qUtZa9gFFanChSx5qlMBJM">02:40</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 附件资料（盒内滚动） -->
+    <div class="box file-box rise d1" data-page-node-id="FoAKKHBnnBzxEr4VCb0ErK">
+      <div class="box-head" data-page-node-id="099JbhuggR5EcWIlOy0KBO">
+        <h2 data-page-node-id="IZ2muiE1jhAV23RFgJWkwF">附件资料</h2>
+        <a class="more" href="#" data-page-node-id="yuqJo29JpMqbeYl78W2FAa">全部下载</a>
+      </div>
+      <div class="scroll" style="flex:1" data-page-node-id="OhOryUowNz5pa3S95vJaFB">
+        <a class="frow" href="#" data-page-node-id="8GlF22lk2XYnrOI3dV70Zu">
+          <span class="fico pdf" data-page-node-id="LTp8IO0C4E3LXJFzC67Hl3">PDF</span>
+          <div data-page-node-id="hKQY9laBHMfU6WbJkJczmj">
+            <div class="fname" data-page-node-id="h46UbMFAKDaLcGDKow34XI">副歌段落六线谱（含指法标注）</div>
+            <div class="fmeta" data-page-node-id="0GDFNCyXxyFlCHtqNdNayg">3 天前 · 陈老师</div>
+          </div>
+          <span class="fops" data-page-node-id="2jmQchQu8Qq46XQ5jGpZva"><span class="fbtn" role="button" tabindex="0" data-act="prev" data-page-node-id="2jmQchQu8Qq46XQ5jGpZvaPv">预览</span><span class="fbtn solid" role="button" tabindex="0" data-act="dl" data-page-node-id="2jmQchQu8Qq46XQ5jGpZvaDl">下载</span></span>
+        </a>
+        <a class="frow" href="#" data-page-node-id="py5iFT0unxN9DkLGBuHc4g">
+          <span class="fico" data-page-node-id="tYItsOKtyeqCQyGKkRhlAL">GP</span>
+          <div data-page-node-id="at6n0keZyIjNkJlVcXT0z8">
+            <div class="fname" data-page-node-id="w1DmmpDoUg7hqBUCrUpuFX">Guitar Pro 源文件 · 可调速跟练</div>
+            <div class="fmeta" data-page-node-id="OfsAG1TLC77aUXpMgy9I2s">3 天前 · 陈老师</div>
+          </div>
+          <span class="fops" data-page-node-id="LzJQ05OsdB5FRukzE5mqOU"><span class="fbtn solid" role="button" tabindex="0" data-act="dl" data-page-node-id="LzJQ05OsdB5FRukzE5mqOUDl">下载</span></span>
+        </a>
+        <a class="frow" href="#" data-page-node-id="LFMnE6AFaEgljYzA6rC8pG">
+          <span class="fico" data-page-node-id="FlRVxqT4yu69NZOS8PODgr">MP3</span>
+          <div data-page-node-id="3kpzq9blsiIiko9J4GAHUR">
+            <div class="fname" data-page-node-id="caQn0F2S2KaW0CaJzVbcbe">慢速 0.6× 跟练伴奏 · 无主旋律</div>
+            <div class="fmeta" data-page-node-id="EfxKOBLLSBBFCbA4dQjtB0">1 周前 · 教研组</div>
+          </div>
+          <span class="fops" data-page-node-id="SUlt5zVobe48byxS2hfoMu"><span class="fbtn" role="button" tabindex="0" data-act="play" data-page-node-id="SUlt5zVobe48byxS2hfoMuPv">播放</span><span class="fbtn solid" role="button" tabindex="0" data-act="dl" data-page-node-id="SUlt5zVobe48byxS2hfoMuDl">下载</span></span>
+        </a>
+        <a class="frow" href="#">
+          <span class="fico">MP4</span>
+          <div>
+            <div class="fname">完整示范 · 副歌段落慢速演示</div>
+            <div class="fmeta">1 周前 · 陈老师</div>
+          </div>
+          <span class="fops"><span class="fbtn" role="button" tabindex="0" data-act="play">播放</span><span class="fbtn solid" role="button" tabindex="0" data-act="dl">下载</span></span>
+        </a>
+        <a class="frow" href="#" data-page-node-id="dc3JZrGrUghlHS7lYdQqyM">
+          <span class="fico" data-page-node-id="3mc1KM7rhEHSWfHGA8HVWX">PNG</span>
+          <div data-page-node-id="HfcoF2QkwA4chyLnnlsyG3">
+            <div class="fname" data-page-node-id="qExNHUM1D9gErlZirMfgLb">右手触弦角度示意图（渐强三阶段）</div>
+            <div class="fmeta" data-page-node-id="TsaaOiNI6jXCYexASfZ2ev">1 周前 · 陈老师</div>
+          </div>
+          <span class="fops" data-page-node-id="cZgjN87gqrtFVNjLDtVbfx"><span class="fbtn" role="button" tabindex="0" data-act="prev" data-page-node-id="cZgjN87gqrtFVNjLDtVbfxPv">预览</span><span class="fbtn solid" role="button" tabindex="0" data-act="dl" data-page-node-id="cZgjN87gqrtFVNjLDtVbfxDl">下载</span></span>
+        </a>
+        <a class="frow" href="#" data-page-node-id="pstlAREWnhJoDUHGGeuO9U">
+          <span class="fico pdf" data-page-node-id="eMlRW93grdJ7oM0n5TSlte">PDF</span>
+          <div data-page-node-id="T3MKFtYtCkRY6mPZMVAdGc">
+            <div class="fname" data-page-node-id="nill7VuK8Rbc4NhLGQkr9B">本课练习计划表 · 7 天打卡版</div>
+            <div class="fmeta" data-page-node-id="zHqOoe5zURUDiXhsB7Ymqe">2 周前 · 教研组</div>
+          </div>
+          <span class="fops" data-page-node-id="9STKlY9iBxutzqOlHwdDwi"><span class="fbtn" role="button" tabindex="0" data-act="prev" data-page-node-id="9STKlY9iBxutzqOlHwdDwiPv">预览</span><span class="fbtn solid" role="button" tabindex="0" data-act="dl" data-page-node-id="9STKlY9iBxutzqOlHwdDwiDl">下载</span></span>
+        </a>
+      </div>
+    </div>
+
+    <!-- 关联图书馆（课件 ↔ 电子书关联状态） -->
+    <div class="box lib-box rise d2" data-page-node-id="pL1b7XqkNnLX2D9FiuSba">
+      <div class="box-head" data-page-node-id="sVt9n8RQEKcyHJ4baWpxL">
+        <h2 data-page-node-id="tXm5kCw9FvUorLFeJhzYy">图书馆</h2>
+        <a class="more" href="#" data-page-node-id="uWk4pRzGcXoJvTNeBhLqs">进入图书馆</a>
+      </div>
+      <a class="brow" href="#" data-page-node-id="vYq2nCsTfKpHwLMdoRbxm">
+        <span class="bcover" data-page-node-id="wZn6vDtShJqXREePkLmoC">卡农进阶</span>
+        <div data-page-node-id="xBr8wFuQcMkTVpGLnJeAs">
+          <div class="bname" data-page-node-id="yCt4xGvRnLpWQHfDiKzbt">卡农独奏进阶教程（电子书）</div>
+          <div class="bmeta" data-page-node-id="zDv5yHwScMXRJIGEoLAcut"><span class="link-dot"></span>已关联 · 第 5 章 渐强与音色层次</div>
+        </div>
+        <span class="bops" data-page-node-id="aEw7zKtTnQYSLJhFvMxbu"><span class="fbtn" role="button" tabindex="0" data-act="prev" data-page-node-id="aEw7zKtTnQYSLJhFvMxbuPv">预览</span><span class="fbtn solid" role="button" tabindex="0" data-act="dl" data-page-node-id="aEw7zKtTnQYSLJhFvMxbuDl">下载</span></span>
+      </a>
+    </div>
+
+  </div>
+
+  <!-- ================= 左列：标题 + 前置知识点 + 视频 + 简介 ================= -->
+  <div class="main" data-page-node-id="4Gnd6pajvOrvKjpgSaNzx5">
+
+    <!-- 课程标题 -->
+    <div class="course-head rise" data-page-node-id="kYy5YF8arCCtuBCTDFcSqc">
+      <div class="crumbs" data-page-node-id="PdRfZtRpJPL3CLXJsccwyv">
+        <a href="#" data-page-node-id="yssoGZgK6j9SQX8YmhDKg2">指弹进阶 S2</a><i data-page-node-id="7HjWSV08VcpDY0Vp9ZFdA5">/</i><span data-page-node-id="OZsh6LFZxgd9cikZjQil7T">第 12 课 · 共 16 课</span>
+      </div>
+      <h1 data-page-node-id="vPZSBRQgYebgSRMKC5FuLs"><mark>卡农独奏 · 副歌段落精讲</mark>：渐强与情绪推起</h1>
+    </div>
+
+    <!-- 前置知识点（单行 · 老师可设置） -->
+    <div class="prereq rise d1" data-page-node-id="N4Dg7Fye14HHULGqDZvQwJ">
+      <span class="lbl" data-page-node-id="BkwxAkBY2nB6FyUAu97Pza">前置知识点</span>
+      <div class="items" data-page-node-id="f6YriAggjA1o9cVNAEDutU">
+        <span class="pi" data-page-node-id="Lf8XpypnvtYCriC3szJlB1"><i data-page-node-id="0H5iDMcdM4OphN1GjYhZ3c"></i>看懂和弦进行：1645 的秘密<span class="pm">26 分钟</span></span>
+        <span class="pi" data-page-node-id="ztojTMSEsGnslOs9sIYdoC"><i data-page-node-id="rfkMk2g6rKpPh55c7Cawlo"></i>右手指法与触弦角度入门<span class="pm">28 分钟</span></span>
+        <span class="pi" data-page-node-id="H7ZiFunLrGpMtZvBT9GwqD"><i data-page-node-id="1Lhog7XGod2fD6tbY7EKF7"></i>低音独立性：拇指保持训练<span class="pm">30 分钟</span></span>
+      </div>
+    </div>
+
+    <!-- 视频区 -->
+    <div class="video-wrap rise d1" data-page-node-id="8IUkQeWbqZRQ4zxXlD2o9q">
+      <div class="video" data-page-node-id="sDlNAMM1EudgcbUrIqaE0f">
+        <svg class="vart" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice" aria-hidden="true" data-page-node-id="SkrpiIEazTZ5aZWm8CAWTp">
+          <rect width="800" height="450" fill="oklch(95% 0.012 85)" data-page-node-id="gpDPWIwEpGCxvj4pG6B2uW"/>
+          <g fill="none" stroke="oklch(78% 0.02 70)" stroke-width="1" data-page-node-id="bF23YtqgUl6iAbQGNUZpNw">
+            <circle cx="400" cy="225" r="230" data-page-node-id="b6HyvKx8E9d4K7OkoOxrTB"/>
+            <circle cx="400" cy="225" r="170" stroke-dasharray="2 5" data-page-node-id="SarmzS6BTcHJqQ8vzaYvio"/>
+            <circle cx="400" cy="225" r="110" data-page-node-id="JGBrTzyliLBFtoCjMnGFsK"/>
+            <line x1="60" y1="420" x2="740" y2="30" opacity=".6" data-page-node-id="vqjCXupl2LJc2J2KvWFNCQ"/>
+            <line x1="110" y1="430" x2="760" y2="60" opacity=".35" data-page-node-id="gzQP6Eqj1XyIC9jscPK1rf"/>
+          </g>
+          <g fill="none" stroke="oklch(66% 0.03 68)" stroke-width="1.2" data-page-node-id="KIqPssNbWLp35Q8jiyZYk2">
+            <path d="M540 96 q40 -18 78 0" opacity=".8" data-page-node-id="R3yIaekX0SCpa3S7zAktCB"/>
+            <path d="M560 116 q30 -13 56 0" opacity=".6" data-page-node-id="6NWJ5dttFpHAGBIOigTJcY"/>
+          </g>
+          <circle cx="648" cy="84" r="3.5" fill="oklch(47% 0.13 25)" data-page-node-id="VVClPBw7HO2GlMB9an7sON"/>
+        </svg>
+        <span class="video-badge" data-page-node-id="QXFclo5jiROwWyUjbeAxci"><span class="dot" data-page-node-id="ufEW27gOJY1a9GbQ7jntuy"></span>正在播放 · 副歌段落</span>
+        <div class="video-cover" id="vinyl" aria-hidden="true" data-page-node-id="h5ZoiROsbDOL2QnsobgVj5">
+          <div class="vlabel" data-page-node-id="4ybF6Yre2AOjTyq3zyFkU7"><i data-page-node-id="GH7bhu9NmrfFx3cK147FbQ"></i></div>
+        </div>
+        <!-- Bilibili 风格悬浮极简控制条：播放 → 下一曲 → 倍速 → 进度条 → 清晰度 → 全屏 → 时间 -->
+        <div class="vctrl">
+          <button class="ibtn" id="mainPlay" aria-label="暂停">
+            <svg viewBox="0 0 24 24" fill="currentColor" id="playIcon"><path d="M8 6h2.4v12H8V6Zm5.6 0H16v12h-2.4V6Z"/></svg>
+          </button>
+          <button class="ibtn" id="nextBtn" aria-label="下一曲">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 6H17v12h-1.5V6ZM6 6.8 15 12l-9 5.2V6.8Z"/></svg>
+          </button>
+          <div class="pop-wrap" id="speedWrap">
+            <button class="tbtn" id="speedBtn" aria-haspopup="menu">1.0x</button>
+            <div class="pmenu" id="speedMenu" role="menu"></div>
+          </div>
+          <div class="pbar" id="vBar" role="slider" aria-label="播放进度 42%" aria-valuemin="0" aria-valuemax="100" aria-valuenow="42" data-total="32:00"><i></i><span class="knob"></span><span class="tt" id="vTime">13:26</span></div>
+          <div class="pop-wrap" id="qualWrap">
+            <button class="tbtn" id="qualBtn" aria-haspopup="menu">1080P</button>
+            <div class="pmenu" id="qualMenu" role="menu"></div>
+          </div>
+          <button class="ibtn" id="fsBtn" aria-label="全屏">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+          </button>
+          <span class="ctime num" id="ctime">13:26 / 32:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 视频简介（盒内滚动） -->
+    <div class="desc-box rise d2">
+      <p>本节课聚焦副歌段落的动态处理：如何用右手指甲角度与触弦深度的变化做出渐强，并在第 9 小节的和弦转换处保持低音连贯。建议先看完整示范（02/03 段），再进入分段讲解，最后跟随慢速循环练习（10 段）。练习中的疑问可在对应时间点留言给老师；完成本课练习后，请录制副歌段落一段并提交作业，老师会在 24 小时内逐句反馈。常见问题：渐强时手腕紧张、和弦转换抢拍、泛音不响，均可在 12 段「常见错误纠正」中找到对照与练习方法。</p>
+    </div>
+
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  // 播放/暂停（黑胶旋转联动；暂停时控制层常显）
+  const mainBtn = document.getElementById('mainPlay');
+  const mainIcon = document.getElementById('playIcon');
+  const vinyl = document.getElementById('vinyl');
+  const videoBox = document.querySelector('.video');
+  const PLAY = '<path d="M9 6.2 16.5 12 9 17.8V6.2Z"/>';
+  const PAUSE = '<path d="M8 6h2.4v12H8V6Zm5.6 0H16v12h-2.4V6Z"/>';
+  let playing = true;
+  function render(){
+    vinyl.classList.toggle('spin', playing);
+    videoBox.classList.toggle('playing', playing);   /* 播放中且未 hover → 控制条自动隐藏 */
+    mainIcon.innerHTML = playing ? PAUSE : PLAY;
+    mainBtn.setAttribute('aria-label', playing ? '暂停' : '播放');
+  }
+  mainBtn.addEventListener('click', () => { playing = !playing; render(); });
+  render();
+  document.getElementById('nextBtn').addEventListener('click', () => toast('演示：切到下一曲'));
+  document.getElementById('fsBtn').addEventListener('click', () => toast('演示：进入全屏'));
+
+  /* ===== 共用弹出菜单组件（倍速 / 清晰度） ===== */
+  function setupMenu(wrapId, btnId, menuId, items, cur, fmt, onPick){
+    const wrap = document.getElementById(wrapId);
+    const btn  = document.getElementById(btnId);
+    const menu = document.getElementById(menuId);
+    let hideTimer = null;
+    function renderMenu(){
+      menu.innerHTML = items.map((it, i) =>
+        '<button type="button" role="menuitem' + (i === cur ? 'radio' : '') + '"' + (i === cur ? ' class="on"' : '') + ' data-i="' + i + '">' +
+          '<span class="dot"></span><span>' + it.label + '</span>' +
+        '</button>'
+      ).join('');
+    }
+    function open(){ clearTimeout(hideTimer); wrap.classList.add('menu-on'); }
+    function closeDelay(){ clearTimeout(hideTimer); hideTimer = setTimeout(() => wrap.classList.remove('menu-on'), 150); } /* 移开 150ms 后收起，防误关 */
+    wrap.addEventListener('mouseenter', open);
+    wrap.addEventListener('mouseleave', closeDelay);
+    menu.addEventListener('click', e => {
+      const b = e.target.closest('button[data-i]'); if(!b) return;
+      cur = parseInt(b.dataset.i, 10);
+      btn.textContent = fmt(items[cur]);
+      renderMenu();
+      wrap.classList.remove('menu-on');
+      onPick(items[cur]);
+    });
+    renderMenu();
+    btn.textContent = fmt(items[cur]);
+    return { get cur(){ return cur; } };
+  }
+
+  /* 倍速菜单 */
+  const SPEEDS = [
+    {label:'2.0x', v:2.0}, {label:'1.5x', v:1.5}, {label:'1.25x', v:1.25},
+    {label:'1.0x', v:1.0}, {label:'0.75x', v:0.75}, {label:'0.5x', v:0.5},
+  ];
+  setupMenu('speedWrap', 'speedBtn', 'speedMenu', SPEEDS, 3,
+    it => it.label,
+    it  => toast('演示：倍速调整为 ' + it.label));
+
+  /* 清晰度菜单：切换保持播放进度（记录 currentTime → 换源 → seek 回原位置） */
+  const QUALITIES = [
+    {label:'1080P 高清', tag:'1080P'},
+    {label:'720P 高清',  tag:'720P'},
+    {label:'480P 清晰',  tag:'480P'},
+    {label:'360P 流畅',  tag:'360P'},
+  ];
+  function currentSec(){ return TOTAL * curPct(); }
+  setupMenu('qualWrap', 'qualBtn', 'qualMenu', QUALITIES, 0,
+    it => it.tag,
+    it  => {
+      const t = currentSec();                                    /* 切换前记录进度 */
+      toast('演示：已切换至 ' + it.label + '（进度保持 ' + fmtTime(t) + '）');
+      seekTo(t);                                                 /* 换源后 seek 回原位置 */
+    });
+
+  /* ===== 进度条：悬停时间气泡 · 点击定位 ===== */
+  const vBar = document.getElementById('vBar');
+  const vTime = document.getElementById('vTime');
+  const ctime = document.getElementById('ctime');
+  const TOTAL = (() => {
+    const t = (vBar.dataset.total || '0:00').split(':');
+    return parseInt(t[0], 10) * 60 + parseInt(t[1], 10);
+  })();
+  const fmtTime = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+  const posPct = e => {
+    const r = vBar.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  };
+  let curP = 0.42;
+  function curPct(){ return curP; }
+  function applyP(p){
+    curP = p;
+    vBar.style.setProperty('--p', (p * 100).toFixed(2) + '%');
+    vBar.setAttribute('aria-valuenow', Math.round(p * 100));
+    ctime.textContent = fmtTime(TOTAL * p) + ' / ' + fmtTime(TOTAL);
+  }
+  function seekTo(sec){ applyP(Math.min(1, Math.max(0, sec / TOTAL))); }
+  vBar.addEventListener('mousemove', e => {
+    const p = posPct(e);
+    vTime.textContent = fmtTime(TOTAL * p);
+    vBar.style.setProperty('--hx', (p * 100).toFixed(2) + '%');   /* 气泡跟随鼠标 */
+  });
+  vBar.addEventListener('click', e => {
+    const p = posPct(e);
+    applyP(p);
+    vBar.style.setProperty('--hx', (p * 100).toFixed(2) + '%');
+    vTime.textContent = fmtTime(TOTAL * p);
+  });
+  vBar.style.setProperty('--hx', '42%');   /* 初始与播放进度对齐 */
+
+  /* ===== 附件 / 电子书：预览 · 下载 ===== */
+  const toastEl = document.getElementById('toast');
+  let toastTimer = null;
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1900);
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if(!b) return;
+    e.preventDefault(); e.stopPropagation();
+    const row = b.closest('.frow, .brow');
+    const nameEl = row && row.querySelector('.fname, .bname');
+    const nm = nameEl ? nameEl.textContent : '文件';
+    const actMsg = { prev:'演示：预览「', play:'演示：立即播放「', dl:'演示：开始下载「' }[b.dataset.act];
+    if(actMsg) toast(actMsg + nm + '」');
+  });
+  document.addEventListener('keydown', e => {
+    if((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[data-act]')){
+      e.preventDefault(); e.target.click();
+    }
+  });
+</script>
+</body>
+</html>

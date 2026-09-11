@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跳转中… · 能学慧吉他教室（管理端）</title>
+<script>
+/* 旧版三步向导已拆分为两个独立页面：
+   新建合集 -> admin-create-track-collection.html?zone=...
+   新建单课 -> admin-create-track-point.html?zone=...
+   区域由入口（曲目区 / 知识点区）的 ?zone= 参数决定 */
+(function(){
+  const p = new URLSearchParams(location.search);
+  const zone = p.get('zone') === 'knowledge' ? 'knowledge' : (p.get('zone') === 'track' ? 'track' : '');
+  const type = p.get('type') === 'collection' ? 'collection' : 'lesson';
+  const page = type === 'collection' ? 'admin-create-track-collection.html' : 'admin-create-track-point.html';
+  location.replace(zone ? page + '?zone=' + zone : page);
+})();
+</script>
+</head>
+<body style="font-family:sans-serif;color:#5d4326;background:#f2ead9;display:grid;place-items:center;height:100vh;margin:0">
+正在打开创建页…
+</body>
+</html>

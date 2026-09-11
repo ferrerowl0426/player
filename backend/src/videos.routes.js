@@ -2,7 +2,8 @@ import path from 'node:path';
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { pool } from './db.js';
-import { requireAdmin, requireSuperAdmin, requireUserOrAdmin } from './auth.js';
+import { config } from './config.js';
+import { requireSuperAdmin, requireUserOrAdmin } from './auth.js';
 import {
   abortMultipartUpload,
   completeMultipartUpload,
@@ -15,6 +16,8 @@ import {
   getPublicUrl,
   normalizePublicUrl
 } from './storage.js';
+import { createInitialRenditions, deleteObjectKeys, getVideoObjectKeys, upsertRendition, verifyCiSignature } from './transcode.js';
+import { logStandaloneDeletion } from './deletion.js';
 
 const TITLE_MAX_LENGTH = 120;
 const DESCRIPTION_MAX_LENGTH = 1000;
@@ -224,24 +227,7 @@ async function ensurePrerequisitesValid({ videoId, prerequisiteVideoIds }) {
     return '部分前置知识点视频不存在';
   }
 
-  const cycleResult = await pool.query(
-    `WITH RECURSIVE downstream AS (
-       SELECT video_id, prerequisite_video_id
-       FROM video_prerequisites
-       WHERE prerequisite_video_id = $1
-       UNION
-       SELECT vp.video_id, vp.prerequisite_video_id
-       FROM video_prerequisites vp
-       JOIN downstream d ON vp.prerequisite_video_id = d.video_id
-     )
-     SELECT 1
-     FROM downstream
-     WHERE video_id = ANY($2::int[])
-     LIMIT 1`,
-    [videoId, prerequisiteVideoIds]
-  );
-
-  return cycleResult.rowCount > 0 ? '前置知识点不能形成循环引用' : '';
+  return '';
 }
 
 function isExpectedUploadKey(key, prefix) {
@@ -272,6 +258,13 @@ function formatVideoResponse(video) {
     ...video,
     video_url: normalizePublicUrl(video.video_url),
     cover_url: normalizePublicUrl(video.cover_url)
+  };
+}
+
+function formatRenditionResponse(rendition) {
+  return {
+    ...rendition,
+    video_url: normalizePublicUrl(rendition.video_url)
   };
 }
 
@@ -356,7 +349,7 @@ videoRouter.get('/', requireUserOrAdmin, async (req, res, next) => {
 
 // POST /api/videos/multipart/create
 // 创建视频分片上传任务。前端只提交文件元数据，后端返回 uploadId 和 object key。
-videoRouter.post('/multipart/create', requireAdmin, async (req, res, next) => {
+videoRouter.post('/multipart/create', requireSuperAdmin, async (req, res, next) => {
   try {
     const videoFile = req.body.video;
     const attachments = normalizeAttachments(req.body.attachments);
@@ -429,7 +422,7 @@ videoRouter.post('/multipart/create', requireAdmin, async (req, res, next) => {
 
 // POST /api/videos/multipart/part-url
 // 为单个分片生成预签名 URL。浏览器随后用 PUT 把对应 Blob 分片直传 COS。
-videoRouter.post('/multipart/part-url', requireAdmin, async (req, res, next) => {
+videoRouter.post('/multipart/part-url', requireSuperAdmin, async (req, res, next) => {
   try {
     const key = req.body.key;
     const uploadId = String(req.body.uploadId || '').trim();
@@ -450,7 +443,7 @@ videoRouter.post('/multipart/part-url', requireAdmin, async (req, res, next) => 
 
 // POST /api/videos/multipart/complete
 // 前端上传完所有分片后，把每片的 PartNumber 和 ETag 交给后端，由后端通知 COS 合并。
-videoRouter.post('/multipart/complete', requireAdmin, async (req, res, next) => {
+videoRouter.post('/multipart/complete', requireSuperAdmin, async (req, res, next) => {
   try {
     const key = req.body.key;
     const uploadId = String(req.body.uploadId || '').trim();
@@ -472,7 +465,7 @@ videoRouter.post('/multipart/complete', requireAdmin, async (req, res, next) => 
 
 // POST /api/videos/multipart/abort
 // 上传失败或取消时终止 Multipart Upload，避免 COS 保留未完成的分片。
-videoRouter.post('/multipart/abort', requireAdmin, async (req, res, next) => {
+videoRouter.post('/multipart/abort', requireSuperAdmin, async (req, res, next) => {
   try {
     const key = req.body.key;
     const uploadId = String(req.body.uploadId || '').trim();
@@ -491,7 +484,7 @@ videoRouter.post('/multipart/abort', requireAdmin, async (req, res, next) => {
 
 // POST /api/videos/complete
 // 浏览器直传对象存储成功后，再调用这个接口把视频信息写入数据库。
-videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
+videoRouter.post('/complete', requireSuperAdmin, async (req, res, next) => {
   try {
     const title = normalizeText(req.body.title);
     const description = normalizeText(req.body.description);
@@ -583,6 +576,11 @@ videoRouter.post('/complete', requireAdmin, async (req, res, next) => {
       );
 
       const video = result.rows[0];
+      await createInitialRenditions(client, {
+        videoId: video.id,
+        sourceUrl: video.video_url,
+        sourceSize: Number(videoHead.ContentLength || 0)
+      });
 
       if (prerequisiteVideoIds.length > 0) {
         await client.query(
@@ -680,6 +678,65 @@ videoRouter.post('/edit-upload/create', requireSuperAdmin, async (req, res, next
   }
 });
 
+// POST /api/videos/transcode/callback
+// 数据万象 CI 工作流回调：登记 1080p/720p 转码状态。CI 未配置时不会影响原画播放。
+videoRouter.post('/transcode/callback', async (req, res, next) => {
+  try {
+    const rawBody = req.rawBody || JSON.stringify(req.body || {});
+    const signature = req.get('x-ci-signature') || req.get('x-cos-signature') || '';
+
+    if (!verifyCiSignature({ rawBody, signature, secret: config.ci.callbackSecret })) {
+      res.status(401).json({ message: 'CI 回调签名无效' });
+      return;
+    }
+
+    const payload = req.body || {};
+    const videoId = Number(payload.videoId || payload.video_id || payload.VideoId);
+    const quality = payload.quality || payload.Quality;
+    const status = payload.status || payload.Status;
+    const videoUrl = payload.videoUrl || payload.video_url || payload.Url || payload.url || '';
+    const fileSize = payload.fileSize || payload.file_size || payload.Size || 0;
+
+    const ok = await upsertRendition({ videoId, quality, status, videoUrl, fileSize });
+    if (!ok) {
+      res.status(400).json({ message: 'CI 回调参数无效' });
+      return;
+    }
+
+    res.json({ message: '已更新转码状态' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/videos/:id/renditions/:quality
+// CI 回调丢失时，教导主任可手动登记某一档状态。
+videoRouter.patch('/:id/renditions/:quality', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const videoId = Number(req.params.id);
+    const quality = String(req.params.quality || '').trim();
+    const status = String(req.body.status || '').trim();
+    const videoUrl = String(req.body.videoUrl || '').trim();
+    const fileSize = Number(req.body.fileSize || 0);
+
+    const exists = await pool.query('SELECT id FROM videos WHERE id = $1', [videoId]);
+    if (exists.rowCount === 0) {
+      res.status(404).json({ message: '视频不存在' });
+      return;
+    }
+
+    const ok = await upsertRendition({ videoId, quality, status, videoUrl, fileSize });
+    if (!ok) {
+      res.status(400).json({ message: '清晰度状态参数无效' });
+      return;
+    }
+
+    res.json({ message: '已更新清晰度状态' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/videos/:id
 // 获取单个视频详情，播放页会用到。
 videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
@@ -713,6 +770,14 @@ videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
       [req.params.id]
     );
 
+    const renditionsResult = await pool.query(
+      `SELECT quality, video_url, file_size, status, updated_at
+       FROM video_renditions
+       WHERE video_id = $1
+       ORDER BY CASE quality WHEN '1080p' THEN 1 WHEN '720p' THEN 2 WHEN 'source' THEN 3 ELSE 4 END`,
+      [req.params.id]
+    );
+
     const descendantsResult = await pool.query(
       `WITH RECURSIVE descendants AS (
          SELECT video_id
@@ -733,6 +798,7 @@ videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
         ...formatVideoResponse(result.rows[0]),
         attachments: attachmentsResult.rows.map(formatAttachmentResponse),
         prerequisites: prerequisitesResult.rows,
+        renditions: renditionsResult.rows.map(formatRenditionResponse),
         descendantVideoIds: descendantsResult.rows.map((row) => row.id)
       }
     });
@@ -938,12 +1004,11 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
 
 // DELETE /api/videos/:id
 // 删除视频接口。
-// 删除顺序：先删除数据库记录，让前置知识关系和学生主页历史记录按外键规则稳定落库；
-// 数据库提交成功后再删除存储桶对象，失败时只留下可清理的孤儿文件，不影响业务数据。
+// 删除顺序：先清理 COS 对象，再删库记录并写删除日志。
 videoRouter.delete('/:id', requireSuperAdmin, async (req, res, next) => {
   try {
     const findResult = await pool.query(
-      `SELECT id, video_url, cover_url
+      `SELECT id, title, video_url, cover_url
        FROM videos
        WHERE id = $1`,
       [req.params.id]
@@ -962,14 +1027,15 @@ videoRouter.delete('/:id', requireSuperAdmin, async (req, res, next) => {
     );
 
     const video = findResult.rows[0];
-    const objectKeys = [
-      getKeyFromPublicUrl(video.video_url),
-      getKeyFromPublicUrl(video.cover_url),
+    const objectKeys = await getVideoObjectKeys(video.id, [
+      video.video_url,
+      video.cover_url,
       ...attachmentsResult.rows.map((attachment) => attachment.file_key)
-    ].filter(Boolean);
+    ]);
 
+    await deleteObjectKeys(objectKeys);
     await pool.query('DELETE FROM videos WHERE id = $1', [video.id]);
-    await Promise.all(objectKeys.map((key) => deleteFromBucket(key).catch(() => {})));
+    await logStandaloneDeletion({ objectType: 'video', objectId: video.id, objectTitle: video.title || '', adminId: req.admin.adminId });
 
     res.json({ message: '删除成功' });
   } catch (error) {

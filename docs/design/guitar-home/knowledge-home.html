@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="tHHxU7HU1TVokKuvx1SEqJ">
+<head data-page-node-id="IXta7clJsfNnFIERExK3lL">
+<meta charset="UTF-8" data-page-node-id="0DvTALcPJzomDcYUwGwZmG">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="FMSPzHmhByCK0jMfDrUPO4">
+<title>知识点区 · 能学慧吉他教室</title>
+<style>
+/* ============================================================
+   知识点区首页 · 上下两区（知识点集 / 知识点）+ 分区搜索
+   视觉遵循 design-spec v1.0：纸底 / 咖啡描边盒子 / 橘色强调 / 绿色仅点睛
+============================================================ */
+:root{
+  --paper:  #e8e6d6;   /* 明度较高的卡其 · 降低黄味 */
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{height:100%}
+html{scroll-behavior:smooth}
+body{
+  min-height:100%;
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底，格纹保留 */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow-x:hidden;overflow-y:auto;  /* 允许整页滚动：单课区可超过一屏 */
+}
+/* 格纹底饰：颜色浅 · 下浓上淡 · 近页头逐渐消失 */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+input{font-family:inherit}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:10px;letter-spacing:2.5px;color:var(--ink-3);text-transform:uppercase;font-weight:500}
+.scroll{overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent}
+.scroll::-webkit-scrollbar{width:4px}
+.scroll::-webkit-scrollbar-thumb{background:var(--hair-2)}
+.scroll::-webkit-scrollbar-track{background:transparent}
+
+/* ============ 导航（复用课程页） ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区 ============ */
+.home{flex:1 0 auto;max-width:1440px;width:100%;margin:0 auto;padding:14px 36px 26px;display:flex;flex-direction:column;gap:14px}
+
+/* ---- 搜索条 + 视角切换 ---- */
+.toolrow{flex:none;display:flex;align-items:center;gap:16px}
+.searchbar{
+  flex:1;max-width:520px;display:flex;align-items:center;gap:10px;
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:9px 16px;transition:box-shadow .25s var(--ease);
+}
+.searchbar:focus-within{box-shadow:0 2px 8px rgba(93,67,38,.12)}
+.searchbar svg{width:15px;height:15px;color:var(--ink-3);flex:none}
+.searchbar input{
+  flex:1;border:none;background:none;outline:none;
+  font-size:13px;color:var(--ink);letter-spacing:.4px;
+}
+.searchbar input::placeholder{color:#b3a58c}
+.searchbar .clr{
+  display:none;font-size:10.5px;letter-spacing:1px;color:var(--ink-3);
+  border:1px solid var(--hair-2);border-radius:4px;padding:2px 8px;transition:all .25s;
+}
+.searchbar .clr:hover{color:var(--orange);border-color:var(--orange)}
+.searchbar.filtering .clr{display:inline-block}
+.toolrow .hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+.viewseg{margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid var(--hair-2);border-radius:4px;overflow:hidden;background:var(--white)}
+.viewseg .lbl{font-size:10px;letter-spacing:1.5px;color:var(--ink-3);padding:0 10px;border-right:1px dashed var(--hair-2)}
+.viewseg button{
+  font-size:11px;letter-spacing:1px;color:var(--ink-3);padding:5px 13px;
+  transition:all .25s;
+}
+.viewseg button + button{border-left:1px solid var(--hair)}
+.viewseg button.on{background:var(--coffee);color:var(--white);font-weight:600}
+
+/* ---- 区块（知识点集 / 知识点）：均去外框，卡片平铺在格纹底图上 ---- */
+.zone{
+  flex:none;
+  display:flex;flex-direction:column;min-height:0;overflow:visible;
+}
+.zone-head{
+  flex:none;padding:2px 0 0;
+  display:flex;align-items:baseline;gap:12px;position:relative;
+}
+.zone-head h2{font-size:13.5px;font-weight:700;letter-spacing:2px;color:var(--coffee);display:flex;align-items:center;gap:9px;width:78px;flex:none}
+.zone-head h2::before{content:"";width:4px;height:14px;border-radius:1px;flex:none;background:var(--orange)}
+.zone-head::after{display:none}
+.zone-head .meta{font-size:10.5px;color:var(--ink-3);letter-spacing:1px;width:58px;flex:none;white-space:nowrap}
+.zone-head .order{
+  appearance:none;-webkit-appearance:none;
+  font-family:inherit;font-size:10.5px;letter-spacing:1px;font-weight:600;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:3px 22px 3px 9px;
+  background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%237a4a26' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 7px center;
+  cursor:pointer;outline:none;transition:border-color .25s;
+}
+.zone-head .order:hover{border-color:var(--orange)}
+.zone-ops{margin-left:auto;display:flex;gap:9px}
+.zbtn{
+  font-size:11px;letter-spacing:1.5px;font-weight:600;
+  border-radius:4px;padding:5px 14px;transition:all .3s var(--ease);
+  white-space:nowrap;
+}
+.zbtn.ghost{color:var(--coffee);border:1px solid var(--hair-2);background:var(--white)}
+.zbtn.ghost:hover{border-color:var(--orange);color:var(--orange)}
+
+/* ---- 卡片网格 ---- */
+.grid{
+  padding:12px 0;
+  display:grid;
+  grid-template-columns:repeat(8, minmax(0,1fr));  /* 一行 8 张铺满整个盒子宽度 */
+  gap:10px;align-items:stretch;                    /* 同行卡片等高，小间距 */
+}
+.pg-hide{display:none!important}
+/* ---- 翻页器：无框页码式（与合集详情页一致 · 当前页橙色马克笔） ---- */
+.pager{
+  flex:none;display:flex;align-items:center;justify-content:center;gap:4px;
+  padding:2px 0 0;
+}
+.pager .pgbtn{
+  width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;color:var(--coffee);
+  transition:background .25s var(--ease), color .25s var(--ease), opacity .25s;
+}
+.pager .pgbtn svg{width:15px;height:15px}
+.pager .pgbtn:hover:not(:disabled){background:rgba(255,127,0,.12);color:var(--orange)}
+.pager .pgbtn:disabled{opacity:.22;cursor:not-allowed}
+.pager .pgnums{display:flex;align-items:center;gap:2px;margin:0 2px}
+.pager .pgnum{
+  min-width:28px;height:28px;padding:0 6px;border-radius:4px;
+  font-size:12px;letter-spacing:.5px;color:var(--ink-3);
+  display:grid;place-items:center;
+  transition:color .25s var(--ease);
+}
+.pager .pgnum:hover{color:var(--coffee)}
+.pager .pgnum.on{
+  color:var(--ink);font-weight:700;
+  background:linear-gradient(180deg, transparent 60%, rgba(255,127,0,.46) 60%);
+}
+.pager .pgdots{color:var(--hair-2);font-size:12px;padding:0 1px;letter-spacing:1px}
+/* 知识点集区内的翻页器：无框后与整页留白一致 */
+.zone.sets .pager{padding:6px 0 0}
+.card{
+  text-decoration:none;color:inherit;
+  display:flex;flex-direction:column;height:100%;   /* 等高卡片 */
+  border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.06);
+  padding:8px;transition:all .3s var(--ease);
+}
+.card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(93,67,38,.13)}
+.card .cover{
+  aspect-ratio:1/1;border-radius:4px;position:relative;overflow:hidden;
+  display:grid;place-items:center;
+}
+/* 假封面：木质黑胶纹样（三种底色轮换） */
+.card .cover .disc{position:absolute;inset:9%;border-radius:50%;background:var(--wood);display:grid;place-items:center}
+.card .cover .disc::before{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid rgba(242,234,217,.4)}
+.card .cover .disc::after{content:"";position:absolute;inset:36%;border-radius:50%;background:var(--white)}
+.card .cover.c2 .disc{background:var(--coffee)}
+.card .cover.c3 .disc{background:var(--amber)}
+.card .cover.c4 .disc{background:#6b4d2e}
+.card .cover.c5 .disc{background:#8c5a2b}
+.card .cover.c6 .disc{background:#5c5340}
+/* 随机纹样变体：默认黑胶 / 纹路唱片 / 叠碟（stack 伪元素见上） */
+.card .cover .disc i{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from var(--rot,20deg), rgba(242,234,217,.08) 0 16deg, transparent 16deg 42deg)}
+.card .cover.v-groove .disc{background:transparent;box-shadow:inset 0 0 0 2px rgba(93,67,38,.28)}
+.card .cover.v-groove .disc::before{border-color:rgba(93,67,38,.4);border-style:dashed}
+.card .cover.v-groove .disc i{display:none}
+/* 黑胶中心小橘点 */
+.card .cover .disc .lbl{width:15%;height:15%;border-radius:50%;background:var(--white);position:relative;z-index:1;display:grid;place-items:center}
+.card .cover .disc .lbl i{width:6px;height:6px;border-radius:50%;background:var(--orange)}
+/* 合集封面：叠放小碟 */
+.card .cover.stack::before{
+  content:"";position:absolute;left:8%;right:8%;bottom:6%;height:10px;border-radius:3px;
+  background:rgba(93,67,38,.18);
+}
+.card .cover.stack::after{
+  content:"";position:absolute;left:4%;right:4%;bottom:11%;height:10px;border-radius:3px;
+  background:rgba(93,67,38,.3);
+}
+.card .name{font-size:12.5px;font-weight:600;letter-spacing:.3px;line-height:1.5;margin-top:8px;flex:none;height:1.5em;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.card .meta{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:2px;display:flex;align-items:center;gap:6px;flex:none;white-space:nowrap;overflow:hidden}
+.card .meta .cnt-chip{
+  font-size:9.5px;color:var(--coffee);border:1px solid var(--hair-2);
+  border-radius:3px;padding:0 6px;letter-spacing:.5px;
+}
+/* 「知识点」轻量标识已按需求移除 */
+/* 区内空态 / 搜索空态 */
+.zone-empty{
+  grid-column:1 / -1;display:none;text-align:center;padding:28px 0 20px;
+  color:var(--ink-3);font-size:12px;letter-spacing:.5px;
+}
+.zone-empty.show{display:block}
+.zone-empty b{color:var(--coffee);letter-spacing:1px}
+/* 全局搜索空态（覆盖两区） */
+.global-empty{
+  flex:1;min-height:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  border:1.5px solid var(--coffee);border-radius:6px;background:var(--glass);
+  box-shadow:0 2px 10px rgba(64,45,20,.08);
+  color:var(--ink-3);font-size:12.5px;letter-spacing:.5px;text-align:center;
+}
+.global-empty.show{display:flex}
+.global-empty .big{font-size:15px;color:var(--ink);font-weight:700;letter-spacing:1px}
+.global-empty .big mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 3px}
+.global-empty button{
+  font-size:11.5px;letter-spacing:1.5px;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:6px 16px;background:var(--white);
+  transition:all .25s;
+}
+.global-empty button:hover{border-color:var(--orange);color:var(--orange)}
+body.searching .zone,body.searching .zone .zone-head{display:flex}
+body.searching .zone{display:flex}
+body.searching .global-empty{display:none}
+.global-empty.show{display:flex}
+.global-empty .big{font-size:15px;color:var(--ink);font-weight:700;letter-spacing:1px}
+.global-empty .big mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 3px}
+.global-empty button{
+  font-size:11.5px;letter-spacing:1.5px;color:var(--coffee);
+  border:1px solid var(--hair-2);border-radius:4px;padding:6px 16px;background:var(--white);
+  transition:all .25s;
+}
+.global-empty button:hover{border-color:var(--orange);color:var(--orange)}
+
+/* 入场动效 */
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+.rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){.rise{opacity:1;transform:none;animation:none}}
+
+/* ---- 回到顶部（整页可滚动，滚过一屏后出现） ---- */
+.to-top{
+  position:fixed;right:26px;bottom:26px;z-index:80;
+  width:38px;height:38px;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--white);border:1.5px solid var(--coffee);color:var(--coffee);
+  box-shadow:0 4px 14px rgba(60,42,20,.16);
+  opacity:0;transform:translateY(10px);pointer-events:none;
+  transition:opacity .28s var(--ease), transform .28s var(--ease), background .25s, color .25s;
+}
+.to-top.show{opacity:1;transform:none;pointer-events:auto}
+.to-top:hover{background:var(--coffee);color:var(--white)}
+.to-top svg{width:16px;height:16px}
+
+/* ---- 教导主任视角：卡片封面悬停操作层（覆盖在封面下部，不挡标题） ---- */
+.card{position:relative}
+.card .ops{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;
+  display:none;flex-direction:column;gap:1px;
+  background:rgba(251,247,236,.66);
+  border:1px solid rgba(93,67,38,.26);border-radius:5px;
+  padding:3px;
+  backdrop-filter:blur(7px) saturate(1.15);-webkit-backdrop-filter:blur(7px) saturate(1.15);
+  box-shadow:0 6px 18px rgba(60,42,20,.16);
+}
+body.dean .card:hover .ops{display:flex}
+.card .ops button{
+  flex:none;font-size:10px;letter-spacing:.5px;color:var(--coffee);
+  border:none;border-radius:3px;padding:4px 9px;background:transparent;
+  transition:all .2s;white-space:nowrap;cursor:pointer;
+}
+.card .ops button:hover{background:rgba(93,67,38,.1)}
+.card .ops button.op-del:hover{background:rgba(180,69,46,.12);color:#b4452e}
+/* ---- 删除二次确认弹层 ---- */
+.modal-mask{
+  position:fixed;inset:0;z-index:100;display:none;place-items:center;
+  background:rgba(60,42,20,.38);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+}
+.modal-mask.show{display:grid}
+.modal{
+  width:320px;background:var(--white);border:1.5px solid var(--coffee);border-radius:8px;
+  box-shadow:0 12px 32px rgba(60,42,20,.18);padding:20px 22px;
+  animation:modal-pop .25s var(--ease);
+}
+@keyframes modal-pop{from{transform:scale(.94);opacity:0}}
+.modal .modal-title{
+  font-size:14px;font-weight:700;letter-spacing:2px;color:var(--coffee);
+  margin-bottom:10px;padding-bottom:9px;border-bottom:1px dashed var(--hair-2);
+}
+.modal p{font-size:12px;line-height:1.9;color:var(--ink);margin:0 0 16px;letter-spacing:.3px}
+.modal p b{color:#b4452e}
+.modal .modal-ops{display:flex;gap:10px;justify-content:flex-end}
+.mbtn{
+  font-size:11.5px;letter-spacing:1px;padding:5px 16px;border-radius:4px;
+  border:1px solid var(--hair-2);color:var(--ink-3);background:var(--white);
+  transition:all .2s;cursor:pointer;
+}
+.mbtn:hover{border-color:var(--coffee);color:var(--coffee)}
+.mbtn.danger{color:var(--white);background:var(--orange);border-color:var(--orange)}
+.mbtn.danger:hover{background:#b4452e;border-color:#b4452e}
+.dean-toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%, 12px);z-index:99;
+  font-size:11.5px;letter-spacing:.5px;color:var(--coffee);
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:7px 18px;box-shadow:0 6px 18px rgba(60,42,20,.15);
+  opacity:0;pointer-events:none;transition:all .25s var(--ease);
+}
+.dean-toast.show{opacity:1;transform:translate(-50%, 0)}
+
+/* 响应式 */
+
+@media (max-width:1024px){
+  body{overflow:auto;display:block}
+  .home{padding:14px 20px 40px;gap:16px}
+
+  .grid{grid-template-columns:repeat(4,1fr);align-items:start;justify-content:normal}
+  .card{max-width:none}
+}
+@media (max-width:640px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .home{padding:12px 14px 32px}
+  .grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:12px 14px;justify-content:normal}
+  .card{max-width:none}
+  .toolrow{flex-wrap:wrap}
+  .viewseg{margin-left:0}
+  .zone-ops{width:100%;margin:6px 0 0}
+}
+</style>
+</head>
+<body data-page-node-id="ic4anTe4u7FPd3yYTW3ZDQ">
+
+<!-- ================= 导航 ================= -->
+<nav class="nav" data-page-node-id="HFl7Lfzm03vUnSO0m76wPE">
+  <div class="nav-inner" data-page-node-id="PI7ImhOqrj29eiTg1LFmNS">
+    <a class="logo" href="#" data-page-node-id="jDwSfmtWEOET9wP1kiI7F0">
+      <span class="mark" data-page-node-id="S4u4zBPDMd5PaafEEHlxAX"></span>
+      能学慧吉他教室
+      <small data-page-node-id="vQxE9VDfelKw4z0GDXQdRq">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="4j8DxmLy9rxsDKO0dAKZbW">
+      <a href="#" data-page-node-id="xSYGUCmEoFugfbjjXC25bm">首页</a>
+      <a href="knowledge-home.html" class="active" data-page-node-id="rTDHCs6Dltk7ZjNUBfDmyL">知识点区</a>
+      <a href="tracks-home.html" data-page-node-id="Emas2AMWQ3AYjcGAoFU7vK">曲目库</a>
+      <a href="library.html" data-page-node-id="qfooYCzsmzpZ2Ncb1VsWzd">图书馆</a>
+      <a href="#" data-page-node-id="gFsbZmhllpdXFvqkBa6HX2">作业记录</a>
+    </div>
+    <div class="nav-right" data-page-node-id="13hCFD5fLSqfGi82cd8suP">
+      <div class="avatar" data-page-node-id="Bcxq5Sp5Go3o91QEl4rEK6">李</div>
+    </div>
+  </div>
+</nav>
+
+<main class="home" data-page-node-id="vVKyFGSefEFuwAWMwjTLYI">
+
+  <!-- 搜索条 + 视角切换（演示用） -->
+  <div class="toolrow rise" data-page-node-id="6kWl9DrqmfDGTI8Ckxo3tR">
+    <div class="searchbar" id="searchbar" data-page-node-id="XWTJeWkw0QfxIWYDh9XuoQ">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="ot6BSBeMoFm0OJ884iKka4"><circle cx="11" cy="11" r="7" data-page-node-id="YerhvHHlqNxsXq0BPRTjex"/><path d="m20 20-3.5-3.5" data-page-node-id="twHG12DIeLwgllGTod1caC"/></svg>
+      <input type="text" id="searchInput" placeholder="搜索知识点集、知识点…" aria-label="搜索知识点集和知识点" data-page-node-id="LDNRIzDZMAd96jAjOw1F5r">
+      <button type="button" class="clr" id="clrBtn" data-page-node-id="YxdIHNQzLb1rH5OJmBshcp">清除</button>
+    </div>
+    <span class="hint" data-page-node-id="hTKSF2qJspck4kgkZXNgSl">同时搜索知识点集与知识点 · 结果按更新时间倒序</span>
+    <div class="viewseg" role="group" aria-label="预览视角" data-page-node-id="phDi8hUMjNiTgSF4qS9YBQ">
+      <span class="lbl" data-page-node-id="VfVOx5fJYeVICQnqDxmSTe">预览视角</span>
+      <button type="button" class="on" data-dean="0">老师</button>
+      <button type="button" data-dean="0">学生</button>
+      <button type="button" data-dean="0">游客</button>
+      <button type="button" data-dean="1">教导主任</button>
+    </div>
+  </div>
+
+
+
+  <!-- ============ 上区：知识点集 ============ -->
+  <section class="zone sets rise d1" data-page-node-id="SKdCIOTUeeI0lsGzA8dHbi">
+    <div class="zone-head" data-page-node-id="hVmUbRudZwOks7gAWi8woh">
+      <h2 data-page-node-id="yhF6LTHfX8izerezRolfdO">知识点集</h2>
+      <span class="meta num" id="setMeta" data-page-node-id="uW6logcv4oM5yqqAABn2Ro">共 6 套</span>
+      <select class="order" data-page-node-id="qXTtnRQagMGgjrOf1cTss7" aria-label="排序方式"><option value="new" selected>按更新时间倒序</option><option value="old">按更新时间正序</option><option value="az">按首字母</option></select>
+      <div class="zone-ops teacher-only" style="display:none" data-page-node-id="ItEFs1dyaLYAOkLGwckAqC">
+        <button class="zbtn ghost" onclick="location.href='admin-create-track-collection.html?zone=knowledge'" data-page-node-id="vI1tX47eaSBOTEALF0I4f3">＋ 新建知识点集</button>
+      </div>
+    </div>
+    <div class="grid" id="setGrid" data-page-node-id="AC3s0a2BECT06CJrQp5Bfn">
+      <a class="card" href="knowledge-collection-detail.html" data-kw="右手 基本功 系列" data-page-node-id="P88Tdnha6G519YbxBc4YiF">
+        <div class="cover stack" data-page-node-id="O7enFkj3qJdDPZcVhVAMbn"><div class="disc" data-page-node-id="lG6Lt3zxsFxFbfY6s9FKf2"><span class="lbl" data-page-node-id="PPF5fALGXdu6R69vVdEYFQ"><i data-page-node-id="3pzRVKXJwhJ6XzfmeusfAF"></i></span></div></div>
+        <div class="name" data-page-node-id="LtmbLNkhfxCzFjcOF3Vl5Y">右手基本功系列</div>
+        <div class="meta" data-page-node-id="NCFlowXZ6UHRLS2xV7uNVa"><span class="cnt-chip num" data-page-node-id="9E9JGORCzLYzvixvkwR4bN">收录 6 个</span><span class="num" data-page-node-id="hwzABpWaysEnUB7N0XV9fT">昨天更新</span></div>
+      </a>
+      <a class="card" href="knowledge-collection-detail.html" data-kw="左手 技巧 大全 击勾 滑推" data-page-node-id="JLMto6BEEpzFybm1s0SDxC">
+        <div class="cover c2 stack" data-page-node-id="UCpE5kgiADekyH7RsHB6vT"><div class="disc" data-page-node-id="Tv1JnNxHWnB1I6FTuD5Gi5"><span class="lbl" data-page-node-id="Ph552C7aTgoVD3k70RmVh9"><i data-page-node-id="sgaMlzizNjmJFolzIbEGqE"></i></span></div></div>
+        <div class="name" data-page-node-id="xprjLjFMbAUmQbKv67KHiF">左手技巧大全</div>
+        <div class="meta" data-page-node-id="QEfsv8Hr8XgwEhF2UtUVP8"><span class="cnt-chip num" data-page-node-id="HHvE4J6OAxP7IunuxhajPl">收录 9 个</span><span class="num" data-page-node-id="UJlwMfbPOQXQHJfqvkURHT">3 天前更新</span></div>
+      </a>
+      <a class="card" href="knowledge-collection-detail.html" data-kw="乐理 入门 和声 调式" data-page-node-id="DJjP7ZObOV4wcts1UqWHIQ">
+        <div class="cover c3 stack" data-page-node-id="yUCFBjRRnBguxAjZYXIGuU"><div class="disc" data-page-node-id="nM3MOUnxTcX94bMOBGpbfK"><span class="lbl" data-page-node-id="nD0Kg7UyX7CMUHLVsH5pWO"><i data-page-node-id="cahjaFuCHZxhEDQDJATsXj"></i></span></div></div>
+        <div class="name" data-page-node-id="9t5PwONRaT5l3VY4GY7nPC">乐理入门：为吉他手讲的乐理</div>
+        <div class="meta" data-page-node-id="xJcWL1FL4hUUqHNmFjJ0Pw"><span class="cnt-chip num" data-page-node-id="EENKRqiwpDl5XbDjLvFDPe">收录 7 个</span><span class="num" data-page-node-id="BUWHkzF0R06nhGGniHMNZu">1 周前更新</span></div>
+      </a>
+            <a class="card" href="knowledge-collection-detail.html" data-kw="押尾 技法 专题">
+        <div class="cover stack"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">押尾技法专题集</div>
+        <div class="meta"><span class="cnt-chip num">收录 5 个</span><span class="num">2 周前更新</span></div>
+      </a>
+      <a class="card" href="knowledge-collection-detail.html" data-kw="前置 必修 指弹 预备">
+        <div class="cover stack"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">指弹预备 · 前置必修包</div>
+        <div class="meta"><span class="cnt-chip num">收录 8 个</span><span class="num">3 周前更新</span></div>
+      </a>
+      <a class="card" href="knowledge-collection-detail.html" data-kw="考级 乐理 伴读">
+        <div class="cover stack"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">考级乐理伴读</div>
+        <div class="meta"><span class="cnt-chip num">收录 6 个</span><span class="num">1 个月前更新</span></div>
+      </a>
+<div class="zone-empty" id="setEmpty" data-page-node-id="UUA0n48RdMA0GvXX3lTmqF">知识点集中未找到与「<b id="setKw" data-page-node-id="t0VxnTwcwGBKZODUYDpiGC"></b>」相关的内容</div>
+    </div>
+  <nav class="pager" id="setPager" aria-label="知识点集分页">
+      <button type="button" class="pgbtn" data-act="prev" aria-label="上一页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
+      </button>
+      <span class="pgnums num" data-nums><!-- JS 渲染 --></span>
+      <button type="button" class="pgbtn" data-act="next" aria-label="下一页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </nav>
+  </section>
+
+  <!-- ============ 下区：知识点 ============ -->
+  <section class="zone tracks rise d2" data-page-node-id="8j7o95OxysAYid0YXSSUHh">
+    <div class="zone-head" data-page-node-id="JIwaTlCSaoALiTDWhM8e9E">
+      <h2 data-page-node-id="FFEF9V80k1cW5UxOn4XIZw">知识点</h2>
+      <span class="meta num" id="trackMeta" data-page-node-id="VT8xpvN1njVXfXt9S5IVar">共 48 个</span>
+      <select class="order" data-page-node-id="LDjpP927fYSGF2PwGUsmbW" aria-label="排序方式"><option value="new" selected>按更新时间倒序</option><option value="old">按更新时间正序</option><option value="az">按首字母</option></select>
+      <div class="zone-ops teacher-only" style="display:none" data-page-node-id="kAh0UDFCHIV06AQt6VnwJB">
+        <button class="zbtn ghost" onclick="location.href='admin-create-track-point.html?zone=knowledge'" data-page-node-id="jjenOpNTegtQjLjAi2s5tm">＋ 新建单课</button>
+      </div>
+    </div>
+    <div class="grid" id="trackGrid" data-page-node-id="BGDvazeMuprWB8hEH7Q82G">
+      <a class="card" href="track-point-detail.html" data-kw="1645 和弦 进行 和声" data-page-node-id="0QkrPPIPxgilOFwjACtAfI">
+        <div class="cover" data-page-node-id="ETc4mMIlKu7Fq7k0ErdqzH"><div class="disc" data-page-node-id="h86Oejfs8nP6b2FNCHg8hq"><span class="lbl" data-page-node-id="PHlV31LUzLnHhDajMJEWcl"><i data-page-node-id="FtnWOmEYQEST8KAOHlxHnm"></i></span></div></div>
+        <div class="name" data-page-node-id="A1k2gA4Dw0OFqjYxoiK7r1">看懂和弦进行：1645 的秘密</div>
+        <div class="meta num" data-page-node-id="R14562gsvum82EEr1qG1Eg"><span data-page-node-id="dbDRxGFJ0iBlRCsIytcEsr">26 分钟 · 昨天更新</span></div>
+      </a>
+      <a class="card" href="#" data-kw="右手 指法 触弦 角度" data-page-node-id="ovYLXxEIkbBjwUB8U6XuOS">
+        <div class="cover c2" data-page-node-id="MPVhWoWSos9GOE9rhZLwRW"><div class="disc" data-page-node-id="fKO1EDwAgG9HcCXZGrLXMr"><span class="lbl" data-page-node-id="6hDUAI5PNm4eK4nJMoOoXD"><i data-page-node-id="kdNlG2magpTnnpqOBvG8is"></i></span></div></div>
+        <div class="name" data-page-node-id="jKNSvps850095DVboD92Zg">右手指法与触弦角度入门</div>
+        <div class="meta num" data-page-node-id="yg0ztDDcatq92AxcujWOIR"><span data-page-node-id="uPz89TaYoF0uoV8u5tbju5">28 分钟 · 3 天前更新</span></div>
+      </a>
+      <a class="card" href="#" data-kw="低音 拇指 独立性 保持" data-page-node-id="sbfrkMBw6HL9gUjQFoH8Ey">
+        <div class="cover c3" data-page-node-id="MQHOtGYddJRIrxytQxC4zy"><div class="disc" data-page-node-id="JaB0uBWBBDNiwGiru8qtUf"><span class="lbl" data-page-node-id="FZGFe49vXsf734P3tKEi30"><i data-page-node-id="0bFtyxK6cCCaZNVY0qtUU9"></i></span></div></div>
+        <div class="name" data-page-node-id="JClMruTqBvw0a3eOGKXV2K">低音独立性：拇指保持训练</div>
+        <div class="meta num" data-page-node-id="iN2LntzThsPF5ddsrLdRgD"><span data-page-node-id="jmQ15KfYnLuUrYM3w7vhcS">30 分钟 · 4 天前更新</span></div>
+      </a>
+      <a class="card" href="#" data-kw="击弦 勾弦 锤弦 技巧" data-page-node-id="WPaHTolWBWOk30FowJDHpP">
+        <div class="cover c4" data-page-node-id="pwVV9DKhQSN1gSh0KKoelL"><div class="disc" data-page-node-id="jI0hAhtyJ9lkyev3sQ5yON"><span class="lbl" data-page-node-id="kVeHYXFNQjaSJ0WcY7fvfl"><i data-page-node-id="p8g9unp0XOUUguvc3VS0hO"></i></span></div></div>
+        <div class="name" data-page-node-id="af1UjyjYr20HuuFjph68mQ">击勾弦：左手连贯性练习</div>
+        <div class="meta num" data-page-node-id="FzMrEgTBsWgTMRzN3CEIbK"><span data-page-node-id="5KCAB1FmrHU00ghNHjQ1MJ">22 分钟 · 1 周前更新</span></div>
+      </a>
+      <a class="card" href="#" data-kw="泛音 触弦 角度 自然泛音" data-page-node-id="ficpQ48ho3TzKg6WpzrnEu">
+        <div class="cover c2" data-page-node-id="IFBUSrwz9Os4I1uxSwSaYa"><div class="disc" data-page-node-id="1t1L3u4yTB6570wmKBFk5C"><span class="lbl" data-page-node-id="6d3SWaDcsAi9y3hm4z4NFE"><i data-page-node-id="4dZg27vVWB6HvF9dWvzoYs"></i></span></div></div>
+        <div class="name" data-page-node-id="zCo7OPLRxHGxWQPwBFukuX">自然泛音：触弦位置与角度</div>
+        <div class="meta num" data-page-node-id="rEDylWeqfITslmTEyUSKbR"><span data-page-node-id="a2JiyyOMbESQOWcLjoBhoc">18 分钟 · 1 周前更新</span></div>
+      </a>
+      <a class="card" href="#" data-kw="pm 打板 percussion" data-page-node-id="7TEl1kNAU9zH5QQneTuLdH">
+        <div class="cover c3" data-page-node-id="xbNAHHd9IIg74V7zdyVFVh"><div class="disc" data-page-node-id="CzRlCZR5EkpKROzylQaz2T"><span class="lbl" data-page-node-id="PRST77UnClpIvni6D09C00"><i data-page-node-id="SKU1q3MiGvj4i25OJMU43N"></i></span></div></div>
+        <div class="name" data-page-node-id="0EtgIsJE9VhAa0LuhZxjRw">PM 打板：低音与节奏同步</div>
+        <div class="meta num" data-page-node-id="ArUGrYesNTo98BLFnLo2Bp"><span data-page-node-id="RJRZ7JQXjQiB8ZccIPGX89">25 分钟 · 2 周前更新</span></div>
+      </a>
+      <a class="card" href="#" data-kw="c调 音阶 把位" data-page-node-id="RcotzCmm5RMDIbYnFlXfAt">
+        <div class="cover" data-page-node-id="XvWgGcVOAcmSuVDJnVMxVi"><div class="disc" data-page-node-id="I8DbDfPmWBmO0epsfYGCEA"><span class="lbl" data-page-node-id="7JNWT5MDu2Q4n6Qjw8JYje"><i data-page-node-id="x3HHkEBmm216S8A675j23m"></i></span></div></div>
+        <div class="name" data-page-node-id="KHHrm6upm8iOsx8zUxWSLD">C 调音阶：第一把位全指法</div>
+        <div class="meta num" data-page-node-id="WzEoOUO1E2WT3TIuB6pGPR"><span data-page-node-id="FZpEqi7KAhNM6EDsPuKy9M">35 分钟 · 2 周前更新</span></div>
+      </a>
+      <a class="card" href="#" data-kw="滑弦 推弦 表情" data-page-node-id="0NFGOht3NkWmjXyqLMDxMc">
+        <div class="cover c4" data-page-node-id="1TlImqmadmNQDjvxAznwRe"><div class="disc" data-page-node-id="TQkB6nV9f5UIlLNEsr9X0B"><span class="lbl" data-page-node-id="oZMKCRjd19Ft8PZ9dqtrgA"><i data-page-node-id="bBzTb9xScbW50dxLUmClbs"></i></span></div></div>
+        <div class="name" data-page-node-id="A1CMaG49fEM5b2ajauI9UE">滑弦与推弦：让旋律会唱歌</div>
+        <div class="meta num" data-page-node-id="429ERwHBqlGB0MCCQ0ac0o"><span data-page-node-id="rEBwTjGG1HeRn1MC8rUi3D">20 分钟 · 3 周前更新</span></div>
+      </a>
+            <a class="card" href="#" data-kw="和弦转换 抢拍 锚点">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">和弦转换不抢拍：三个锚点手指</div>
+        <div class="meta num"><span>24 分钟 · 3 周前更新</span></div>
+      </a>
+      <a class="card" href="#" data-kw="靠弦 不靠弦 拨弦 触弦">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">右手拨弦两派：靠弦与不靠弦</div>
+        <div class="meta num"><span>21 分钟 · 4 周前更新</span></div>
+      </a>
+      <a class="card" href="#" data-kw="音程 指板 地图 品位">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">音程与指板地图：告别死记品位</div>
+        <div class="meta num"><span>32 分钟 · 1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="节拍器 稳定 速度 训练">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">节拍器训练：从 60 稳到 120</div>
+        <div class="meta num"><span>27 分钟 · 1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="大横按 f和弦 封闭 按法">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">大横按通关：F 和弦的三种按法</div>
+        <div class="meta num"><span>23 分钟 · 1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="六线谱 节奏 记号 休止符">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">六线谱精读：节奏记号与休止</div>
+        <div class="meta num"><span>19 分钟 · 1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="扫弦 节奏型 八分音符 分解">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">扫弦节奏型：八分音符分解</div>
+        <div class="meta num"><span>21 分钟 · 1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="切音 闷音 节奏 呼吸">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">切音与闷音：让节奏有呼吸</div>
+        <div class="meta num"><span>17 分钟 · 1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="和弦转位 c调 转位 指法">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">和弦转位：C 调常用转位指法</div>
+        <div class="meta num"><span>26 分钟 · 1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="三和弦 七和弦 色彩 和声">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">三和弦与七和弦：色彩的区别</div>
+        <div class="meta num"><span>29 分钟 · 1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="卡农 进行 15634145 和声">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">卡农进行：15634145 实战</div>
+        <div class="meta num"><span>31 分钟 · 1 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="指弹 入门 拇指 旋律 分层">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">指弹入门：拇指打底与旋律分层</div>
+        <div class="meta num"><span>34 分钟 · 2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="打板 底鼓 军鼓 pm 进阶">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">打板进阶：底鼓与军鼓的配合</div>
+        <div class="meta num"><span>28 分钟 · 2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="泛音 人工泛音 点弦 技巧">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">泛音家族：人工泛音与点弦</div>
+        <div class="meta num"><span>24 分钟 · 2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="双音 八度 拨片 跳弦">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">双音与八度：拨片跳弦练习</div>
+        <div class="meta num"><span>22 分钟 · 2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="揉弦 幅度 速度 表情">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">揉弦的三种幅度与速度</div>
+        <div class="meta num"><span>20 分钟 · 2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="推弦 音准 半音 校准">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">推弦音准：用耳朵校准半音</div>
+        <div class="meta num"><span>25 分钟 · 2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="即兴 五声音阶 把位">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">即兴入门：五声音阶五个把位</div>
+        <div class="meta num"><span>36 分钟 · 2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="布鲁斯 12小节 进行">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">布鲁斯进行：12 小节实战</div>
+        <div class="meta num"><span>33 分钟 · 2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="编配 配和弦 旋律 和声">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">和弦编配：给旋律配和弦</div>
+        <div class="meta num"><span>38 分钟 · 2 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="变调夹 capo 位置 移调">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">变调夹用法：五个常用位置</div>
+        <div class="meta num"><span>18 分钟 · 3 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="调音 换弦 手感 维护">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">调音与换弦：琴的手感维护</div>
+        <div class="meta num"><span>16 分钟 · 3 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="左手 按弦 发力 手型 放松">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">左手按弦发力：不痛的按法</div>
+        <div class="meta num"><span>21 分钟 · 3 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="拨片 角度 音色 明暗">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">右手拨片角度：音色明暗开关</div>
+        <div class="meta num"><span>19 分钟 · 3 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="轮指 四连音 速度 阶梯">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">轮指进阶：四连音速度阶梯</div>
+        <div class="meta num"><span>27 分钟 · 3 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="音阶 模进 三度 四度">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">音阶模进：三度与四度组合</div>
+        <div class="meta num"><span>30 分钟 · 3 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="错误 纠正 高频 问题">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">常见错误：12 个高频问题纠正</div>
+        <div class="meta num"><span>35 分钟 · 3 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="视奏 边看边弹 节奏 训练">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">视奏训练：边看边弹的节奏</div>
+        <div class="meta num"><span>26 分钟 · 3 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="弹唱 配合 唱 弹 协调">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">弹唱配合：先唱还是先弹</div>
+        <div class="meta num"><span>23 分钟 · 4 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="音色 控制 指甲 拨片 取舍">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">音色控制：指甲与拨片的取舍</div>
+        <div class="meta num"><span>22 分钟 · 4 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="听歌 定调 配级数 和弦推断">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">和弦推断：听歌定调与配级数</div>
+        <div class="meta num"><span>32 分钟 · 4 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="指弹 编曲 独奏 改编">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">指弹编曲：把歌曲改成独奏</div>
+        <div class="meta num"><span>40 分钟 · 4 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="录音 手机 音色 入门">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">录音入门：手机也能录出好音色</div>
+        <div class="meta num"><span>24 分钟 · 5 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="舞台 表现 呼吸 节拍 弹唱">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">舞台表现：弹唱时的呼吸与节拍</div>
+        <div class="meta num"><span>20 分钟 · 5 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="曲目 拆解 啃歌 分段练习">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">曲目拆解：一句一句啃新歌</div>
+        <div class="meta num"><span>28 分钟 · 5 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="练习 计划 目标 时间安排">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">练习计划：一个月能练到什么</div>
+        <div class="meta num"><span>25 分钟 · 5 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="乐理 级数 功能圈 速查">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">乐理速查：级数与功能圈</div>
+        <div class="meta num"><span>30 分钟 · 6 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="视唱 节奏 打拍 重音">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">节奏视唱：用手打拍找重音</div>
+        <div class="meta num"><span>22 分钟 · 6 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="高把位 和弦 封闭 开放">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">高把位和弦：封闭与开放之间</div>
+        <div class="meta num"><span>27 分钟 · 6 个月前更新</span></div>
+      </a>
+      <a class="card" href="track-point-detail.html" data-kw="自测 基本功 验收 阶段">
+        <div class="cover"><div class="disc"><span class="lbl"><i></i></span></div></div>
+        <div class="name">阶段自测：基本功 30 项验收</div>
+        <div class="meta num"><span>33 分钟 · 6 个月前更新</span></div>
+      </a>
+<div class="zone-empty" id="trackEmpty" data-page-node-id="l1u7UdObrH87He3CmoBFDH">知识点中未找到与「<b id="trackKw" data-page-node-id="lbusL3fuhsYcRXrpRo3QoK"></b>」相关的内容</div>
+    </div>
+  <nav class="pager" id="trackPager" aria-label="单课分页">
+      <button type="button" class="pgbtn" data-act="prev" aria-label="上一页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
+      </button>
+      <span class="pgnums num" data-nums><!-- JS 渲染 --></span>
+      <button type="button" class="pgbtn" data-act="next" aria-label="下一页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </nav>
+  </section>
+
+
+
+  <!-- 全局搜索空态 -->
+  <div class="global-empty" id="globalEmpty">
+    <span class="big">没有找到与「<mark><b id="allKw"></b>」相关的内容</mark></span>
+    <span>换个关键词试试，或清除搜索浏览全部内容</span>
+    <button type="button" id="clrAll">清除搜索</button>
+  </div>
+</main>
+
+<!-- 回到顶部 -->
+<button type="button" class="to-top" id="toTop" aria-label="回到顶部">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+</button>
+
+<script>
+/* ================= 视角切换（老师/学生/游客 = 浏览视角；教导主任 = 管理视角） ================= */
+const vBtns = [...document.querySelectorAll('.viewseg button')];
+function setView(dean){
+  vBtns.forEach(b=>b.classList.toggle('on', (b.dataset.dean === '1') === dean));
+  document.body.classList.toggle('dean', dean);
+  document.querySelectorAll('.teacher-only').forEach(el=>{ el.style.display = dean ? 'flex' : 'none'; });
+}
+vBtns.forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.dean === '1')));
+
+/* ================= 教导主任视角：卡片悬停操作层（查看详情 / 编辑 / 删除） ================= */
+(function(){
+  let toastTimer = null;
+  function toast(msg){
+    let t = document.querySelector('.dean-toast');
+    if(!t){
+      t = document.createElement('div');
+      t.className = 'dean-toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove('show'), 1600);
+  }
+  function bumpMeta(card){
+    const grid = card.closest('.grid');
+    if(!grid) return;
+    const meta = document.getElementById(grid.id === 'setGrid' ? 'setMeta' : 'trackMeta');
+    const left = grid.querySelectorAll('.card').length;
+    if(meta) meta.textContent = meta.textContent.replace(/共 \d+/, '共 ' + left);
+  }
+  document.querySelectorAll('.card').forEach(card=>{
+    const ops = document.createElement('div');
+    ops.className = 'ops';
+    ops.innerHTML =
+      '<button type="button" data-act="view">查看详情</button>' +
+      '<button type="button" data-act="edit">编辑</button>' +
+      '<button type="button" data-act="del" class="op-del">删除</button>';
+    card.querySelector('.cover').appendChild(ops);
+    ops.addEventListener('click', e=>{
+      e.preventDefault(); e.stopPropagation();
+      const act = e.target.dataset && e.target.dataset.act;
+      if(!act) return;
+      if(act === 'del'){
+        /* 二次确认：弹出删除确认层 */
+        pendingCard = card;
+        document.getElementById('delName').textContent = (card.querySelector('.name')||{}).textContent.trim();
+        document.getElementById('delModal').classList.add('show');
+      }else{
+        toast(act === 'view' ? '演示：进入「' + (card.querySelector('.name')||{}).textContent.trim() + '」详情页' : '演示：进入编辑页');
+      }
+    });
+  });
+
+(function(){
+  document.body.insertAdjacentHTML('beforeend', [
+    '<div class="modal-mask" id="delModal" role="dialog" aria-modal="true" aria-label="删除确认">',
+      '<div class="modal">',
+        '<div class="modal-title">删 除 确 认</div>',
+        '<p>确定要删除「<b id="delName"></b>」吗？<br>删除后该内容将不可恢复。</p>',
+        '<div class="modal-ops">',
+          '<button type="button" class="mbtn" id="delCancel">取 消</button>',
+          '<button type="button" class="mbtn danger" id="delOk">确认删除</button>',
+        '</div>',
+      '</div>',
+    '</div>'
+  ].join(''));
+})();
+  /* ---- 删除确认弹层逻辑 ---- */
+  let pendingCard = null;
+  const mask = document.getElementById('delModal');
+  function doDelete(){
+    if(!pendingCard) return;
+    const card = pendingCard; pendingCard = null;
+    mask.classList.remove('show');
+    card.style.transition = 'opacity .25s, transform .25s';
+    card.style.opacity = '0'; card.style.transform = 'scale(.94)';
+    setTimeout(()=>{ card.remove(); bumpMeta(card); layoutAll(); }, 250);
+    toast('演示：已删除「' + (card.querySelector('.name')||{}).textContent.trim() + '」');
+  }
+  document.getElementById('delOk').addEventListener('click', doDelete);
+  document.getElementById('delCancel').addEventListener('click', closeDel);
+  mask.addEventListener('click', e=>{ if(e.target === mask) closeDel(); });
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && mask.classList.contains('show')) closeDel(); });
+  function closeDel(){ pendingCard = null; mask.classList.remove('show'); }
+})();
+
+/* ================= 搜索（同时过滤两区） ================= */
+const input = document.getElementById('searchInput');
+const bar = document.getElementById('searchbar');
+const cards = [...document.querySelectorAll('.card')];
+function applySearch(){
+  const kw = input.value.trim().toLowerCase();
+  bar.classList.toggle('filtering', kw !== '');
+  document.body.classList.toggle('searching', kw !== '');
+  let trackHit = 0, setHit = 0;
+  cards.forEach(c=>{
+    const hit = kw === '' || c.dataset.kw.toLowerCase().includes(kw) || c.querySelector('.name').textContent.toLowerCase().includes(kw);
+    c.style.display = hit ? '' : 'none';
+    if(hit){
+      if(c.closest('#trackGrid')) trackHit++; else setHit++;
+    }
+  });
+  document.getElementById('trackEmpty').classList.toggle('show', trackHit === 0);
+  document.getElementById('setEmpty').classList.toggle('show', setHit === 0);
+  document.getElementById('trackKw').textContent = input.value.trim();
+  document.getElementById('setKw').textContent = input.value.trim();
+  document.getElementById('allKw').textContent = input.value.trim();
+  /* 两区全空 → 全局空态卡片 */
+  const none = trackHit === 0 && setHit === 0;
+  document.getElementById('globalEmpty').classList.toggle('show', none);
+  document.querySelector('.zone.tracks').style.display = none ? 'none' : 'flex';
+  document.querySelector('.zone.sets').style.display   = none ? 'none' : 'flex';
+  /* 搜索变化 → 分页重置回第 1 页 */
+  PAGES.forEach(z=>{ z.page = 1; });
+  layoutAll();
+}
+input.addEventListener('input', applySearch);
+document.getElementById('clrBtn').addEventListener('click', ()=>{ input.value=''; applySearch(); input.focus(); });
+document.getElementById('clrAll').addEventListener('click', ()=>{ input.value=''; applySearch(); input.focus(); });
+
+/* ================= 真实专辑封面（iTunes 公开曲库 · 600×600） ================= */
+const TRACK_IMGS = ['assets/covers/real-01.jpg', 'assets/covers/real-02.jpg', 'assets/covers/real-03.jpg', 'assets/covers/real-04.jpg', 'assets/covers/real-05.jpg', 'assets/covers/real-06.jpg', 'assets/covers/real-07.jpg', 'assets/covers/real-08.jpg', 'assets/covers/real-09.jpg', 'assets/covers/real-10.jpg', 'assets/covers/real-11.jpg', 'assets/covers/real-12.jpg', 'assets/covers/real-13.jpg', 'assets/covers/real-14.jpg', 'assets/covers/real-15.jpg', 'assets/covers/real-16.jpg', 'assets/covers/real-17.jpg', 'assets/covers/real-18.jpg'];
+const SET_IMGS = ['assets/covers/real-13.jpg', 'assets/covers/real-14.jpg', 'assets/covers/real-15.jpg', 'assets/covers/real-16.jpg', 'assets/covers/real-17.jpg', 'assets/covers/real-18.jpg', 'assets/covers/real-12.jpg'];
+function applyImgs(gridSel, imgs){
+  document.querySelectorAll(gridSel + ' .card .cover').forEach((cv, i)=>{
+    cv.classList.remove('stack','v-groove','c2','c3','c4','c5','c6');
+    cv.style.backgroundImage = 'url("' + imgs[i % imgs.length] + '")';
+    cv.style.backgroundSize = 'cover';
+    cv.style.backgroundPosition = 'center';
+    const disc = cv.querySelector('.disc');
+    if(disc) disc.style.display = 'none';
+  });
+}
+applyImgs('#trackGrid', TRACK_IMGS);
+applyImgs('#setGrid', SET_IMGS);
+
+/* ================= 区块计数（按实际卡片数） ================= */
+document.getElementById('trackMeta').textContent = '共 ' + document.querySelectorAll('#trackGrid .card').length + ' 个';
+document.getElementById('setMeta').textContent   = '共 ' + document.querySelectorAll('#setGrid .card').length + ' 套';
+
+/* ================= 分页：无框页码式（当前页橙色马克笔） =================
+   知识点集：一行 8 张 → 每页 8 个
+   单课区：整页可滚动，单课区约 2 屏高度后翻页 → 每页 5 行 × 8 = 40 个
+======================================================================= */
+const SET_SIZE = 8;
+const TRACK_SIZE = 8 * 5;
+const PAGES = [
+  {gridId:'trackGrid', pagerId:'trackPager', size:TRACK_SIZE, page:1},
+  {gridId:'setGrid',   pagerId:'setPager',   size:SET_SIZE,   page:1}
+].map(cfg=>{
+  const grid  = document.getElementById(cfg.gridId);
+  const pager = document.getElementById(cfg.pagerId);
+  const z = {cards:[...grid.querySelectorAll('.card')], pager, page:1, size:cfg.size, nums:pager.querySelector('[data-nums]')};
+  pager.querySelector('[data-act="prev"]').addEventListener('click', ()=>{ z.page--; layoutPage(z); });
+  pager.querySelector('[data-act="next"]').addEventListener('click', ()=>{ z.page++; layoutPage(z); });
+  z.nums.addEventListener('click', e=>{
+    const b = e.target.closest('.pgnum'); if(!b) return;
+    z.page = parseInt(b.dataset.p, 10); layoutPage(z);
+  });
+  return z;
+});
+/* 页码序列：≤7 页全部列出；更多时首尾 + 当前页邻域折叠 */
+function pageSeq(cur, total){
+  if(total <= 7) return Array.from({length:total}, (_,i)=>i+1);
+  const list = [1];
+  const s = Math.max(2, cur-1), e = Math.min(total-1, cur+1);
+  if(s > 2) list.push('…');
+  for(let i=s;i<=e;i++) list.push(i);
+  if(e < total-1) list.push('…');
+  list.push(total);
+  return list;
+}
+function layoutPage(z){
+  const vis = z.cards.filter(c=>c.style.display !== 'none');
+  const total = Math.max(1, Math.ceil(vis.length / z.size));
+  z.page = Math.min(Math.max(1, z.page), total);
+  vis.forEach((c, i)=> c.classList.toggle('pg-hide', !(i >= (z.page-1)*z.size && i < z.page*z.size)));
+  z.nums.innerHTML = pageSeq(z.page, total).map(v=> v === '…'
+    ? '<span class="pgdots">…</span>'
+    : '<button type="button" class="pgnum' + (v === z.page ? ' on' : '') + '" data-p="' + v + '"'
+      + ' aria-label="第 ' + v + ' 页"' + (v === z.page ? ' aria-current="page"' : '') + '>' + v + '</button>'
+  ).join('');
+  z.pager.querySelector('[data-act="prev"]').disabled = z.page <= 1;
+  z.pager.querySelector('[data-act="next"]').disabled = z.page >= total;
+}
+function layoutAll(){ PAGES.forEach(layoutPage); }
+layoutAll();
+
+/* ================= 回到顶部（滚过约一屏后出现） ================= */
+const toTop = document.getElementById('toTop');
+function syncToTop(){ toTop.classList.toggle('show', window.scrollY > innerHeight * 0.6); }
+addEventListener('scroll', syncToTop, {passive:true});
+addEventListener('resize', syncToTop);
+toTop.addEventListener('click', ()=> window.scrollTo({top:0, behavior:'smooth'}));
+syncToTop();
+/* ================= 排序：更新时间倒序(默认)/正序 · 首字母 ================= */
+function relTs(txt){
+  const t = (txt||'').replace(/\s/g,'');
+  if(t.indexOf('今天') > -1) return 1;
+  if(t.indexOf('昨天') > -1) return 24;
+  const m = t.match(/(\d+)(分钟|小时|天|周|个月|月)前/);
+  if(!m) return 1e9;
+  const unit = {'分钟':1/60,'小时':1,'天':24,'周':168,'个月':720,'月':720}[m[2]];
+  return (+m[1]) * unit;
+}
+document.querySelectorAll('.zone-head .order').forEach(sel=>{
+  const zone = sel.closest('.zone');
+  const grid = zone.querySelector('.grid');
+  sel.addEventListener('change', ()=>{
+    const mode = sel.value;
+    const sorted = [...grid.querySelectorAll('.card')].sort((a,b)=>{
+      if(mode === 'az'){
+        return (a.querySelector('.name')||{}).textContent.trim()
+          .localeCompare((b.querySelector('.name')||{}).textContent.trim(), 'zh-CN');
+      }
+      const ta = relTs((a.querySelector('.meta')||{}).textContent);
+      const tb = relTs((b.querySelector('.meta')||{}).textContent);
+      return mode === 'old' ? tb - ta : ta - tb;
+    });
+    sorted.forEach(c=>grid.appendChild(c));
+    const z = PAGES.find(p=>p.gridId === grid.id);
+    if(z){ z.page = 1; layoutPage(z); }
+  });
+});
+</script>
+</body>
+</html>

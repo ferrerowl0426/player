@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="oxmiYcSpb1xwHJ0Hvb2jF1">
+<head data-page-node-id="9aKnuqD9MQF9KUROur6jK5">
+<meta charset="UTF-8" data-page-node-id="HQkSwA4Y12PyYBfR73j4Iy">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="iasOPmHFc3xdVB9CM8knQa">
+<title>登录 · 能学慧吉他教室</title>
+<style>
+/* ============================================================
+   登录页 · 能学慧吉他教室
+   骨架参考：暖棕包围 + 奶油大卡 + 左上凸出 logo 牌 + 左表单右插画
+   材质遵循 design-spec v1.0：咖啡描边 / 硬阴影 / 小圆角 / 纸张颗粒
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --cream:  #ffffff;              /* 卡片纯白底 */
+  --brown:  #83654b;              /* 页面暖棕包围（低饱和 · 偏暖） */
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #cf6f24;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --glass-line: rgba(93, 67, 38, .32);
+  --wood:   #3a2a18;
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{min-height:100%}
+body{
+  font-family:var(--font-body);
+  background:var(--brown);
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;display:grid;place-items:center;
+  padding:56px 24px 40px;
+  position:relative;overflow:hidden;
+}
+/* 暖棕底上的半调网点装饰（参考图边角波点） */
+body::before,body::after{
+  content:"";position:fixed;pointer-events:none;
+  background-image:radial-gradient(circle, rgba(242,234,217,.22) 1.4px, transparent 1.5px);
+  background-size:13px 13px;
+}
+body::before{top:26px;right:30px;width:300px;height:190px;
+  -webkit-mask:radial-gradient(ellipse at top right,#000 30%,transparent 72%);
+          mask:radial-gradient(ellipse at top right,#000 30%,transparent 72%);}
+body::after{bottom:24px;left:28px;width:280px;height:180px;
+  -webkit-mask:radial-gradient(ellipse at bottom left,#000 30%,transparent 72%);
+          mask:radial-gradient(ellipse at bottom left,#000 30%,transparent 72%);}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:inherit}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:10px;letter-spacing:2.5px;color:var(--ink-3);text-transform:uppercase;font-weight:500}
+
+/* ============ 主卡片 ============ */
+.card{
+  position:relative;
+  width:min(960px,100%);
+  display:grid;grid-template-columns:460px 1fr;
+  /* 水彩明信片：奶油纸底 + 三片淡彩晕染（降艳：低透明度） */
+  background:
+    radial-gradient(430px 300px at 86% 6%,  rgba(207,111,36,.07), transparent 70%),
+    radial-gradient(400px 320px at 6% 94%,  rgba(125,139,94,.08), transparent 70%),
+    radial-gradient(320px 260px at 68% 92%, rgba(185,142,62,.07), transparent 72%),
+    var(--cream);
+  border:1.5px solid var(--coffee);border-radius:8px;
+  box-shadow:8px 10px 0 rgba(38,29,16,.32), 0 26px 60px rgba(38,29,16,.35);
+}
+/* 明信片内框（细虚线 · 邮票框感） */
+.postcard-frame{
+  position:absolute;inset:9px;z-index:2;pointer-events:none;
+  border:1px dashed rgba(201,183,141,.75);border-radius:5px;
+}
+/* 纸张颗粒（弱） */
+.card::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .34 0 0 0 0 .2 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- 左上凸出 logo 牌 + 欢迎语（参考图 Anima 牌位） ---- */
+.tab-row{
+  position:absolute;top:-27px;left:44px;z-index:3;
+  display:flex;align-items:center;gap:20px;
+}
+.logo-tab{
+  display:flex;align-items:center;gap:10px;
+  background:var(--white);
+  border:1.5px solid var(--coffee);border-radius:5px;
+  box-shadow:3px 4px 0 rgba(38,29,16,.30);
+  padding:12px 22px 12px 16px;
+}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+
+/* ============ 左侧：表单 ============ */
+.form-side{padding:64px 52px 44px;display:flex;flex-direction:column}
+.form-head{text-align:center;margin-bottom:26px}
+.form-head h1{font-size:21px;font-weight:700;letter-spacing:1.5px;line-height:1.5}
+.form-head h1 mark{
+  background:linear-gradient(180deg, transparent 55%, rgba(233,178,80,.55) 55%);
+  color:inherit;padding:0 2px;
+}
+.field{margin-bottom:16px}
+.field label{
+  display:flex;align-items:baseline;justify-content:space-between;
+  font-size:11px;font-weight:600;letter-spacing:.8px;color:var(--ink-2);margin-bottom:6px;
+}
+.field label .aux{font-weight:400;font-size:11px;letter-spacing:.5px}
+.field label .aux .link-btn{
+  font:inherit;letter-spacing:inherit;color:var(--coffee);
+  border-bottom:1px dashed var(--hair-2);padding:0;transition:color .25s;
+}
+.field label .aux .link-btn:hover{color:var(--orange);border-color:var(--orange)}
+/* 忘记密码提示（纸条样式） */
+.pwd-tip{
+  display:none;margin-top:7px;
+  font-size:11px;letter-spacing:.5px;color:var(--coffee);
+  background:rgba(233,178,80,.16);
+  border:1px dashed var(--hair-2);border-radius:4px;
+  padding:6px 11px;
+}
+.pwd-tip.show{display:block}
+.field input{
+  width:100%;height:40px;padding:0 13px;
+  background:var(--white);
+  border:1px solid var(--hair-2);border-radius:4px;
+  font-size:13.5px;color:var(--ink);letter-spacing:.3px;
+  transition:border-color .25s var(--ease), box-shadow .25s var(--ease);
+}
+.field input::placeholder{color:#b3a58c}
+.field input:hover{border-color:var(--coffee)}
+.field input:focus{outline:none;border-color:var(--coffee);box-shadow:2px 3px 0 rgba(93,67,38,.14)}
+
+/* 记住我（方形勾选 · 咖啡勾） */
+.remember{display:flex;align-items:center;gap:8px;margin:2px 0 18px;cursor:pointer;user-select:none;width:fit-content}
+.remember input{position:absolute;opacity:0;width:0;height:0}
+.remember .cbx{
+  width:15px;height:15px;flex:none;border:1px solid var(--hair-2);border-radius:3px;background:var(--white);
+  display:grid;place-items:center;font-size:10px;color:transparent;line-height:1;
+  transition:all .25s var(--ease);
+}
+.remember input:checked + .cbx{background:var(--coffee);border-color:var(--coffee);color:var(--white)}
+.remember input:focus-visible + .cbx{outline:1.5px solid var(--ink);outline-offset:3px}
+.remember span.txt{font-size:12px;color:var(--ink-2);letter-spacing:.5px}
+.remember:hover .cbx{border-color:var(--coffee)}
+
+/* 登录按钮：橘底 · 硬阴影 · hover 转 coffee（主按钮规范同播放键） */
+.btn-main{
+  width:100%;height:44px;
+  background:var(--orange);color:var(--white);
+  border:1.5px solid var(--orange);border-radius:4px;
+  font-size:14px;font-weight:600;letter-spacing:6px;text-indent:6px;
+  box-shadow:3px 4px 0 rgba(93,67,38,.30);
+  transition:background .3s var(--ease), border-color .3s var(--ease), transform .15s var(--ease);
+}
+.btn-main:hover{background:var(--coffee);border-color:var(--coffee)}
+.btn-main:active{transform:translate(2px,3px);box-shadow:1px 1px 0 rgba(93,67,38,.30)}
+
+/* 游客模式入口 */
+.guest{
+  display:block;width:fit-content;margin:16px auto 0;
+  font-size:12px;letter-spacing:.5px;color:var(--ink-3);text-decoration:none;
+  border-bottom:1px dashed var(--hair-2);padding-bottom:1px;
+  transition:color .25s;
+}
+.guest:hover{color:var(--orange);border-color:var(--orange)}
+
+/* ============ 左侧：水彩主体（无框 · 周围白纸填充） ============ */
+.img-side{
+  position:relative;overflow:hidden;
+  border-right:1px solid var(--glass-line);
+  /* 白纸底 + 水彩主体按原比例居中，高度不够时上下以白纸补足 */
+  background:#ffffff url("assets/wc-metronome-tall.jpg") center/cover no-repeat;
+}
+
+/* ============ 动效 ============ */
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+.rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}.rise.d3{animation-delay:.24s}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){
+  .rise{opacity:1;transform:none;animation:none}
+}
+
+/* ============ 响应式 ============ */
+@media (max-width:900px){
+  .card{grid-template-columns:1fr;width:min(460px,100%)}
+  .img-side{display:none}
+}
+@media (max-width:480px){
+  body{padding:48px 14px 28px}
+  .form-side{padding:58px 30px 34px}
+  .tab-row{left:26px}
+}
+</style>
+</head>
+<body data-page-node-id="rRG1CarxDmyurdeiPV4A6U">
+
+  <main class="card rise" data-page-node-id="n6xjPr3bWSpQln5WpDMlzK">
+    <div class="postcard-frame" aria-hidden="true"></div>
+    <!-- 左上凸出 logo 牌 -->
+    <div class="tab-row" data-page-node-id="MTswpmWLXzF4fvV0lg3drp">
+      <div class="logo-tab" data-page-node-id="SfIZGxyxmVaJ0vAUBtGswr">
+        <a class="logo" href="#" data-page-node-id="82u6cDh6Zn3yWUr9VpEtwH">
+          <span class="mark" data-page-node-id="9aJEDcdNDfCZ6c7Mkc4AD5"></span>
+          能学慧吉他教室
+          <small data-page-node-id="fokxmY5Ev9UOhkzYLIc5nt">NXH GUITAR</small>
+        </a>
+      </div>
+    </div>
+
+    <!-- 左：展示图（定稿水彩琴桌） -->
+    <div class="img-side rise" data-page-node-id="nImgSide0login1left2"></div>
+
+    <!-- 右：登录表单 -->
+    <div class="form-side" data-page-node-id="5p4oylQbivp06iaZzH6uKE">
+      <div class="form-head rise d1" data-page-node-id="OKoDWyIDjwKHsURVFE6oyV">
+        <h1 data-page-node-id="AKIvM2K9UYDM1GDMVkpFMM"><mark data-page-node-id="9HeSFFFE9f1hnnummvpmAg">登录教室</mark>，继续练琴</h1>
+      </div>
+
+      <form class="rise d2" autocomplete="off" data-page-node-id="WBjOFutCszA1lwxpo3Ahoq">
+        <div class="field" data-page-node-id="GAMozqzWTQUZg6yhlDRy2F">
+          <label for="account" data-page-node-id="0NbYheCnIHzcCsn473WEGY">账号（手机号）</label>
+          <input id="account" name="account" type="tel" placeholder="请输入手机号" autocomplete="username" maxlength="11" data-page-node-id="71Eq754L1PUIcVg9eFcH5R">
+        </div>
+        <div class="field" data-page-node-id="ZFI6pbEMPHQOuuM0idW4kz">
+          <label for="pwd" data-page-node-id="WpoyuMR0wzvjtnjWdLuO8k">密码
+            <span class="aux" data-page-node-id="v5HoUprjdiIsxwc2FE1mV6"><button type="button" class="link-btn" id="forgotPwd" data-page-node-id="zRIcwpgkpbFiUEf2C1QqqI">忘记密码？</button></span>
+          </label>
+          <input id="pwd" type="password" placeholder="请输入密码" data-page-node-id="1mTIRsBvV4JWFcx8XnhhYh">
+          <div class="pwd-tip" id="pwdTip" role="note">请联系你的老师修改密码</div>
+        </div>
+
+        <label class="remember" data-page-node-id="ZNLJ11WjFaJkHInRyJTHK5">
+          <input type="checkbox" checked data-page-node-id="18Fdu1qFe3IJV9MyK19Zjg">
+          <span class="cbx" data-page-node-id="oG1SZpKFKKvhLvzFbhEBzD">✓</span>
+          <span class="txt" data-page-node-id="yOr0BUH6wtI42m21cQTr18">记住我（7 天内免登录）</span>
+        </label>
+
+        <button type="submit" class="btn-main" data-page-node-id="CNIhJDu0FCTTc0pN2lWoHZ">登 录</button>
+      </form>
+
+      <a class="guest rise d3" href="#" data-page-node-id="nGuest0mode1login2link3">先不登录，使用游客模式访问 →</a>
+    </div>
+
+  </main>
+
+<script>
+  // 登录提交（演示：阻止默认 + 按钮反馈）
+  document.querySelector('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const btn = e.target.querySelector('.btn-main');
+    const old = btn.textContent;
+    btn.textContent = '登录中…';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 1200);
+  });
+  // 忘记密码：显示提示纸条
+  document.getElementById('forgotPwd').addEventListener('click', () => {
+    document.getElementById('pwdTip').classList.toggle('show');
+  });
+</script>
+</body>
+</html>

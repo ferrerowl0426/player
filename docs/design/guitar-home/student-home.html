@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="tvcfu4GKORTxwy01SI7zHQ">
+<head data-page-node-id="qoV3pqFIDJdAYAvu7avEOJ">
+<meta charset="UTF-8" data-page-node-id="C1pPjG0cKeEPmkA5KkW0Ad">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="l01n85T9kdf9RSIG3eMAO6">
+<title>首页 · 能学慧吉他教室</title>
+<style>
+/* ============================================================
+   学员首页 · 左「老师留言板（信纸）」/ 右「今日学习资源」（含停用态）
+   视觉遵循 design-spec v2.0：纯白底 / 焦糖格纹 / 咖啡描边 / 亮橙强调
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --pc-paper:   #fffdf7;   /* 信纸纸色 */
+  --pc-ink:     #3a2c1c;   /* 信纸书写墨色 */
+  --pc-line:    rgba(122, 74, 38, .13);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-hand: "Kaiti SC", "STKaiti", "KaiTi", "楷体", "Songti SC", serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{height:100%}
+body{
+  min-height:100%;
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底 + 格纹底饰（design-spec v2.0 §3） */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;
+}
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ============ 导航（学员视角） ============ */
+.nav{
+  position:relative;flex:none;z-index:50;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区 ============ */
+.home{
+  flex:1 0 auto;max-width:1440px;width:100%;margin:0 auto;
+  padding:14px 36px 36px;display:flex;flex-direction:column;gap:16px;
+}
+
+/* ---- 问候行 ---- */
+.greet{flex:none;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.greet h1{font-size:20px;font-weight:700;letter-spacing:1px;line-height:1.4}
+.greet .sub{font-size:11px;color:var(--ink-3);letter-spacing:.5px;padding-bottom:3px}
+.viewseg{margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid var(--hair-2);border-radius:4px;overflow:hidden;background:var(--white)}
+.viewseg .lbl{font-size:10px;letter-spacing:1.5px;color:var(--ink-3);padding:0 10px;border-right:1px dashed var(--hair-2)}
+.viewseg button{font-size:11px;letter-spacing:1px;color:var(--ink-3);padding:5px 13px;transition:all .25s}
+.viewseg button + button{border-left:1px solid var(--hair)}
+.viewseg button.on{background:var(--coffee);color:var(--white);font-weight:600}
+
+/* ---- 停用横幅（纸条） ---- */
+.stop-banner{
+  flex:none;display:none;align-items:flex-start;gap:12px;
+  border:1.5px dashed rgba(180,69,46,.55);border-radius:6px;
+  background:rgba(255,252,242,.85);
+  padding:12px 18px;
+}
+body.disabled .stop-banner{display:flex}
+.stop-banner .ico{
+  flex:none;width:30px;height:30px;border-radius:50%;margin-top:2px;
+  border:1.5px solid rgba(180,69,46,.5);background:rgba(180,69,46,.06);
+  display:grid;place-items:center;color:#b4452e;
+}
+.stop-banner .ico svg{width:15px;height:15px}
+.stop-banner .t{font-size:12.5px;color:var(--ink);letter-spacing:.5px;line-height:1.8}
+.stop-banner .t b{color:#b4452e}
+
+/* ============ 左右分区 ============ */
+.cols{
+  flex:1 0 auto;
+  display:grid;gap:24px;
+  grid-template-columns:minmax(0,45fr) minmax(0,55fr);
+  align-items:stretch;
+}
+.sec{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:0 2px}
+.sec-head h2{
+  font-size:15px;font-weight:700;letter-spacing:2px;color:var(--coffee);
+  display:flex;align-items:center;gap:9px;
+}
+.sec-head h2::before{content:"";width:4px;height:15px;border-radius:1px;flex:none;background:var(--orange)}
+.sec-head .meta{font-size:10.5px;color:var(--ink-3);letter-spacing:1px}
+.sec-head .note{margin-left:auto;font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+
+/* ============ 左：老师留言板（信纸） ============ */
+.letter{
+  position:relative;flex:1;min-height:340px;
+  background:var(--pc-paper);
+  border:1px solid var(--hair-2);
+  border-radius:2px;
+  box-shadow:0 1px 2px rgba(93,67,38,.10), 0 10px 26px rgba(93,67,38,.10);
+  padding:24px 26px 20px;
+  display:flex;flex-direction:column;
+}
+/* 邮票（齿孔） */
+.pc-stamp{
+  position:absolute;right:22px;top:20px;width:52px;height:62px;
+  background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  box-shadow:1px 2px 5px rgba(93,67,38,.18);
+}
+.pc-stamp::after{
+  content:"";position:absolute;inset:-1px;pointer-events:none;
+  background:
+    radial-gradient(circle 2.4px at 50% 0,    var(--pc-paper) 98%, transparent 100%) 0 0/9px 9px repeat-x,
+    radial-gradient(circle 2.4px at 50% 100%, var(--pc-paper) 98%, transparent 100%) 0 100%/9px 9px repeat-x,
+    radial-gradient(circle 2.4px at 0 50%,    var(--pc-paper) 98%, transparent 100%) 0 0/9px 9px repeat-y,
+    radial-gradient(circle 2.4px at 100% 50%, var(--pc-paper) 98%, transparent 100%) 100% 0/9px 9px repeat-y;
+}
+.pc-stamp-art{display:grid;place-items:center;color:var(--coffee)}
+.pc-stamp-art svg{width:19px;height:19px}
+.pc-stamp-txt{font-size:7px;font-weight:700;letter-spacing:1.5px;color:var(--ink-3)}
+/* 邮戳 */
+.pc-mark{
+  position:absolute;right:62px;top:28px;width:54px;height:54px;border-radius:50%;
+  border:1.4px solid rgba(122,74,38,.38);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  color:rgba(122,74,38,.55);transform:rotate(-13deg);
+  background:rgba(255,253,247,.42);
+}
+.pc-mark::after{content:"";position:absolute;inset:3px;border-radius:50%;border:1px dashed rgba(122,74,38,.3)}
+.pc-mark-d{font-size:12.5px;font-weight:700;line-height:1;letter-spacing:.5px}
+.pc-mark-t{font-size:5.5px;letter-spacing:1px;transform:scale(.92)}
+
+/* 信纸正文：横线贯穿整张纸 */
+.lt-body{
+  flex:1;min-height:0;
+  background:repeating-linear-gradient(180deg, transparent 0 29px, var(--pc-line) 29px 30px);
+  background-position:0 0;
+}
+.lt-h{
+  font-size:12px;font-weight:700;letter-spacing:3px;color:var(--coffee);
+  line-height:30px;padding-right:126px;
+}
+.lt-list{
+  list-style:none;counter-reset:n;margin:0;padding:0;
+  font-family:var(--font-hand);font-size:15px;color:var(--pc-ink);letter-spacing:.4px;
+}
+.lt-list li{
+  counter-increment:n;position:relative;line-height:30px;
+  padding-left:24px;padding-right:126px;
+}
+.lt-list li::before{
+  content:counter(n) ".";position:absolute;left:0;top:0;
+  font-size:12px;font-weight:700;color:var(--coffee);letter-spacing:0;
+}
+/* 收尾话术（与横线行距对齐） */
+.lt-note{
+  margin-top:30px;
+  font-family:var(--font-hand);font-size:15px;line-height:30px;
+  color:var(--pc-ink);letter-spacing:.4px;padding-right:126px;
+}
+/* 署名（信纸底部） */
+.lt-sign{
+  flex:none;margin-top:16px;padding-top:12px;
+  border-top:1px dashed rgba(122,74,38,.22);
+  display:flex;align-items:baseline;justify-content:flex-end;gap:12px;
+}
+.lt-sign-nm{font-family:var(--font-hand);font-size:16px;color:var(--pc-ink);letter-spacing:1px}
+.lt-sign-t{font-size:10px;color:var(--ink-3);letter-spacing:1.5px}
+
+/* ============ 右：今日学习资源（直排无框） ============ */
+.grid{
+  display:grid;gap:14px;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  align-content:start;
+}
+.hw{
+  text-decoration:none;color:inherit;
+  display:flex;flex-direction:column;
+  border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.06);
+  padding:7px;transition:all .3s var(--ease);
+}
+.hw:hover{transform:translateY(-3px);box-shadow:0 6px 16px rgba(93,67,38,.14)}
+.hw .cover{
+  position:relative;width:100%;aspect-ratio:1/1;border-radius:4px;overflow:hidden;
+  background:var(--wood) center/cover no-repeat;display:grid;place-items:center;
+}
+.hw .cover .p-tag{
+  position:absolute;right:7px;bottom:7px;z-index:2;
+  font-size:9px;letter-spacing:1px;font-weight:700;color:var(--white);
+  background:rgba(93,67,38,.88);border-radius:3px;padding:2px 8px;
+}
+.hw .cover .go{
+  position:absolute;inset:0;z-index:3;display:grid;place-items:center;
+  background:rgba(38,26,12,.32);opacity:0;transition:opacity .3s var(--ease);
+}
+.hw:hover .cover .go{opacity:1}
+.hw .cover .go span{
+  font-size:11px;letter-spacing:3px;font-weight:600;color:var(--coffee);
+  background:rgba(255,255,255,.92);border:1.5px solid var(--coffee);border-radius:4px;
+  padding:6px 16px;box-shadow:2px 3px 0 rgba(38,26,12,.25);
+}
+.kind-chip{
+  position:absolute;left:7px;top:7px;z-index:2;
+  font-size:9px;letter-spacing:1.5px;font-weight:600;color:var(--white);
+  background:var(--orange);border-radius:3px;padding:2px 8px;
+}
+.kind-chip.k-set{background:#8a5a12}
+.hw .nm{
+  font-size:12px;font-weight:600;letter-spacing:.3px;line-height:1.5;margin-top:7px;
+  height:1.5em;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;
+}
+.hw .from{font-size:9.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:5px;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}
+.hw .from .tk{flex:none;width:14px;height:14px;border-radius:50%;border:1px solid var(--hair-2);display:inline-grid;place-items:center;font-size:8px;color:var(--coffee)}
+.hw-empty{
+  grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  padding:60px 10px;text-align:center;color:var(--ink-3);font-size:12.5px;letter-spacing:.5px;
+}
+.hw-empty .big{font-size:15px;color:var(--ink);font-weight:700;letter-spacing:1px}
+
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+.rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){.rise{opacity:1;transform:none;animation:none}}
+
+@media (max-width:1180px){
+  .grid{grid-template-columns:repeat(2, minmax(0,1fr))}
+}
+@media (max-width:1024px){
+  .home{padding:14px 20px 40px}
+  .cols{grid-template-columns:1fr;gap:22px}
+  .letter{min-height:300px}
+}
+@media (max-width:640px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .home{padding:12px 14px 32px}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .viewseg{margin-left:0}
+  .greet{align-items:center}
+  .letter{padding:20px 16px 16px}
+  .pc-stamp{right:14px;top:16px;width:44px;height:52px}
+  .pc-mark{right:50px;top:22px;width:46px;height:46px}
+  .lt-h,.lt-list li,.lt-note{padding-right:0}
+}
+</style>
+</head>
+<body data-page-node-id="B6ygFeJpijd5cEWz7UNbjN">
+
+<!-- ================= 导航（学员） ================= -->
+<nav class="nav" data-page-node-id="GNK6ZOQjU2O59yYQYX2ZKS">
+  <div class="nav-inner" data-page-node-id="ftrg6kavohBEOGsX4zhbV0">
+    <a class="logo" href="#" data-page-node-id="eKv8o7gOk7osMMXgJVMgFx">
+      <span class="mark" data-page-node-id="34prOYUtSfEBy6DHL6eJJ4"></span>
+      能学慧吉他教室
+      <small data-page-node-id="6Da22pLXQB8YjnIuuLzyV8">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="RXUriGiO3f05dLYxdXqykz">
+      <a href="#" class="active" data-page-node-id="5aWmPu1saqXIPYkVoi4Ux5">首页</a>
+      <a href="knowledge-home.html" data-page-node-id="qWRBj8eVMtb0G5wrGRZYOH">知识点区</a>
+      <a href="tracks-home.html" data-page-node-id="M3MCTehjeXnnhhVyEPF0Hs">曲目库</a>
+      <a href="library.html" data-page-node-id="BAHfsQVGZIZjZ2aXM9SpfE">图书馆</a>
+      <a href="my-homework.html" data-page-node-id="qnuDwNKadZmMQnZJOVwNrY">我的历史作业</a>
+    </div>
+    <div class="nav-right" data-page-node-id="uvRNuxQtGsJwsceu4ciFSd">
+      <div class="avatar" data-page-node-id="n54PifUvClmJW3vVZyQpll">陈</div>
+    </div>
+  </div>
+</nav>
+
+<main class="home" data-page-node-id="72cpH6bXILNyEtRoGGvkSA">
+
+  <!-- 问候 + 视角切换（演示） -->
+  <div class="greet rise" data-page-node-id="HIG4Mti94aWBr3z4q3H96h">
+    <h1 data-page-node-id="OSH5IZhOWwj7SM1FCqO7tf">陈一一，今天练琴了吗？</h1>
+    <span class="sub num" data-page-node-id="fUkrWyKsjrmYf032wYiNuF">启蒙一班 · 老师李弦安 · 9 月 10 日 周四</span>
+    <div class="viewseg" role="group" aria-label="预览视角" data-page-node-id="DQTly62RdzyPCMwAh8O3r7">
+      <span class="lbl" data-page-node-id="NKfPwCntt9JYJMqJzKdrAX">预览视角</span>
+      <button type="button" class="on" data-v="normal" data-page-node-id="wTBF9R5eHLJBJuGGfdBODd">学员</button>
+      <button type="button" data-v="disabled" data-page-node-id="bVrPjGfEBjRgtuiGz6PEHt">停用学员</button>
+    </div>
+  </div>
+
+  <!-- 停用横幅 -->
+  <div class="stop-banner rise d1" role="alert" data-page-node-id="JQpKvl7v2xDC9CHYiwcOfr">
+    <span class="ico" data-page-node-id="VfCdEfx4fGhhTtAAC8To1d">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" data-page-node-id="WYg6faCICOxWe5BeNAl7zm"><circle cx="12" cy="12" r="9" data-page-node-id="HSDciXTefmYDJ0ZhgDfHqY"/><path d="M12 8v5" data-page-node-id="akZxENW6kJReN7mC5TMgWX"/><circle cx="12" cy="16" r=".5" fill="currentColor" data-page-node-id="pGVTf3VMCHAkNkhHueGYR3"/></svg>
+    </span>
+    <span class="t" data-page-node-id="B4ej26jqHWMSQ2rApLy0kZ"><b data-page-node-id="bugeu1Ck5HqbFai8PcSuGJ">你的课程已暂时停用。</b>资源免费开放半年用于自学，如需恢复课程请联系老师。</span>
+  </div>
+
+  <!-- ============ 左右分区 ============ -->
+  <div class="cols rise d2">
+
+    <!-- 左：老师留言板（信纸） -->
+    <section class="sec" aria-label="老师留言板">
+      <div class="sec-head">
+        <h2>老师留言板</h2>
+        <span class="meta">作业细则</span>
+      </div>
+      <article class="letter">
+        <div class="pc-stamp" aria-hidden="true">
+          <span class="pc-stamp-art">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 17.5V5.2l10-2v12.3"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/></svg>
+          </span>
+          <span class="pc-stamp-txt num">NXH</span>
+        </div>
+        <div class="pc-mark" aria-hidden="true">
+          <span class="pc-mark-d num">9.10</span>
+          <span class="pc-mark-t">NXH GUITAR</span>
+        </div>
+
+        <div class="lt-body">
+          <h3 class="lt-h">作业细则</h3>
+          <ol class="lt-list">
+            <li>卡农 P2 段落衔接，先慢速跟练三遍，节拍器 60。</li>
+            <li>天空之城重点练右手分解和弦，低音要保持住。</li>
+            <li>指弹入门 30 首，本周先拿下前 3 首，录一段发我。</li>
+            <li>练琴前热身 10 分钟，手腕放松，别硬撑。</li>
+            <li>每天 20 分钟，坚持比时长更重要。</li>
+          </ol>
+          <p class="lt-note">这周的重点是把节奏稳住，宁可慢，不要错。<br>下周课上我们一起过一遍 P2 的衔接。<br>有不懂的地方随时来问我。</p>
+        </div>
+
+        <div class="lt-sign">
+          <span class="lt-sign-nm">李弦安 老师</span>
+          <span class="lt-sign-t num">2026 · 09 · 10</span>
+        </div>
+      </article>
+    </section>
+
+    <!-- 右：今日学习资源 -->
+    <section class="sec" aria-label="今日学习资源">
+      <div class="sec-head">
+        <h2>今天你需要用到的学习资源</h2>
+        <span class="meta num" id="hwMeta">老师布置了 5 项</span>
+        <span class="note">点击封面开始学习 · 单 P 直达对应段落</span>
+      </div>
+      <div class="grid" id="hwGrid" data-page-node-id="GIARrj8qUK0IQ6HdmM2Csu"><!-- JS 渲染 --></div>
+    </section>
+
+  </div>
+
+</main>
+
+<script>
+/* ================= 假数据（≤5 项 · 单 P 用所属单课封面） ================= */
+const HW = [
+  {kind:'单课', nm:'卡农独奏 · 全曲精讲',   img:'assets/covers/real-01.jpg', from:'李弦安', t:'昨天 20:30', href:'track-point-detail.html'},
+  {kind:'P2',  nm:'卡农 · P2 分段讲解',    img:'assets/covers/real-01.jpg',           from:'李弦安', t:'昨天 20:30', href:'track-point-detail.html'},
+  {kind:'合集', nm:'指弹入门 30 首',        img:'assets/covers/real-15.jpg',         from:'李弦安', t:'3 天前',    href:'track-collection-detail.html'},
+  {kind:'单课', nm:'天空之城 · 指弹改编',   img:'assets/covers/real-02.jpg',                                        from:'李弦安', t:'4 天前',    href:'#'},
+  {kind:'P3',  nm:'晴天 · P1 前奏演示',    img:'assets/covers/real-06.jpg',                 from:'李弦安', t:'1 周前',    href:'#'},
+];
+
+/* ================= 渲染 ================= */
+const grid = document.getElementById('hwGrid');
+function render(){
+  document.getElementById('hwMeta').textContent = '老师布置了 ' + HW.length + ' 项';
+  grid.innerHTML = HW.map(h=>
+    '<a class="hw" href="' + h.href + '">' +
+      '<div class="cover" style="background-image:url(\'' + h.img + '\')">' +
+        '<span class="kind-chip' + (h.kind==='合集'?' k-set':'') + '">' + h.kind + '</span>' +
+        (h.kind.charAt(0) === 'P' ? '<span class="p-tag num">' + h.kind + '</span>' : '') +
+        '<span class="go"><span>开始学习</span></span>' +
+      '</div>' +
+      '<div class="nm">' + h.nm + '</div>' +
+      '<div class="from num"><span class="tk">' + h.from[0] + '</span>' + h.from + ' · ' + h.t + '</div>' +
+    '</a>'
+  ).join('') + (HW.length ? '' :
+    '<div class="hw-empty"><span class="big">今天还没有作业</span><span>去曲目库和图书馆逛逛，或查看历史作业复习</span></div>');
+}
+render();
+
+/* ================= 视角切换（学员 / 停用学员） ================= */
+document.querySelectorAll('.viewseg button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.viewseg button').forEach(x=>x.classList.toggle('on', x===b));
+    document.body.classList.toggle('disabled', b.dataset.v === 'disabled');
+  });
+});
+</script>
+</body>
+</html>

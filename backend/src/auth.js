@@ -36,7 +36,8 @@ export function signAdminToken(admin) {
     type: 'admin',
     adminId: admin.id,
     username: admin.username,
-    role: admin.role
+    role: admin.role,
+    status: admin.status || 'active'
   });
 }
 
@@ -44,7 +45,8 @@ export function signUserToken(user) {
   return signToken({
     type: 'user',
     userId: user.id,
-    username: user.username
+    role: user.role || 'user',
+    status: user.status || 'active'
   });
 }
 
@@ -64,58 +66,49 @@ export function clearUserCookie(res) {
   clearAuthCookie(res, config.auth.userCookieName);
 }
 
+export function requireRole(...allowedRoles) {
+  return (req, res, next) => {
+    const token = readToken(req, config.auth.adminCookieName);
+
+    if (!token) {
+      res.status(401).json({ message: '请先登录老师账号' });
+      return;
+    }
+
+    try {
+      const payload = jwt.verify(token, config.auth.jwtSecret);
+
+      if (payload.type !== 'admin') {
+        res.status(401).json({ message: '老师登录状态无效' });
+        return;
+      }
+
+      if (!allowedRoles.includes(payload.role)) {
+        res.status(403).json({ message: '没有执行此操作的权限' });
+        return;
+      }
+
+      if (payload.status === 'disabled') {
+        res.status(403).json({ message: '此账号已停用，不能执行管理操作' });
+        return;
+      }
+
+      req.admin = payload;
+      next();
+    } catch (error) {
+      clearAdminCookie(res);
+      res.status(401).json({ message: '登录已过期，请重新登录' });
+    }
+  };
+}
+
 export function requireAdmin(req, res, next) {
-  const token = readToken(req, config.auth.adminCookieName);
-
-  if (!token) {
-    res.status(401).json({ message: '请先登录老师账号' });
-    return;
-  }
-
-  try {
-    const payload = jwt.verify(token, config.auth.jwtSecret);
-
-    if (payload.type !== 'admin') {
-      res.status(401).json({ message: '老师登录状态无效' });
-      return;
-    }
-
-    req.admin = payload;
-    next();
-  } catch (error) {
-    clearAdminCookie(res);
-    res.status(401).json({ message: '登录已过期，请重新登录' });
-  }
+  return requireRole('teacher', 'super_admin')(req, res, next);
 }
 
-export function requireSuperAdmin(req, res, next) {
-  const token = readToken(req, config.auth.adminCookieName);
+export const requireTeacherOrSuperAdmin = requireAdmin;
 
-  if (!token) {
-    res.status(401).json({ message: '请先登录老师账号' });
-    return;
-  }
-
-  try {
-    const payload = jwt.verify(token, config.auth.jwtSecret);
-
-    if (payload.type !== 'admin') {
-      res.status(401).json({ message: '老师登录状态无效' });
-      return;
-    }
-
-    if (payload.role !== 'super_admin') {
-      res.status(403).json({ message: '需要教导主任权限' });
-      return;
-    }
-
-    req.admin = payload;
-    next();
-  } catch (error) {
-    clearAdminCookie(res);
-    res.status(401).json({ message: '登录已过期，请重新登录' });
-  }
-}
+export const requireSuperAdmin = requireRole('super_admin');
 
 export function requireUser(req, res, next) {
   const token = readToken(req, config.auth.userCookieName);
@@ -130,6 +123,11 @@ export function requireUser(req, res, next) {
 
     if (payload.type !== 'user') {
       res.status(401).json({ message: '学员登录状态无效' });
+      return;
+    }
+
+    if (payload.status === 'disabled') {
+      res.status(403).json({ message: '这个学员已被停用，请联系老师' });
       return;
     }
 
@@ -156,15 +154,21 @@ export function requireUserOrAdmin(req, res, next) {
       const payload = jwt.verify(token, config.auth.jwtSecret);
 
       if (payload.type === 'user') {
+        if (payload.status === 'disabled') {
+          continue;
+        }
+
         req.user = payload;
-        next();
-        return;
+        return next();
       }
 
       if (payload.type === 'admin') {
+        if (payload.status === 'disabled') {
+          continue;
+        }
+
         req.admin = payload;
-        next();
-        return;
+        return next();
       }
     } catch (error) {
       // 如果一个 Cookie 过期了，继续尝试另一个身份的 Cookie。

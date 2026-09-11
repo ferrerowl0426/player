@@ -4,3 +4,6 @@ dist
 .env
 .env.local
 uploads/temp/*
+frontend/tmp/
+teacher_cookies.txt
+docs/design/guitar-home/_edgetmp/

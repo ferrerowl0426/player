@@ -1,20 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { loginAdmin, loginUser } from '../../lib/api.js';
-
-const TABS = [
-  { key: 'student', label: '学员登录' },
-  { key: 'teacher', label: '老师登录' },
-  { key: 'super', label: '教导主任登录' }
-];
+import { useRouter } from 'next/navigation';
+import { loginByAccount } from '../../lib/api.js';
+import { setGuestMode } from '../../lib/guest.js';
 
 export default function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [tab, setTab] = useState(searchParams.get('tab') === 'teacher' ? 'teacher' : 'student');
   const [status, setStatus] = useState('');
+  const [showPasswordTip, setShowPasswordTip] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleLogin(event) {
@@ -33,16 +27,12 @@ export default function LoginForm() {
     setStatus('正在登录...');
 
     try {
-      if (tab === 'student') {
-        await loginUser({ username, password });
+      const result = await loginByAccount({ username, password });
+      const role = result.data?.role;
+
+      if (role === 'user') {
         router.replace('/');
-      } else if (tab === 'teacher') {
-        // 老师登录选项卡只允许实际角色为 teacher 的账号。
-        await loginAdmin({ username, password, expectedRole: 'teacher' });
-        router.replace('/admin');
       } else {
-        // 教导主任登录选项卡只允许实际角色为 super_admin 的账号。
-        await loginAdmin({ username, password, expectedRole: 'super_admin' });
         router.replace('/admin');
       }
 
@@ -54,63 +44,67 @@ export default function LoginForm() {
     }
   }
 
-  const descriptions = {
-    student: '学员登录后可以浏览视频列表，并查看老师单独推送的今日作业。',
-    teacher: '老师登录后可以管理班级学员、上传视频并推送作业。',
-    super: '教导主任登录后可以管理班级、老师账号、删除视频并给任意学员推送。'
-  };
+  function handleEnterGuest() {
+    setGuestMode(true);
+    router.replace('/tracks');
+  }
 
   return (
-    <section className="login-panel">
-      <div className="login-tabs">
-        {TABS.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            className={tab === item.key ? 'active' : ''}
-            onClick={() => {
-              setTab(item.key);
-              setStatus('');
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+    <section className="guitar-login-page">
+      <main className="guitar-login-card guitar-rise">
+        <div className="guitar-postcard-frame" aria-hidden="true"></div>
 
-      <h1>{TABS.find((item) => item.key === tab).label}</h1>
-      <p>{descriptions[tab]}</p>
-
-      <form className="upload-form" onSubmit={handleLogin}>
-        <label>
-          <span>账号</span>
-          <input name="username" type="text" autoComplete="username" placeholder="请输入账号" required />
-        </label>
-
-        <label>
-          <span>密码</span>
-          <input name="password" type="password" autoComplete="current-password" placeholder="请输入密码" required />
-        </label>
-
-        <button type="submit" disabled={isSubmitting}>{isSubmitting ? '登录中...' : '登录'}</button>
-        <p className="status-text">{status}</p>
-      </form>
-
-      <div className="login-test-note">
-        <strong>测试账号备注</strong>
-        <p>仅用于测试人员快捷登录，正式版本需要删除。</p>
-        <div className="login-test-grid">
-          <span>教导主任：admin / 123456</span>
-          <span>老师：teacher_a / 123456</span>
-          <span>老师：teacher_b / 123456</span>
-          <span>学员：student_a1 / 123456</span>
-          <span>学员：student_a2 / 123456</span>
-          <span>学员：student_a3 / 123456</span>
-          <span>学员：student_b1 / 123456</span>
-          <span>学员：student_b2 / 123456</span>
-          <span>学员：student_b3 / 123456</span>
+        <div className="guitar-tab-row">
+          <div className="guitar-logo-tab">
+            <a className="guitar-logo" href="/tracks">
+              <span className="guitar-mark"></span>
+              能学慧吉他教室
+              <small>NXH GUITAR</small>
+            </a>
+          </div>
         </div>
-      </div>
+
+        <div className="guitar-login-image guitar-rise"></div>
+
+        <div className="guitar-form-side">
+          <div className="guitar-form-head guitar-rise guitar-delay-1">
+            <h1><mark>登录教室</mark>，继续练琴</h1>
+            <p>输入账号密码，系统会自动识别学员、老师或教导主任身份。</p>
+          </div>
+
+          <form className="guitar-login-form guitar-rise guitar-delay-2" autoComplete="off" onSubmit={handleLogin}>
+            <div className="guitar-field">
+              <label htmlFor="username">账号</label>
+              <input id="username" name="username" type="text" autoComplete="username" placeholder="请输入账号" required />
+            </div>
+
+            <div className="guitar-field">
+              <label htmlFor="password">
+                密码
+                <span className="guitar-aux">
+                  <button type="button" className="guitar-link-button" onClick={() => setShowPasswordTip((value) => !value)}>
+                    忘记密码？
+                  </button>
+                </span>
+              </label>
+              <input id="password" name="password" type="password" autoComplete="current-password" placeholder="请输入密码" required />
+              <div className={`guitar-password-tip${showPasswordTip ? ' show' : ''}`} role="note">请联系你的老师修改密码</div>
+            </div>
+
+            <label className="guitar-remember">
+              <input type="checkbox" defaultChecked />
+              <span className="guitar-cbx">✓</span>
+              <span className="guitar-txt">记住我（7 天内免登录）</span>
+            </label>
+
+            <button type="submit" className="guitar-main-button" disabled={isSubmitting}>{isSubmitting ? '登录中…' : '登 录'}</button>
+            {status ? <p className="guitar-status-text">{status}</p> : null}
+          </form>
+
+          <button type="button" className="guitar-guest guitar-rise guitar-delay-3" onClick={handleEnterGuest}>先不登录，使用游客模式访问 →</button>
+
+        </div>
+      </main>
     </section>
   );
 }

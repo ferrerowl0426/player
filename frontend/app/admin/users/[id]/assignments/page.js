@@ -9,7 +9,9 @@ import {
   createUserAssignment,
   deleteOperation,
   fetchAdminMe,
-  fetchUserAssignments
+  fetchUserAssignments,
+  fetchTrackLibrary,
+  fetchKnowledgeLibrary
 } from '../../../../../lib/api.js';
 import { EMPTY_VIDEO_FILTERS, useVideoList } from '../../../../../lib/useVideoList.js';
 
@@ -28,7 +30,8 @@ export default function UserAssignmentsPage() {
   const [user, setUser] = useState(null);
   const [operations, setOperations] = useState([]);
   const [activeVideos, setActiveVideos] = useState([]);
-  const [selectedVideoIds, setSelectedVideoIds] = useState([]);
+  const [selectedObjects, setSelectedObjects] = useState([]);
+  const [contentOptions, setContentOptions] = useState({ tracks: [], collections: [], points: [], knowledgeCollections: [] });
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState('正在检查老师登录状态...');
   const {
@@ -57,7 +60,8 @@ export default function UserAssignmentsPage() {
         setAdmin(me.data);
         await Promise.all([
           loadAssignments(),
-          loadVideos(EMPTY_VIDEO_FILTERS)
+          loadVideos(EMPTY_VIDEO_FILTERS),
+          fetchTrackLibrary().then((result) => fetchKnowledgeLibrary().then((knowledge) => setContentOptions({ tracks: result.data.track_points || [], collections: result.data.track_collections || [], points: knowledge.data.points || [], knowledgeCollections: knowledge.data.knowledge_collections || [] })))
         ]);
       } catch (error) {
         router.replace('/admin/login');
@@ -68,26 +72,12 @@ export default function UserAssignmentsPage() {
   }, [router, userId]);
 
   function handleToggleVideo(video) {
-    const activeVideoIds = activeVideos.map((item) => item.id);
+    const object = { objectType: 'video', objectId: video.id };
+    setSelectedObjects((current) => current.some((item) => item.objectType === object.objectType && item.objectId === object.objectId) ? current.filter((item) => item.objectId !== object.objectId || item.objectType !== object.objectType) : [...current, object]);
+  }
 
-    if (activeVideoIds.includes(video.id)) {
-      setStatus('这个课程视频已经在学生主页置顶中');
-      return;
-    }
-
-    setSelectedVideoIds((current) => {
-      if (current.includes(video.id)) {
-        return current.filter((id) => id !== video.id);
-      }
-
-      if (activeVideos.length + current.length >= MAX_ACTIVE_VIDEO_ASSIGNMENTS) {
-        setStatus(`同一个学员最多只能同时推送 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个视频`);
-        return current;
-      }
-
-      setStatus('');
-      return [...current, video.id];
-    });
+  function handleToggleObject(objectType, objectId) {
+    setSelectedObjects((current) => current.some((item) => item.objectType === objectType && item.objectId === objectId) ? current.filter((item) => item.objectId !== objectId || item.objectType !== objectType) : [...current, { objectType, objectId }]);
   }
 
   async function handleSaveAssignment(event) {
@@ -95,8 +85,8 @@ export default function UserAssignmentsPage() {
 
     const trimmedMessage = message.trim();
 
-    if (selectedVideoIds.length === 0 && !trimmedMessage) {
-      setStatus('请选择要置顶的课程视频或填写作业备注');
+    if (selectedObjects.length === 0 && !trimmedMessage) {
+      setStatus('请选择要推送的内容或填写作业备注');
       return;
     }
 
@@ -107,12 +97,8 @@ export default function UserAssignmentsPage() {
 
     try {
       setStatus('正在保存学生主页设置...');
-      await createUserAssignment({
-        userId,
-        videoIds: selectedVideoIds,
-        message: trimmedMessage
-      });
-      setSelectedVideoIds([]);
+      await createUserAssignment({ userId, objects: selectedObjects, message: trimmedMessage });
+      setSelectedObjects([]);
       await loadAssignments();
     } catch (error) {
       setStatus(error.message);
@@ -150,6 +136,10 @@ export default function UserAssignmentsPage() {
   }
 
   const activeVideoIds = activeVideos.map((item) => item.id);
+  const contentGroups = [
+    ['曲目', 'track_point', contentOptions.tracks], ['曲谱集', 'track_collection', contentOptions.collections],
+    ['知识点', 'knowledge_point', contentOptions.points], ['知识点集', 'knowledge_collection', contentOptions.knowledgeCollections]
+  ];
 
   return (
     <>
@@ -196,7 +186,7 @@ export default function UserAssignmentsPage() {
           videos={videos}
           status={listStatus}
           canSelect
-          selectedIds={selectedVideoIds}
+          selectedIds={selectedObjects.filter((item) => item.objectType === 'video').map((item) => item.objectId)}
           disabledIds={activeVideoIds}
           disabledSelectText="已置顶"
           selectText="选择置顶"
@@ -204,15 +194,15 @@ export default function UserAssignmentsPage() {
           onSelect={handleToggleVideo}
           detailQuery={`?from=admin&returnTo=${encodeURIComponent(`/admin/users/${userId}/assignments`)}`}
         />
-      </section>
-
-      <section className="upload-panel">
+        {contentGroups.map(([label, type, items]) => (
+          <div key={type} className="assignment-block"><h3>选择{label}</h3><div className="message-list">{items.map((item) => <button type="button" className="select-button" key={item.id} onClick={() => handleToggleObject(type, item.id)}>{selectedObjects.some((selected) => selected.objectType === type && selected.objectId === item.id) ? '已选择' : `选择${label}`}：{item.name}</button>)}</div></div>
+        ))}
         <h2>保存主页课程设置</h2>
         <form className="upload-form" onSubmit={handleSaveAssignment}>
           <label>
-            <span>已选课程视频数量</span>
-            <input value={`${selectedVideoIds.length} 个`} readOnly />
-            <small>同一个学员最多只能同时存在 {MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个主页置顶课程视频。</small>
+            <span>已选推送对象数量</span>
+            <input value={`${selectedObjects.length} 个`} readOnly />
+            <small>同一个学员最多只能同时存在 {MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个推送对象。</small>
           </label>
 
           <label>

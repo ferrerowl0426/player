@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+// TODO(M3 cleanup): 旧后台首页仍使用 hero/video-section/VideoList；角色后台页按 student-manage/class-manage 设计稿返工后删除这套旧视频管理入口。
 import VideoFilters from '../../components/VideoFilters.js';
 import VideoList from '../../components/VideoList.js';
 import { deleteVideo, fetchAdminMe, fetchClasses, logoutAdmin } from '../../lib/api.js';
@@ -85,7 +86,10 @@ export default function AdminPage() {
           <h2>快捷入口</h2>
         </div>
         <div className="admin-link-grid">
-          <a href="/admin/upload">上传视频</a>
+          <a href="/admin/upload?zone=track&type=lesson">新建单曲目</a>
+          <a href="/admin/upload?zone=track&type=collection">新建曲谱集</a>
+          {isSuperAdmin && <a href="/admin/tracks">曲目管理</a>}
+          {isSuperAdmin && <a href="/admin/knowledge">知识点管理</a>}
           {isSuperAdmin && <a href="/admin/classes">班级管理</a>}
           <a href="/admin/users">{isSuperAdmin ? '学员管理' : '班级学员'}</a>
         </div>
@@ -113,7 +117,7 @@ export default function AdminPage() {
           <h2>视频管理</h2>
           <button type="button" onClick={() => loadVideos(filters)}>刷新</button>
         </div>
-        {isSuperAdmin ? <p className="section-note">教导主任可以在课程卡片中编辑或删除课程。编辑课程会修改原课程记录，不会新建课程。</p> : null}
+        {isSuperAdmin ? <p className="section-note">教导主任可以在课程卡片中编辑或删除课程，并管理曲目和 P 分段。</p> : <p className="section-note">老师可以管理本班学员和作业，内容创建与编辑由教导主任负责。</p>}
 
         <VideoFilters filters={filters} onChange={setFilters} onSubmit={handleSearch} onReset={handleReset} />
         <VideoList

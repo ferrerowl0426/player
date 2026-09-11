@@ -129,7 +129,7 @@ function buildVideoParts(file) {
   });
 }
 
-export async function uploadVideoByMultipart({ file, key, uploadId, onProgress }) {
+export async function uploadVideoByMultipart({ file, key, uploadId, onProgress, uploadPart = createMultipartPartUploadUrl, uploadPartFile = uploadMultipartPartToBucket }) {
   const fileParts = buildVideoParts(file);
   const loadedBytesByPart = new Map();
   const uploadedParts = [];
@@ -150,13 +150,14 @@ export async function uploadVideoByMultipart({ file, key, uploadId, onProgress }
     }
 
     // 每个分片都先向后端申请预签名 URL，真实文件内容仍由浏览器直传腾讯云 COS。
-    const partUrlResult = await createMultipartPartUploadUrl({
+    const partUrlResult = await uploadPart({
       key,
       uploadId,
       partNumber: part.partNumber
     });
-    const etag = await uploadMultipartPartToBucket({
-      uploadUrl: partUrlResult.data.uploadUrl,
+    const uploadUrl = partUrlResult?.data?.uploadUrl || partUrlResult?.uploadUrl || partUrlResult;
+    const etag = await uploadPartFile({
+      uploadUrl,
       blob: part.blob,
       contentType: file.type,
       onProgress: (progress) => updateProgress(part.partNumber, Math.round((progress / 100) * part.size))

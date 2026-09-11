@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="79ohT99ogxeIGLnQfdjZpv">
+<head data-page-node-id="Lco8d01M23uHJWrCDuAKs9">
+<meta charset="UTF-8" data-page-node-id="lvJC0w2sy4DkCDaR4VU739">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="q4AzSFU4l4wwNajhtr8mF4">
+<title>上传 PDF · 能学慧吉他教室（管理端）</title>
+<style>
+/* ============================================================
+   图书馆 · 上传 PDF（教导主任）— 与「新建单课」同款设计
+   无框向导 · 三栏（基本信息 / A4 封面 / 预览）· PDF 管理盒
+   视觉遵循 design-spec v2.0；封面比例 = A4 竖版（210 : 297）
+============================================================ */
+:root{
+  --paper:  #f2ead9;
+  --white:  #ffffff;
+  --ink:    #261d10;
+  --ink-2:  #4f4230;
+  --ink-3:  #7a6a52;
+  --hair:   #ddd0b4;
+  --hair-2: #c9b795;
+  --coffee: #5d4326;
+  --orange: #ff7f00;
+  --amber:  #b98e3e;
+  --green:  #4f7d3a;
+  --wood:   #3a2a18;
+  --glass:      rgba(255, 255, 255, .85);
+  --glass-line: rgba(93, 67, 38, .32);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{min-height:100%}
+body{
+  font-family:var(--font-body);
+  background:#ffffff;  /* 纯白底 + 格纹底饰（design-spec v2.0 §3） */
+  color:var(--ink);
+  font-size:14.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  overflow-x:hidden;overflow-y:auto;
+}
+/* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
+body::after{display:none}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.16) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(90deg, rgba(122,74,38,.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg,  rgba(122,74,38,.06) 0 1px, transparent 1px 18px);
+  -webkit-mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+          mask:linear-gradient(180deg, transparent 0%, rgba(0,0,0,.12) 30%, rgba(0,0,0,.55) 62%, #000 100%);
+}
+::selection{background:#ecd9ae}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}
+input,textarea{font-family:inherit}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:10px;letter-spacing:2.5px;color:var(--ink-3);text-transform:uppercase;font-weight:500}
+.rise{opacity:0;transform:translateY(12px);animation:rise .7s var(--ease) forwards}
+@keyframes rise{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){.rise{opacity:1;transform:none;animation:none}}
+
+/* ============ 导航 ============ */
+.nav{
+  position:relative;z-index:50;flex:none;
+  background:var(--white);
+  border-bottom:1px solid var(--glass-line);
+  box-shadow:0 1px 8px rgba(64,45,20,.07);
+}
+.nav::before{
+  content:"";position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--coffee);
+}
+.nav-inner{max-width:1440px;margin:0 auto;padding:0 36px;height:56px;display:flex;align-items:center;gap:40px;position:relative}
+.logo{display:flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:3px;color:var(--ink);text-decoration:none}
+.logo .mark{width:9px;height:9px;background:var(--orange);flex:none;align-self:center}
+.logo small{font-size:10px;letter-spacing:2px;color:var(--ink-3);font-weight:400}
+.nav-links{display:flex;gap:32px;flex:1}
+.nav-links a{
+  color:var(--ink-2);text-decoration:none;font-size:13px;letter-spacing:1px;
+  padding:4px 3px 7px;position:relative;transition:color .3s var(--ease);
+}
+.nav-links a.active{
+  color:var(--ink);font-weight:600;
+  background:linear-gradient(180deg, transparent 58%, rgba(255,127,0,.42) 58%);
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.avatar{
+  position:relative;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--coffee);background:var(--white);
+  display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;
+}
+.avatar::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;
+  background:var(--green);border:1.5px solid var(--paper);
+}
+
+/* ============ 主区：向导（无框 · 与新建单课一致） ============ */
+.admin-wrap{flex:1 0 auto;display:flex;justify-content:center;padding:16px 36px 44px}
+.wizard{
+  width:min(1080px,100%);display:flex;flex-direction:column;
+  padding:6px 8px 0;
+}
+.wiz-head{flex:none;display:flex;align-items:center;gap:14px;padding-bottom:12px;border-bottom:1px dashed var(--hair-2)}
+.wiz-head h1{font-size:20px;font-weight:700;letter-spacing:1px}
+.wiz-head h1 mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 2px}
+.zone-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;letter-spacing:1.5px;color:var(--coffee);font-weight:600;
+  border:1px dashed var(--hair-2);border-radius:4px;padding:3px 11px;
+  background:rgba(255,127,0,.12);white-space:nowrap;
+}
+.zone-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--orange)}
+.wiz-head .eyebrow{margin-left:auto}
+
+/* ---- 表单：三栏 ---- */
+.form-body{flex:1;padding:2px 2px 6px}
+.form-cols{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:0 48px;align-items:start}
+.fsec{padding:12px 0 4px}
+.fsec.full{grid-column:1 / -1}
+.fsec-title{display:flex;align-items:baseline;gap:9px;font-size:13px;font-weight:700;letter-spacing:2px;color:var(--coffee);margin-bottom:10px}
+.fsec-title::before{content:"";width:4px;height:13px;border-radius:1px;background:var(--orange);flex:none}
+.fsec-title .note{font-size:10.5px;font-weight:400;letter-spacing:.5px;color:var(--ink-3)}
+/* 重要/必填标注用橙色 */
+.fsec-title .note.req{color:var(--orange);font-weight:600}
+
+.field{margin-bottom:14px}
+.field label{
+  display:flex;align-items:baseline;justify-content:space-between;
+  font-size:11px;font-weight:600;letter-spacing:.8px;color:var(--ink-2);margin-bottom:6px;
+}
+.field label .cnt{font-weight:400;font-size:10.5px;color:var(--ink-3)}
+.field label .cnt.over{color:var(--orange);font-weight:600}
+.field input[type=text],.field textarea{
+  width:100%;padding:9px 13px;
+  background:var(--white);
+  border:1px solid var(--hair-2);border-radius:4px;
+  font-size:13.5px;color:var(--ink);letter-spacing:.3px;
+  transition:border-color .25s var(--ease), box-shadow .25s var(--ease);
+}
+.field textarea{resize:vertical;min-height:96px;line-height:1.7}
+.field input::placeholder,.field textarea::placeholder{color:#b3a58c}
+.field input:hover,.field textarea:hover{border-color:var(--coffee)}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--coffee);box-shadow:0 2px 8px rgba(93,67,38,.1)}
+/* 错误态：橘色强调 */
+.field.error input,.field.error textarea,.field.error .drop-box{border-color:var(--orange);box-shadow:0 2px 8px rgba(255,127,0,.16)}
+.err-msg{
+  display:none;margin-top:6px;
+  font-size:11px;letter-spacing:.4px;color:var(--orange);font-weight:600;
+}
+.field.error .err-msg{display:block}
+.err-msg::before{content:"⚠ ";letter-spacing:0}
+
+/* ---- A4 封面上传（200px 宽 · 上传后排版不变） ---- */
+.cover-flex{display:flex;gap:26px;align-items:flex-start}
+.a4-box{
+  flex:none;width:200px;aspect-ratio:210/297;
+  border:1.5px dashed var(--hair-2);border-radius:6px;background:var(--white);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  color:var(--ink-3);font-size:11px;letter-spacing:1px;text-align:center;
+  cursor:pointer;transition:all .3s var(--ease);position:relative;overflow:hidden;
+}
+.a4-box:hover{border-color:var(--orange);color:var(--coffee)}
+.a4-box svg{width:26px;height:26px}
+.a4-box .t1{font-size:12px;letter-spacing:1px;font-weight:600}
+.a4-box .ratio{font-size:9.5px;letter-spacing:1px;color:var(--orange)}
+.a4-box.has{border-style:solid;border-color:var(--coffee);background:url("assets/covers/real-01.jpg") center/cover no-repeat}
+.a4-box.has svg,.a4-box.has .t1,.a4-box.has .ratio{display:none}
+/* 删除封面按钮：仅上传后出现，悬停变红；不改变盒子尺寸与排版 */
+.a4-box .cov-rm{
+  position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;
+  display:none;place-items:center;font-size:11px;line-height:1;cursor:pointer;
+  color:var(--coffee);background:var(--white);border:1px solid var(--hair-2);
+  box-shadow:0 1px 4px rgba(93,67,38,.18);transition:all .2s;z-index:2;
+}
+.a4-box .cov-rm:hover{color:#b4452e;border-color:#b4452e;background:rgba(180,69,46,.08)}
+.a4-box.has .cov-rm{display:grid}
+
+/* ---- 封面预览卡：跟随资料名 / 封面 / PDF 实时更新（A4 竖版） ---- */
+.pv-card{width:200px}
+.pv-cover{
+  aspect-ratio:210/297;border-radius:4px;background:var(--white);position:relative;
+  display:grid;place-items:center;border:1px solid var(--hair-2);overflow:hidden;
+  box-shadow:0 1px 3px rgba(93,67,38,.1), 0 4px 12px rgba(93,67,38,.06);
+}
+/* 纸面质感：无封面时显示 A4 纸示意 */
+.pv-cover::before{
+  content:"";position:absolute;inset:10% 12%;
+  background:repeating-linear-gradient(180deg, transparent 0 14px, rgba(122,74,38,.14) 14px 15px);
+  border-radius:2px;
+}
+.pv-cover .pv-doc{position:relative;z-index:1;display:grid;place-items:center;gap:4px;color:var(--ink-3)}
+.pv-cover .pv-doc svg{width:30px;height:30px}
+.pv-cover .pv-doc span{font-size:9.5px;letter-spacing:1.5px}
+.pv-cover .pv-doc b{font-size:10px;letter-spacing:2px;color:#b4452e}
+.pv-cover.has{background:url("assets/covers/real-01.jpg") center/cover no-repeat}
+.pv-cover.has::before,.pv-cover.has .pv-doc{display:none}
+.pv-card .pv-name{font-size:12.5px;font-weight:600;letter-spacing:.3px;margin-top:8px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-card .pv-meta{font-size:10px;color:var(--ink-3);letter-spacing:.4px;margin-top:2px}
+
+/* ---- PDF 文件管理盒（与新建单课的分段/附件管理同格式） ---- */
+.pmanage{border:1px solid #c3ab88;border-radius:6px;background:var(--white);overflow:hidden}
+.pmanage-head{
+  flex:none;padding:10px 14px;border-bottom:1px solid var(--hair);
+  display:flex;align-items:center;gap:10px;background:rgba(160,106,53,.07);
+}
+.pmanage-head .pm-t{font-size:12.5px;font-weight:700;letter-spacing:1.5px;color:var(--coffee)}
+.pmanage-head .pm-note{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px}
+.pm-state{margin-left:auto;font-size:10.5px;letter-spacing:.5px;color:var(--ink-3)}
+.pm-state.ok{color:var(--green);font-weight:600}
+.pm-body{padding:14px}
+.drop-box{
+  border:1.5px dashed var(--hair-2);border-radius:6px;background:var(--white);
+  padding:18px;display:flex;align-items:center;gap:14px;
+  cursor:pointer;transition:all .25s var(--ease);
+}
+.drop-box:hover{border-color:var(--orange)}
+.drop-box svg{flex:none;width:30px;height:30px;color:#b4452e}
+.drop-box .pd-t{font-size:12.5px;font-weight:600;letter-spacing:.5px;color:var(--ink-2)}
+.drop-box .pd-s{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px}
+.drop-box.has{border-style:solid;border-color:var(--coffee);background:rgba(255,127,0,.06)}
+
+/* 底部操作条 */
+.wiz-foot{
+  flex:none;display:flex;align-items:center;gap:14px;
+  padding-top:14px;margin-top:6px;border-top:1px dashed var(--hair-2);
+}
+.btn{
+  font-size:13px;font-weight:600;letter-spacing:3px;text-indent:3px;
+  border-radius:4px;padding:9px 26px;transition:all .3s var(--ease);
+}
+.btn-main{
+  background:var(--coffee);color:var(--white);
+  border:1.5px solid var(--coffee);
+}
+.btn-main:hover{background:var(--coffee);border-color:var(--coffee)}
+.btn-ghost{
+  color:var(--coffee);border:1px solid var(--hair-2);background:var(--white);font-weight:500;
+}
+.btn-ghost:hover{border-color:var(--orange);color:var(--orange)}
+.wiz-foot .spacer{flex:1}
+.foot-hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
+
+/* 发布成功提示 */
+.pub-toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%, 12px);z-index:99;
+  font-size:11.5px;letter-spacing:.5px;color:var(--coffee);
+  background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
+  padding:7px 18px;box-shadow:0 6px 18px rgba(60,42,20,.15);
+  opacity:0;pointer-events:none;transition:all .25s var(--ease);
+}
+.pub-toast.show{opacity:1;transform:translate(-50%, 0)}
+
+/* 响应式 */
+@media (max-width:1024px){
+  .admin-wrap{padding:16px 20px 40px}
+  .form-cols{grid-template-columns:1fr;gap:0}
+}
+@media (max-width:640px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .admin-wrap{padding:12px 14px 32px}
+  .wizard{padding:14px 16px 16px}
+}
+</style>
+</head>
+<body data-page-node-id="zKTimK6MOa5BO6bEWgjMz8">
+
+<!-- ================= 导航 ================= -->
+<nav class="nav" data-page-node-id="e3E4DDdUnKAg6VkX8M7Q3j">
+  <div class="nav-inner" data-page-node-id="fErntXwG0UMA2VsRCKxX4R">
+    <a class="logo" href="#" data-page-node-id="225iAIHyycctqq6V8vTML2">
+      <span class="mark" data-page-node-id="49KHqdd5G7pmLQRcvKfgxB"></span>
+      能学慧吉他教室
+      <small data-page-node-id="pgF6MRO1fVl3xPV3PApKJn">NXH GUITAR</small>
+    </a>
+    <div class="nav-links" data-page-node-id="TxQLKPUBtCknHtD6dMomV9">
+      <a href="#" data-page-node-id="6kj1uoh4SXJ8eJ9XL7K53M">首页</a>
+      <a href="knowledge-home.html" data-page-node-id="bo459hEJGXJvEDMyy3Gaz1">知识点区</a>
+      <a href="tracks-home.html" data-page-node-id="U6cEu9rbtkGWHlkR20SVao">曲目库</a>
+      <a href="library.html" class="active" data-page-node-id="2Ig3Ks6ugpUoIimnmX0Kjr">图书馆</a>
+      <a href="#" data-page-node-id="iFgMxiB3H4FRQYegX3nEle">作业记录</a>
+    </div>
+    <div class="nav-right" data-page-node-id="cUoUloCjYcFZMHMmKd2Fbf">
+      <div class="avatar" data-page-node-id="r4duIyeC1Tzs8v0Nr8BJc5">陈</div>
+    </div>
+  </div>
+</nav>
+
+<main class="admin-wrap" data-page-node-id="s0oG98MmrdsOBl0BqHKAtz">
+  <div class="wizard rise" data-page-node-id="cjCqkIUDvYMUV3DKum2IqU">
+
+    <div class="wiz-head" data-page-node-id="SgNVV9reHQ7DRKBPdY6Cay">
+      <h1 data-page-node-id="6vahXMpP5FNG6gfSvBqGUr"><mark id="pageTitle" data-page-node-id="7CgZvUXs7ipcsvr4rlYjRb">上传 PDF 资料</mark></h1>
+      <span class="zone-badge" data-page-node-id="n6espeZzMsQEtfCmiDu0kh">图书馆</span>
+      <span class="eyebrow" data-page-node-id="E22HFt8q6EHJJZluK53NN6">UPLOAD PDF</span>
+    </div>
+
+    <form class="form-body" id="uploadForm" autocomplete="off" novalidate data-page-node-id="ujoa4COEqrnYSxrFP744bZ">
+      <div class="form-cols" data-page-node-id="c5vycT6BMzqlrFByGBcm1b">
+
+        <!-- 栏 1：基本信息 -->
+        <div class="fsec" data-page-node-id="xqFbhUyETLkKpNktLf0LgU">
+          <div class="fsec-title" data-page-node-id="UQu57Lr4c9u5CBKVErJFGV">基本信息</div>
+          <div class="field" id="fName" data-page-node-id="pqPjoraTYvCGMYD088XgZg">
+            <label for="inName" data-page-node-id="l0TB7YWoX9D3ZXhTUs2SEM">资料名称 <span class="cnt num" data-page-node-id="Ykfp4oAGukWsEKC3lsI3D8"><span id="nameCnt" data-page-node-id="BnCbDqQPRRmbegdKvQKLrP">0</span>/120</span></label>
+            <input type="text" id="inName" placeholder="如：卡农独奏 · 全曲乐谱" maxlength="140" data-page-node-id="B1umSjSPnTSoidITRCLCO1">
+            <div class="err-msg" data-page-node-id="2t75CEfaGoAifpoAyS4mMu">请填写资料名称，不超过 120 字</div>
+          </div>
+          <div class="field" data-page-node-id="cRUmnTJJj1KFcp9Ih5jHcd">
+            <label for="inDesc" data-page-node-id="FK599Ym84nyF8TSBXF1BCN">简介 <span class="cnt num" data-page-node-id="FY7y4uwFwzLt5rJDfeMeTf"><span id="descCnt" data-page-node-id="El1Dr2Sqf1pEThpcG1dQao">0</span>/500</span></label>
+            <textarea id="inDesc" placeholder="这份资料的内容、适用对象或使用建议…"></textarea>
+          </div>
+        </div>
+
+        <!-- 栏 2：A4 封面 -->
+        <div class="fsec" data-page-node-id="qv6k4PoDDrKPeCH82Ti0Ec">
+          <div class="fsec-title" data-page-node-id="YQ0HgNPiWqDsHoDQuecACc">封面 <span class="note req" data-page-node-id="RY2QyJm3nzZoiBeiuUGIdQ">A4 竖版 · 必填</span></div>
+          <div class="cover-flex" data-page-node-id="ugrrVFQiso6BEJSpUjYAMn">
+            <div class="a4-box" id="coverBox" tabindex="0" role="button" aria-label="上传封面" data-page-node-id="gNH0m2lNWLV72QJHmnVopQ">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" data-page-node-id="f0wUAddkuBojf3Cl0t7ee8"><path d="M12 5v14M5 12h14" data-page-node-id="AJGY5szhy5Vt6EyuteFZBI"/></svg>
+              <span class="t1" data-page-node-id="hoh7VQPfuvKB24vDYWnaHc">上传封面</span>
+              <span class="ratio num" data-page-node-id="lWeKYtpYAI9baVT5rOASbD">210 : 297 · A4 竖版</span>
+              <button type="button" class="cov-rm" id="coverRm" aria-label="移除封面">✕</button>
+            </div>
+          </div>
+          <div class="field error" id="fCover" style="margin-top:10px" data-page-node-id="MHIcx2YjAH4bRHc4hS8b8B">
+            <div class="err-msg" data-page-node-id="XdEUwpgbs6V5WtBYHY3hIR">封面为必填项（A4 竖版 210 : 297）</div>
+          </div>
+        </div>
+
+        <!-- 栏 3：预览 -->
+        <div class="fsec" data-page-node-id="PvSecPdf000000000000001">
+          <div class="fsec-title" data-page-node-id="PvTitlePdf00000000000001">预览 <span class="note" data-page-node-id="PvNotePdf0000000000001">学员视角 · 实时</span></div>
+          <div class="pv-card" data-page-node-id="PvCardPdf00000000000001">
+            <div class="pv-cover" id="pvCover" data-page-node-id="PvCoverPdf0000000000001">
+              <div class="pv-doc" data-page-node-id="PvDocPdf00000000000001">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                <b>PDF</b>
+                <span>A4 封面预览</span>
+              </div>
+            </div>
+            <div class="pv-name" id="pvName" data-page-node-id="PvNamePdf0000000000001">未命名资料</div>
+            <div class="pv-meta num" id="pvMeta" data-page-node-id="PvMetaPdf0000000000001">PDF 资料 · 待上传</div>
+          </div>
+        </div>
+
+        <!-- 通栏：PDF 文件 -->
+        <div class="fsec full" data-page-node-id="4VdvsQQBA3474C5WXvUzYEWrap">
+          <div class="pmanage" data-page-node-id="PmPdfWrap00000000000001">
+            <div class="pmanage-head" data-page-node-id="YeImhunBwLcptNXm1Ds64H">
+              <span class="pm-t" data-page-node-id="PmT00000000000000000001">PDF 文件</span>
+              <span class="pm-note" data-page-node-id="REAw4G7nxFqHSQNKD1pEQd">必填 · 单个文件 ≤ 100 MB · 上传后自动生成预览</span>
+              <span class="pm-state num" id="pmState" data-page-node-id="PmStatePdf000000000001">未上传</span>
+            </div>
+            <div class="pm-body" data-page-node-id="PmBodyPdf0000000000001">
+              <div class="field" id="fPdf" style="margin:0" data-page-node-id="4VdvsQQBA3474C5WXvUzYE">
+                <div class="drop-box" id="pdfDrop" tabindex="0" role="button" aria-label="选择 PDF 文件" data-page-node-id="qFPzRkudCSG9Vgzj3YiQ8S">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" data-page-node-id="wmSUyurJWwKA9bWVVjxsqK"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" data-page-node-id="swXuiBK7GOCrPUxgZKk3AJ"/><path d="M14 2v6h6" data-page-node-id="t2cyVcpeXRQ7IGLMNkqFS1"/></svg>
+                  <div data-page-node-id="r74u95e3eMxqvCBfLuAh5W">
+                    <div class="pd-t" id="pdfTitle" data-page-node-id="wH4KBWjkCy7k8zP7CoOI9P">点击选择 PDF 文件</div>
+                    <div class="pd-s num" id="pdfSub" data-page-node-id="wj2y1y5LUFI7F4j6BFom6t">仅支持 .pdf 格式 · 上传后自动生成预览</div>
+                  </div>
+                </div>
+                <div class="err-msg" data-page-node-id="WoBswkhtn6V1SWbl58OwBx">请选择要上传的 PDF 文件</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </form>
+
+    <!-- 底部操作条 -->
+    <div class="wiz-foot" data-page-node-id="PI7GBepLv94q4c9HQgw3kz">
+      <button type="button" class="btn btn-ghost" id="btnBack" data-page-node-id="ILMwJllc6Z0FLBdkDwbONa">← 返回</button>
+      <span class="foot-hint" data-page-node-id="9o2nAAGQoUz6d4sTkFJApo">图书馆 · 上传 PDF 资料</span>
+      <span class="spacer" data-page-node-id="QCo1MGhoEzTEuVa2asRgQh"></span>
+      <button type="button" class="btn btn-ghost" data-page-node-id="hogRBRczdLVBEXtGR829ze">保存草稿</button>
+      <button type="button" class="btn btn-main" id="btnPublish" data-page-node-id="CiguWr3TFWmEQOgOj89OPx">发 布</button>
+    </div>
+
+  </div>
+</main>
+
+<div class="pub-toast" id="pubToast" data-page-node-id="avLtv1MBP8A1B33qXZrE1P">发布成功 · 正在返回图书馆…</div>
+
+<script>
+/* ================= 字数统计 ================= */
+function bindCount(inputEl, cntEl, cntWrapEl, fieldEl, max){
+  inputEl.addEventListener('input', ()=>{
+    const n = inputEl.value.length;
+    cntEl.textContent = n;
+    cntWrapEl.classList.toggle('over', n > max);
+    if(n > max){ fieldEl.classList.add('error'); } else if(n > 0){ fieldEl.classList.remove('error'); }
+    updatePreview();
+  });
+}
+bindCount(document.getElementById('inName'), document.getElementById('nameCnt'), document.querySelector('#fName .cnt'), document.getElementById('fName'), 120);
+bindCount(document.getElementById('inDesc'), document.getElementById('descCnt'), document.querySelector('label[for=inDesc] .cnt'), null, 500);
+
+/* ================= 预览卡：跟随名称 / 封面 / PDF 实时更新 ================= */
+function updatePreview(){
+  document.getElementById('pvName').textContent = document.getElementById('inName').value.trim() || '未命名资料';
+  const hasPdf   = document.getElementById('pdfDrop').classList.contains('has');
+  const hasCover = document.getElementById('coverBox').classList.contains('has');
+  document.getElementById('pvCover').classList.toggle('has', hasCover);
+  document.getElementById('pvMeta').textContent =
+    'PDF 资料 · ' + (hasPdf ? '8 页 · 2.4 MB' : '待上传 PDF') + (hasCover ? ' · 已选封面' : '');
+}
+
+/* ================= 封面（演示：点击切换已上传态 · 删除钮不改排版） ================= */
+(function(){
+  const boxEl = document.getElementById('coverBox'), fieldEl = document.getElementById('fCover');
+  const rmEl  = document.getElementById('coverRm');
+  const set = (on)=>{
+    boxEl.classList.toggle('has', on);
+    fieldEl.classList.toggle('error', !on);
+    updatePreview();
+  };
+  const toggle = ()=> set(!boxEl.classList.contains('has'));
+  boxEl.addEventListener('click', toggle);
+  boxEl.addEventListener('keydown', e=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); } });
+  rmEl.addEventListener('click', e=>{ e.stopPropagation(); set(false); });
+})();
+
+/* ================= PDF 文件（演示：点击切换已选择态） ================= */
+(function(){
+  const drop = document.getElementById('pdfDrop'), fieldEl = document.getElementById('fPdf');
+  const state = document.getElementById('pmState');
+  const toggle = ()=>{
+    const has = drop.classList.toggle('has');
+    fieldEl.classList.toggle('error', !has);
+    document.getElementById('pdfTitle').textContent = has ? '卡农独奏 · 全曲乐谱.pdf' : '点击选择 PDF 文件';
+    document.getElementById('pdfSub').textContent   = has ? '8 页 · 2.4 MB · 点击可重新选择' : '仅支持 .pdf 格式 · 上传后自动生成预览';
+    state.textContent = has ? '已选择 · 2.4 MB' : '未上传';
+    state.classList.toggle('ok', has);
+    updatePreview();
+  };
+  drop.addEventListener('click', toggle);
+  drop.addEventListener('keydown', e=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); } });
+})();
+
+/* ================= 返回 / 发布（演示） ================= */
+document.getElementById('btnBack').addEventListener('click', ()=>location.href = 'library.html');
+document.getElementById('btnPublish').addEventListener('click', ()=>{
+  let ok = true;
+  const fName = document.getElementById('fName');
+  if(!document.getElementById('inName').value.trim()){ fName.classList.add('error'); ok = false; }
+  const fCover = document.getElementById('fCover');
+  if(!document.getElementById('coverBox').classList.contains('has')){ fCover.classList.add('error'); ok = false; }
+  const fPdf = document.getElementById('fPdf');
+  if(!document.getElementById('pdfDrop').classList.contains('has')){ fPdf.classList.add('error'); ok = false; }
+  if(!ok) return;
+  const t = document.getElementById('pubToast');
+  t.classList.add('show');
+  setTimeout(()=>location.href = 'library.html', 1200);
+});
+updatePreview();
+</script>
+</body>
+</html>

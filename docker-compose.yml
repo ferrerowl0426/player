@@ -40,7 +40,7 @@ services:
     depends_on:
       - backend
     environment:
-      SERVER_API_BASE_URL: http://backend:3000/api
+      SERVER_API_BASE_URL: http://backend:3002/api
     ports:
       - "3001:3001"
 

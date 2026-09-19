@@ -10,7 +10,9 @@ async function parseJsonResponse(response, fallbackMessage) {
   const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(result.message || fallbackMessage);
+    const error = new Error(result.message || fallbackMessage);
+    error.status = response.status;
+    throw error;
   }
 
   return result;
@@ -86,24 +88,137 @@ function uploadBlobWithProgress({ uploadUrl, body, contentType, onProgress, erro
   });
 }
 
-// 获取视频列表，支持关键词和日期区间筛选。
-export async function fetchVideos(filters = {}) {
-  const response = await fetch(`${getApiBaseUrl()}/videos${buildVideoQuery(filters)}`, {
+// 图书馆资料浏览，游客也可以访问。
+export async function fetchLibraryResources(keyword = '') {
+  const response = await fetch(`${getApiBaseUrl()}/library${buildKeywordQuery(keyword)}`, {
     credentials: 'include',
     cache: 'no-store'
   });
-
-  return parseJsonResponse(response, '获取视频列表失败');
+  return parseJsonResponse(response, '获取图书馆失败');
 }
 
-// 获取单个视频详情。
-export async function fetchVideoById(id) {
-  const response = await fetch(`${getApiBaseUrl()}/videos/${id}`, {
+export async function fetchLibraryResourceById(id) {
+  const response = await fetch(`${getApiBaseUrl()}/library/${id}`, {
     credentials: 'include',
     cache: 'no-store'
   });
+  return parseJsonResponse(response, '获取资料详情失败');
+}
 
-  return parseJsonResponse(response, '获取视频详情失败');
+export async function createLibraryUploadUrl(file, kind = 'pdf') {
+  const response = await fetch(`${getApiBaseUrl()}/library/upload-url`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, fileName: file.name, fileType: file.type, fileSize: file.size })
+  });
+  return parseJsonResponse(response, '创建资料上传地址失败');
+}
+
+export async function createTrackAttachmentUploadUrl({ trackId, file }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/attachments/upload-url`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileName: file.name, fileType: file.type, fileSize: file.size })
+  });
+  return parseJsonResponse(response, '创建附件上传地址失败');
+}
+
+export async function saveTrackAttachments({ trackId, attachments }) {
+  const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/attachments`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attachments })
+  });
+  return parseJsonResponse(response, '保存附件失败');
+}
+
+export async function createKnowledgeAttachmentUploadUrl({ pointId, file }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/attachments/upload-url`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileName: file.name, fileType: file.type, fileSize: file.size })
+  });
+  return parseJsonResponse(response, '创建附件上传地址失败');
+}
+
+export async function saveKnowledgeAttachments({ pointId, attachments }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/attachments`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attachments })
+  });
+  return parseJsonResponse(response, '保存附件失败');
+}
+
+export async function uploadLibraryFileToBucket({ uploadUrl, file, onProgress }) {
+  await uploadBlobWithProgress({
+    uploadUrl,
+    body: file,
+    contentType: file.type,
+    onProgress,
+    errorMessage: '上传图书馆资料到存储桶失败'
+  });
+}
+
+export async function createLibraryResource({ title, description = '', cover = '', fileName, fileKey, fileType, fileSize, links = [] }) {
+  const response = await fetch(`${getApiBaseUrl()}/library`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, description, cover, fileName, fileKey, fileType, fileSize, links })
+  });
+  return parseJsonResponse(response, '保存资料失败');
+}
+
+export async function updateLibraryResource({ id, title, description = '', cover = '', links = [] }) {
+  const response = await fetch(`${getApiBaseUrl()}/library/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, description, cover, links })
+  });
+  return parseJsonResponse(response, '更新资料失败');
+}
+
+export async function saveLibraryResourceLinks({ id, links }) {
+  const response = await fetch(`${getApiBaseUrl()}/library/${id}/links`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ links })
+  });
+  return parseJsonResponse(response, '保存图书馆关联失败');
+}
+
+export async function saveContentLibraryLinks({ objectType, objectId, selectedResourceIds, originalResourceIds = [] }) {
+  const target = { objectType, objectId };
+  const selectedIds = Array.from(new Set(selectedResourceIds || []));
+  const affectedIds = Array.from(new Set([...(originalResourceIds || []), ...selectedIds]));
+
+  await Promise.all(affectedIds.map(async (resourceId) => {
+    const detail = await fetchLibraryResourceById(resourceId);
+    const links = (detail.data.links || []).filter((link) => (
+      !((link.objectType ?? link.object_type) === objectType && Number(link.objectId ?? link.object_id) === Number(objectId))
+    ));
+    if (selectedIds.includes(resourceId)) links.push(target);
+    await saveLibraryResourceLinks({ id: resourceId, links });
+  }));
+
+  return { data: selectedIds };
+}
+
+export async function deleteLibraryResource(id) {
+  const response = await fetch(`${getApiBaseUrl()}/library/${id}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  });
+  if (response.status === 204) return { data: null };
+  return parseJsonResponse(response, '删除资料失败');
 }
 
 // 获取曲目库首页数据，游客也可以访问。
@@ -153,6 +268,42 @@ export async function fetchKnowledgePointById(id) {
 export async function fetchKnowledgeCollectionById(id) {
   const response = await fetch(`${getApiBaseUrl()}/knowledge/collections/${id}`, { credentials: 'include', cache: 'no-store' });
   return parseJsonResponse(response, '获取知识点集详情失败');
+}
+
+export async function createKnowledgeCollection({ name, description = '', cover = '' }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/collections`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, cover })
+  });
+  return parseJsonResponse(response, '创建知识点集失败');
+}
+
+export async function updateKnowledgeCollection({ id, name, description = '', cover = '' }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/collections/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, cover })
+  });
+  return parseJsonResponse(response, '更新知识点集失败');
+}
+
+export async function deleteKnowledgeCollection(id) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/collections/${id}`, { method: 'DELETE', credentials: 'include' });
+  if (response.status === 204) return { data: null };
+  return parseJsonResponse(response, '删除知识点集失败');
+}
+
+export async function updateKnowledgeCollectionItems({ id, pointIds }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/collections/${id}/points`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pointIds })
+  });
+  return parseJsonResponse(response, '更新知识点集收录失败');
 }
 
 export async function createKnowledgePoint({ name, description = '', cover = '' }) {
@@ -432,6 +583,16 @@ export async function fetchTodayAssignments() {
   return parseJsonResponse(response, '获取今日作业失败');
 }
 
+// 获取学员自己的历史作业，按一次推送 operation 聚合。
+export async function fetchAssignmentHistory() {
+  const response = await fetch(`${getApiBaseUrl()}/user/assignments/history`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取历史作业失败');
+}
+
 // 老师登录。后端会设置 HttpOnly Cookie，前端不直接保存 token。
 // expectedRole 用于前端告诉后端当前选择的登录身份（teacher 或 super_admin），
 // 后端会校验账号实际角色必须和选择的身份一致。
@@ -458,6 +619,19 @@ export async function fetchAdminMe() {
   return parseJsonResponse(response, '请先登录老师账号');
 }
 
+export async function fetchCurrentViewer() {
+  try {
+    const result = await fetchUserMe();
+    return { ...result, data: { ...result.data, role: 'user' } };
+  } catch {
+    try {
+      return await fetchAdminMe();
+    } catch {
+      return { data: { role: 'guest', username: '访客', nickname: '访客' } };
+    }
+  }
+}
+
 // 老师退出登录。
 export async function logoutAdmin() {
   const response = await fetch(`${getApiBaseUrl()}/admin/logout`, {
@@ -479,14 +653,17 @@ export async function fetchManagedUsers() {
 }
 
 // 老师创建学员。
-export async function createManagedUser({ username, password, classId }) {
+export async function createManagedUser({ username, password, classId, nickname = '' }) {
+  const body = { username, password };
+  if (classId) body.classId = classId;
+  if (nickname) body.nickname = nickname;
   const response = await fetch(`${getApiBaseUrl()}/admin/users`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ username, password, classId })
+    body: JSON.stringify(body)
   });
 
   return parseJsonResponse(response, '创建学员失败');
@@ -506,6 +683,17 @@ export async function resetManagedUserPassword({ id, password }) {
   return parseJsonResponse(response, '重置学员密码失败');
 }
 
+export async function updateManagedUser({ id, nickname }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nickname })
+  });
+
+  return parseJsonResponse(response, '更新学员资料失败');
+}
+
 // 老师启用或禁用学员。
 export async function updateManagedUserStatus({ id, isActive }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}/status`, {
@@ -518,6 +706,26 @@ export async function updateManagedUserStatus({ id, isActive }) {
   });
 
   return parseJsonResponse(response, '更新学员状态失败');
+}
+
+export async function updateManagedUserMark({ id, isMarked }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}/mark`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isMarked })
+  });
+
+  return parseJsonResponse(response, '更新学员标记失败');
+}
+
+export async function clearManagedUserMarks() {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/marks/clear`, {
+    method: 'POST',
+    credentials: 'include'
+  });
+
+  return parseJsonResponse(response, '清除学员标记失败');
 }
 
 // 教导主任删除学员。
@@ -541,17 +749,41 @@ export async function fetchManagedAdmins() {
 }
 
 // 教导主任创建老师或教导主任账号。
-export async function createManagedAdmin({ username, password, role }) {
+export async function createManagedAdmin({ username, password, role, nickname = '' }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/admins`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ username, password, role })
+    body: JSON.stringify({ username, password, role, nickname })
   });
 
   return parseJsonResponse(response, '创建账号失败');
+}
+
+export async function updateManagedAdmin({ id, nickname }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/admins/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nickname })
+  });
+
+  return parseJsonResponse(response, '更新账号资料失败');
+}
+
+export async function updateManagedAdminStatus({ id, status, isActive }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/admins/${id}/status`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ status, isActive })
+  });
+
+  return parseJsonResponse(response, '更新账号状态失败');
 }
 
 // 老师重置其他老师密码。
@@ -589,10 +821,10 @@ export async function fetchUserAssignments(userId) {
 }
 
 // 老师给指定学员保存一次推送操作，可以同时包含旧视频和新内容对象。
-export async function createUserAssignment({ userId, videoIds, objects = [], objectType, objectId, partId, message = '' }) {
+export async function createUserAssignment({ userId, videoIds, objects = [], objectType, objectId, partId, practiceRequirement = '', submitRequirement = '', message = '' }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${userId}/assignments`, {
     method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ videoIds, objects, objectType, objectId, partId, message })
+    body: JSON.stringify({ videoIds, objects, objectType, objectId, partId, practiceRequirement, submitRequirement, message })
   });
   return parseJsonResponse(response, '创建推送失败');
 }
@@ -649,56 +881,6 @@ export async function deleteOperation({ operationId, reason }) {
   return parseJsonResponse(response, '删除操作失败');
 }
 
-// 向后端申请 Multipart 上传任务、封面和资料附件的临时上传地址。
-export async function createMultipartVideoUpload({ title, description, video, cover, attachments = [] }) {
-  const response = await fetch(`${getApiBaseUrl()}/videos/multipart/create`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      title,
-      description,
-      video: {
-        name: video.name,
-        size: video.size,
-        type: video.type
-      },
-      cover: {
-        name: cover.name,
-        size: cover.size,
-        type: cover.type
-      },
-      attachments: attachments.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type
-      }))
-    })
-  });
-
-  return parseJsonResponse(response, '创建分片上传任务失败');
-}
-
-// 获取单个分片的临时上传地址。
-export async function createMultipartPartUploadUrl({ uploadId, key, partNumber }) {
-  const response = await fetch(`${getApiBaseUrl()}/videos/multipart/part-url`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      uploadId,
-      key,
-      partNumber
-    })
-  });
-
-  return parseJsonResponse(response, '获取分片上传地址失败');
-}
-
 // 浏览器用分片临时地址直接 PUT 分片到对象存储，并返回对象存储生成的 ETag。
 export async function uploadMultipartPartToBucket({ uploadUrl, blob, contentType, onProgress }) {
   return uploadBlobWithProgress({
@@ -711,41 +893,6 @@ export async function uploadMultipartPartToBucket({ uploadUrl, blob, contentType
   });
 }
 
-// 分片全部上传完成后，通知后端合并成最终视频对象。
-export async function completeMultipartVideoUpload({ uploadId, key, parts }) {
-  const response = await fetch(`${getApiBaseUrl()}/videos/multipart/complete`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      uploadId,
-      key,
-      parts
-    })
-  });
-
-  return parseJsonResponse(response, '完成分片上传失败');
-}
-
-// 取消 Multipart 上传任务。
-export async function abortMultipartVideoUpload({ uploadId, key }) {
-  const response = await fetch(`${getApiBaseUrl()}/videos/multipart/abort`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      uploadId,
-      key
-    })
-  });
-
-  return parseJsonResponse(response, '取消分片上传失败');
-}
-
 // 浏览器用后端给的临时地址，直接 PUT 文件到对象存储。
 // 这里使用 XMLHttpRequest，因为 fetch 目前不能直接读取上传进度。
 export async function uploadFileToBucket({ uploadUrl, file, onProgress }) {
@@ -756,81 +903,6 @@ export async function uploadFileToBucket({ uploadUrl, file, onProgress }) {
     onProgress,
     errorMessage: '直传文件到存储桶失败'
   });
-}
-
-// 直传完成后，通知后端写入数据库。
-export async function completeVideoUpload({ title, description, videoKey, coverKey, attachments = [], prerequisiteVideoIds = [] }) {
-  const response = await fetch(`${getApiBaseUrl()}/videos/complete`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      title,
-      description,
-      videoKey,
-      coverKey,
-      attachments,
-      prerequisiteVideoIds
-    })
-  });
-
-  return parseJsonResponse(response, '保存视频信息失败');
-}
-
-// 教导主任编辑课程时，为可选替换的视频、封面和资料申请上传地址。
-export async function createEditVideoUpload({ title, description, video = null, cover = null, attachments = [] }) {
-  const response = await fetch(`${getApiBaseUrl()}/videos/edit-upload/create`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      title,
-      description,
-      video: video ? { name: video.name, size: video.size, type: video.type } : null,
-      cover: cover ? { name: cover.name, size: cover.size, type: cover.type } : null,
-      attachments: attachments.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type
-      }))
-    })
-  });
-
-  return parseJsonResponse(response, '创建编辑上传任务失败');
-}
-
-// 教导主任保存课程编辑结果。
-export async function updateVideo({ id, title, description, videoKey = '', coverKey = '', attachments, prerequisiteVideoIds }) {
-  const body = { title, description, videoKey, coverKey, attachments };
-
-  if (Array.isArray(prerequisiteVideoIds)) {
-    body.prerequisiteVideoIds = prerequisiteVideoIds;
-  }
-
-  const response = await fetch(`${getApiBaseUrl()}/videos/${id}`, {
-    method: 'PATCH',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-
-  return parseJsonResponse(response, '保存课程编辑失败');
-}
-
-// 删除视频。
-export async function deleteVideo(id) {
-  const response = await fetch(`${getApiBaseUrl()}/videos/${id}`, {
-    method: 'DELETE',
-    credentials: 'include'
-  });
-
-  return parseJsonResponse(response, '删除视频失败');
 }
 
 // 获取班级列表，包含班级下的学员。
@@ -859,16 +931,34 @@ export async function createClass({ name, teacherId }) {
 
 // 教导主任修改班级信息。
 export async function updateClass({ id, name, teacherId }) {
+  const body = {};
+  if (name !== undefined) body.name = name;
+  if (teacherId !== undefined) body.teacherId = teacherId;
+
   const response = await fetch(`${getApiBaseUrl()}/admin/classes/${id}`, {
     method: 'PATCH',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ name, teacherId })
+    body: JSON.stringify(body)
   });
 
   return parseJsonResponse(response, '修改班级失败');
+}
+
+// 教导主任停用或恢复班级。
+export async function updateClassStatus({ id, isActive }) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/classes/${id}/status`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ isActive })
+  });
+
+  return parseJsonResponse(response, '更新班级状态失败');
 }
 
 // 教导主任删除班级。

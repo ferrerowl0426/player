@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import styles from '../redirect.module.css';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -10,5 +11,5 @@ export default function AdminLoginPage() {
     router.replace('/login');
   }, [router]);
 
-  return <p className="empty-text">正在跳转到登录页...</p>;
+  return <main className={styles.redirectPage}>正在跳转到登录页...</main>;
 }

@@ -1,117 +1,10 @@
-import {
-  abortMultipartVideoUpload,
-  completeMultipartVideoUpload,
-  completeVideoUpload,
-  createMultipartPartUploadUrl,
-  createMultipartVideoUpload,
-  uploadFileToBucket,
-  uploadMultipartPartToBucket
-} from '../lib/api.js';
-
-export const TITLE_MAX_LENGTH = 120;
-export const DESCRIPTION_MAX_LENGTH = 1000;
 export const MAX_VIDEO_SIZE = 500 * 1024 * 1024;
-export const MAX_COVER_SIZE = 5 * 1024 * 1024;
-export const MAX_ATTACHMENT_SIZE = 100 * 1024 * 1024;
-export const MAX_ATTACHMENT_COUNT = 10;
 
 const VIDEO_PART_SIZE = 8 * 1024 * 1024;
 const VIDEO_UPLOAD_CONCURRENCY = 3;
-const INVALID_TEXT_VALUES = ['null', 'undefined', 'nan'];
-const ALLOWED_ATTACHMENT_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.zip', '.mp4'];
 
 export function formatFileSize(bytes) {
   return `${Math.round(bytes / 1024 / 1024)}MB`;
-}
-
-function isInvalidTextValue(value) {
-  return INVALID_TEXT_VALUES.includes(value.trim().toLowerCase());
-}
-
-function getExtension(fileName) {
-  const text = String(fileName || '').toLowerCase();
-  const dotIndex = text.lastIndexOf('.');
-  return dotIndex >= 0 ? text.slice(dotIndex) : '';
-}
-
-function getAttachments(formData) {
-  return formData.getAll('attachments').filter((file) => file && file.size > 0);
-}
-
-function validateAttachments(attachments) {
-  if (attachments.length > MAX_ATTACHMENT_COUNT) {
-    return `资料文件最多上传 ${MAX_ATTACHMENT_COUNT} 个`;
-  }
-
-  for (const file of attachments) {
-    if (file.name.length > 180) {
-      return '资料文件名最多 180 个字';
-    }
-
-    if (!ALLOWED_ATTACHMENT_EXTENSIONS.includes(getExtension(file.name))) {
-      return '资料文件只支持 pdf、doc、docx、ppt、pptx、xls、xlsx、zip、mp4';
-    }
-
-    if (file.size > MAX_ATTACHMENT_SIZE) {
-      return `单个资料文件不能超过 ${formatFileSize(MAX_ATTACHMENT_SIZE)}`;
-    }
-  }
-
-  return '';
-}
-
-export function validateUploadForm(formData) {
-  const title = String(formData.get('title') || '').trim();
-  const description = String(formData.get('description') || '').trim();
-  const video = formData.get('video');
-  const cover = formData.get('cover');
-  const attachments = getAttachments(formData);
-
-  if (!title) {
-    return '请填写视频标题';
-  }
-
-  if (isInvalidTextValue(title)) {
-    return '视频标题不能是 null、undefined、NaN 这类无意义内容';
-  }
-
-  if (title.length > TITLE_MAX_LENGTH) {
-    return `视频标题最多 ${TITLE_MAX_LENGTH} 个字`;
-  }
-
-  if (description && isInvalidTextValue(description)) {
-    return '视频介绍不能是 null、undefined、NaN 这类无意义内容';
-  }
-
-  if (description.length > DESCRIPTION_MAX_LENGTH) {
-    return `视频介绍最多 ${DESCRIPTION_MAX_LENGTH} 个字`;
-  }
-
-  if (!video || video.size === 0) {
-    return '请上传视频文件';
-  }
-
-  if (!video.type.startsWith('video/')) {
-    return '请上传视频文件';
-  }
-
-  if (video.size > MAX_VIDEO_SIZE) {
-    return `视频文件不能超过 ${formatFileSize(MAX_VIDEO_SIZE)}`;
-  }
-
-  if (!cover || cover.size === 0) {
-    return '请上传封面图片';
-  }
-
-  if (!cover.type.startsWith('image/')) {
-    return '封面必须是图片文件';
-  }
-
-  if (cover.size > MAX_COVER_SIZE) {
-    return `封面图片不能超过 ${formatFileSize(MAX_COVER_SIZE)}`;
-  }
-
-  return validateAttachments(attachments);
 }
 
 function buildVideoParts(file) {
@@ -129,7 +22,7 @@ function buildVideoParts(file) {
   });
 }
 
-export async function uploadVideoByMultipart({ file, key, uploadId, onProgress, uploadPart = createMultipartPartUploadUrl, uploadPartFile = uploadMultipartPartToBucket }) {
+export async function uploadVideoByMultipart({ file, key, uploadId, onProgress, uploadPart, uploadPartFile }) {
   const fileParts = buildVideoParts(file);
   const loadedBytesByPart = new Map();
   const uploadedParts = [];
@@ -180,77 +73,3 @@ export async function uploadVideoByMultipart({ file, key, uploadId, onProgress, 
   return uploadedParts.sort((first, second) => first.partNumber - second.partNumber);
 }
 
-export async function uploadVideoFromForm({ formData, onStatus, onProgress }) {
-  const title = String(formData.get('title') || '').trim();
-  const description = String(formData.get('description') || '').trim();
-  const video = formData.get('video');
-  const cover = formData.get('cover');
-  const attachments = getAttachments(formData);
-  const prerequisiteVideoIds = formData
-    .getAll('prerequisiteVideoIds')
-    .map((value) => Number(value))
-    .filter((value) => Number.isInteger(value) && value > 0);
-
-  onStatus('正在获取上传地址...');
-  const multipartUpload = await createMultipartVideoUpload({ title, description, video, cover, attachments });
-  const uploadInfo = multipartUpload.data;
-
-  try {
-    onStatus('正在分片直传视频到存储桶...');
-    const parts = await uploadVideoByMultipart({
-      file: video,
-      key: uploadInfo.video.key,
-      uploadId: uploadInfo.video.uploadId,
-      onProgress: (progress) => onProgress((current) => ({ ...current, video: progress }))
-    });
-
-    onStatus('正在合并视频分片...');
-    await completeMultipartVideoUpload({
-      key: uploadInfo.video.key,
-      uploadId: uploadInfo.video.uploadId,
-      parts
-    });
-  } catch (error) {
-    await abortMultipartVideoUpload({
-      key: uploadInfo.video.key,
-      uploadId: uploadInfo.video.uploadId
-    }).catch(() => {});
-    throw error;
-  }
-
-  onStatus('正在直传封面到存储桶...');
-  await uploadFileToBucket({
-    uploadUrl: uploadInfo.cover.uploadUrl,
-    file: cover,
-    onProgress: (progress) => onProgress((current) => ({ ...current, cover: progress }))
-  });
-
-  const completedAttachments = [];
-
-  for (const [index, file] of attachments.entries()) {
-    const attachmentInfo = uploadInfo.attachments[index];
-
-    onStatus(`正在直传资料 ${index + 1}/${attachments.length} 到存储桶...`);
-    await uploadFileToBucket({
-      uploadUrl: attachmentInfo.uploadUrl,
-      file,
-      onProgress: (progress) => onProgress((current) => ({ ...current, attachments: progress }))
-    });
-
-    completedAttachments.push({
-      key: attachmentInfo.key,
-      fileName: attachmentInfo.fileName,
-      fileType: attachmentInfo.fileType
-    });
-  }
-
-  onStatus('正在保存视频信息...');
-  await completeVideoUpload({
-    title,
-    description,
-    videoKey: uploadInfo.video.key,
-    coverKey: uploadInfo.cover.key,
-    attachments: completedAttachments,
-    prerequisiteVideoIds
-  });
-}

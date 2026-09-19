@@ -6,7 +6,7 @@
 <title>曲目合集详情 · 能学慧吉他教室</title>
 <style>
 /* ============================================================
-   合集详情 · 合集标题 / 简介 / 收录单课排列
+   合集详情 · 合集标题 / 简介 / 收录单曲排列
    知识点集与曲目集共用此模板；视觉遵循 design-spec v2.0
 ============================================================ */
 :root{
@@ -30,7 +30,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{
-  height:100vh;                 /* 一屏内呈现：不整页滚动，超出的单课靠翻页 */
+  height:100vh;                 /* 一屏内呈现：不整页滚动，超出的单曲靠翻页 */
   font-family:var(--font-body);
   background:#ffffff;
   color:var(--ink);
@@ -139,7 +139,27 @@ button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offs
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 
-/* ============ 收录单课（固定 2 行 × 6 列 = 每页 12 个，不滚动） ============ */
+/* ---- 关联图书馆：合集页采用头部右侧紧凑展示，不挤占单曲网格 ---- */
+.c-lib{
+  flex:none;width:248px;align-self:stretch;display:flex;flex-direction:column;
+  border-left:1px dashed var(--hair-2);padding-left:18px;min-width:0;
+}
+.c-lib-head{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+.c-lib-head h2{font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--coffee)}
+.c-lib-head .count{font-size:10px;color:var(--ink-3);letter-spacing:.4px}
+.c-lib-note{font-size:10px;color:var(--ink-3);letter-spacing:.3px;margin-bottom:8px}
+.c-lib-list{display:flex;flex-direction:column;gap:5px;overflow:auto;max-height:110px;scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent}
+.c-lib-list::-webkit-scrollbar{width:4px}
+.c-lib-list::-webkit-scrollbar-thumb{background:var(--hair-2)}
+.c-lib-item{display:flex;align-items:center;gap:7px;min-width:0;padding:5px 7px;background:rgba(255,127,0,.045);border:1px solid rgba(185,142,62,.45);border-radius:4px;color:var(--ink-2);text-decoration:none;transition:background .2s,border-color .2s}
+.c-lib-item:hover{background:rgba(255,127,0,.1);border-color:var(--orange)}
+.c-lib-item .book-mark{flex:none;width:16px;height:19px;border:1px solid var(--amber);border-radius:2px 3px 3px 2px;display:grid;place-items:center;color:var(--amber);font-size:8px;line-height:1}
+.c-lib-item .book-name{min-width:0;flex:1;font-size:11px;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-lib-item .book-meta{flex:none;font-size:9px;color:var(--ink-3);white-space:nowrap}
+.c-lib-empty{font-size:10.5px;color:var(--ink-3);padding:10px 8px;border:1px dashed var(--hair-2);border-radius:4px;text-align:center}
+
+
+/* ============ 收录单曲（固定 2 行 × 6 列 = 每页 12 个，不滚动） ============ */
 .sec{flex:1;min-height:0;display:flex;flex-direction:column;gap:9px}
 .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:0 2px;flex:none}
 .sec-head h2{
@@ -304,6 +324,8 @@ body.dean .card:hover .ops{display:flex}
   .nav-links{display:none}
   .home{padding:12px 14px 28px}
   .c-head{flex-direction:column}
+  .c-lib{width:100%;border-left:none;border-top:1px dashed var(--hair-2);padding:12px 0 0}
+  .c-lib-list{max-height:140px}
   .c-cover{width:150px}
   .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 }
@@ -360,13 +382,18 @@ body.dean .card:hover .ops{display:flex}
       </div>
       <p class="c-desc" id="cDesc" data-page-node-id="kK0LjVwz2uE21FSDM56dIW">从易到难精选 12 首指弹曲：每首按「完整示范 → 分段精讲 → 伴奏跟练」编排，拿下前 4 首即可参加季度汇报演出。</p>
     </div>
+    <aside class="c-lib" aria-label="关联图书馆" data-page-node-id="CollectionLibAside0001">
+      <div class="c-lib-head"><h2>关联图书馆</h2><span class="count num" id="libCount">3 本</span></div>
+      <p class="c-lib-note">本合集配套资料，可查看与下载</p>
+      <div class="c-lib-list" id="libList"></div>
+    </aside>
   </header>
 
-  <!-- ============ 收录单课 ============ -->
+  <!-- ============ 收录单曲 ============ -->
   <section class="sec rise d2" aria-label="收录单曲" data-page-node-id="iFcMBWxc8g57iAMjZ9l2WY">
     <div class="sec-head" data-page-node-id="hDjHTW5BiqerXXjBa4xQTy">
       <h2 data-page-node-id="TkT2GerDfPt5nPO9KRFWQ8">收录单曲</h2>
-      <span class="meta num" id="lesCount" data-page-node-id="1M2GmbuuMoNdssgG2GUnws">6 个</span>
+      <span class="meta num" id="lesCount" data-page-node-id="1M2GmbuuMoNdssgG2GUnws">12 首</span>
       <span class="note" data-page-node-id="voswYNpRuwyfqUcdlxHmqf">点击单曲进入学习 · 单 P 直达对应段落</span>
       <div class="viewseg" role="group" aria-label="预览视角" data-page-node-id="lesViewSegNxde0a">
         <span class="lbl" data-page-node-id="lesViewLblNxde0a">预览视角</span>
@@ -393,9 +420,15 @@ body.dean .card:hover .ops{display:flex}
 <script>
 /* ================= 合集假数据 ================= */
 const SET = {
+  zone:'track',
   title:'指弹入门精选 · 第一辑',
   desc:'从易到难精选 12 首指弹曲：每首按「完整示范 → 分段精讲 → 伴奏跟练」编排，拿下前 4 首即可参加季度汇报演出。',
   updated:'昨天更新',
+  books:[
+    {nm:'民谣吉他入门一本通', m:'96 页'},
+    {nm:'零基础乐理小课', m:'72 页'},
+    {nm:'指弹吉他和弦与节奏图鉴', m:'128 页'}
+  ],
   items:[
     {nm:'卡农 · 摇滚改编指弹版',              p:6, len:'24 分钟'},
     {nm:'天空之城 · 久石让 指弹版',           p:5, len:'20 分钟'},
@@ -427,7 +460,15 @@ document.getElementById('cDesc').textContent = SET.desc;
 const pTotal = SET.items.reduce((s,it)=>s+it.p, 0);
 document.getElementById('metaLes').textContent = '收录 ' + SET.items.length + ' 首单曲';
 document.getElementById('metaP').textContent = '共 ' + pTotal + ' 个 P';
-document.getElementById('lesCount').textContent = SET.items.length + ' 个';
+document.getElementById('lesCount').textContent = SET.items.length + ' 首';
+document.getElementById('libCount').textContent = SET.books.length + ' 本';
+document.getElementById('libList').innerHTML = SET.books.map(it=>
+  '<a class="c-lib-item" href="library-book.html">' +
+    '<span class="book-mark" aria-hidden="true">书</span>' +
+    '<span class="book-name">' + it.nm + '</span>' +
+    '<span class="book-meta num">' + it.m + '</span>' +
+  '</a>'
+).join('');
 document.getElementById('lesGrid').innerHTML = SET.items.map((it,i)=>
   '<a class="card" href="track-point-detail.html">' +
     '<div class="cover c' + (i%5+2) + '">' +
@@ -503,7 +544,7 @@ vBtns.forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.dean === '1')
   }
   function syncCounts(){
     const left = lesGrid.querySelectorAll('.card').length;
-    document.getElementById('lesCount').textContent = left + ' 个';
+    document.getElementById('lesCount').textContent = left + ' 首';
     document.getElementById('metaLes').textContent = '收录 ' + left + ' 首单曲';
   }
   lesGrid.querySelectorAll('.card').forEach(card=>{

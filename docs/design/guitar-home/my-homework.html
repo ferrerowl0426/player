@@ -123,62 +123,61 @@ body.disabled .stop-banner{display:flex}
 .stop-banner .t{font-size:12.5px;color:var(--ink);letter-spacing:.5px;line-height:1.8}
 .stop-banner .t b{color:#b4452e}
 
-/* ---- 时间线列表（无外框，卡片直接排在页面上） ---- */
+/* ---- 历史作业记录列表（与老师端学习记录组件一致） ---- */
 .zone{
   flex:none;position:relative;
+  border:0;border-radius:0;
+  background:rgba(255,255,255,.76);
+  box-shadow:none;
+  overflow:hidden;
 }
-.tl{padding:2px 6px 26px}
-/* 分组日期 */
-.tl-date{
-  display:flex;align-items:center;gap:12px;margin:6px 0 10px;
-  font-size:10.5px;letter-spacing:2px;color:var(--ink-3);
+.rec-list{padding:6px 14px 14px}
+.hw-item{
+  display:flex;gap:12px;
+  padding:10px 0 11px;border-bottom:1px solid rgba(221,208,180,.55);
 }
-.tl-date::after{content:"";flex:1;border-top:1px dashed var(--hair-2)}
-.tl-date b{color:var(--coffee);font-weight:700}
-/* 单次推送记录（operation 卡） */
-.op{
-  position:relative;
-  display:flex;gap:14px;
-  border:1px solid var(--hair-2);border-radius:6px;background:var(--white);
-  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.05);
-  padding:12px 16px;margin:0 0 12px 14px;
+.hw-item:last-child{border-bottom:none}
+/* 已删除记录：整条变灰留痕 */
+.hw-item.deleted .hw-tm,.hw-item.deleted .hw-main{filter:grayscale(1);opacity:.45}
+.hw-delnote{
+  margin-top:6px;font-size:10px;letter-spacing:.4px;color:#8a7a60;
+  border-top:1px dashed var(--hair);padding-top:5px;
 }
-.op::before{  /* 时间线竖轴节点（棕焦糖） */
-  content:"";position:absolute;left:-19px;top:20px;width:8px;height:8px;border-radius:50%;
-  background:#a06a35;box-shadow:0 0 0 2.5px #ffffff;
+.hw-delnote b{color:#8a5a3e;font-weight:600}
+.hw-tm{flex:none;width:52px;padding-top:2px;text-align:center}
+.hw-tm .tm{font-size:13px;font-weight:700;color:var(--coffee);letter-spacing:.5px}
+.hw-tm .lb{font-size:9px;color:var(--ink-3);letter-spacing:1px;margin-top:1px}
+.hw-main{flex:1;min-width:0}
+.hw-from{font-size:11px;color:var(--ink-3);letter-spacing:.4px;margin-bottom:5px}
+.hw-from b{color:var(--ink-2);font-weight:600}
+.hw-msg-pair{display:flex;flex-direction:column;gap:5px;margin-bottom:7px}
+.hw-msg-line{
+  display:flex;align-items:flex-start;gap:5px;min-width:0;
+  font-size:11px;line-height:1.7;color:var(--ink-2);letter-spacing:.3px;
+  background:rgba(93,67,38,.035);border:1px solid rgba(93,67,38,.16);border-radius:4px;
+  padding:4px 9px;
 }
-.op-side{flex:none;width:86px;text-align:center;padding-top:4px}
-.op-side .tm{font-size:15px;font-weight:700;color:var(--coffee);letter-spacing:.5px}
-.op-side .dt{font-size:9.5px;color:var(--ink-3);letter-spacing:1px;margin-top:2px}
-.op-main{flex:1;min-width:0}
-.op-from{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink-3);letter-spacing:.5px;margin-bottom:7px}
-.op-from .tk{flex:none;width:18px;height:18px;border-radius:50%;border:1px solid var(--hair-2);display:inline-grid;place-items:center;font-size:9.5px;color:var(--coffee)}
-/* 留言（便签 · 纸面米色，不用橙） */
-.op-msg{
-  font-size:11.5px;line-height:1.8;color:var(--ink-2);letter-spacing:.3px;
-  background:rgba(93,67,38,.05);border:1px dashed rgba(93,67,38,.28);border-radius:4px;
-  padding:6px 11px;margin-bottom:9px;
+.hw-msg-label{flex:none;width:70px;color:var(--coffee);font-weight:700;white-space:nowrap}
+.hw-msg-text{
+  min-width:0;flex:1;max-height:calc(1.7em * 5);overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
+  overflow-wrap:anywhere;white-space:pre-wrap;word-break:break-word;
 }
-.op-msg .who{color:var(--coffee);font-weight:600;margin-right:4px}
-/* 推送条目（纯标题快照 · 不可交互） */
-.op-items{display:flex;flex-wrap:wrap;gap:6px 20px;padding-top:2px}
-.op-items .it{
-  display:inline-flex;align-items:center;gap:7px;
+.hw-msg-text::-webkit-scrollbar{width:3px}
+.hw-msg-text::-webkit-scrollbar-thumb{background:var(--hair-2)}
+.hw-items{display:flex;flex-wrap:wrap;gap:4px 16px;margin-bottom:7px}
+.hw-items .it{
+  display:inline-flex;align-items:center;gap:6px;
   font-size:11.5px;font-weight:600;color:var(--ink-2);letter-spacing:.3px;
 }
-.op-items .it::before{content:"";width:4px;height:4px;border-radius:50%;background:#a06a35;flex:none}
-.op-items .it em{
-  font-style:normal;font-weight:400;font-size:9px;color:var(--ink-3);letter-spacing:1px;
-  border:1px solid var(--hair);border-radius:3px;padding:0 4px;
-}
-/* 空态 */
-.tl-empty{
+.hw-items .it::before{content:"";width:4px;height:4px;border-radius:50%;background:#a06a35;flex:none}
+.rec-empty{
   display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;
   padding:80px 10px;text-align:center;color:var(--ink-3);font-size:12.5px;letter-spacing:.5px;
 }
-.tl-empty.show{display:flex}
-.tl-empty .big{font-size:15px;color:var(--ink);font-weight:700;letter-spacing:1px}
-.tl-empty .big mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 3px}
+.rec-empty.show{display:flex}
+.rec-empty .big{font-size:15px;color:var(--ink);font-weight:700;letter-spacing:1px}
+.rec-empty .big mark{background:linear-gradient(180deg, transparent 55%, rgba(255,127,0,.46) 55%);color:inherit;padding:0 3px}
 
 /* 回到顶部（时间线旁 · 右下角） */
 .to-top{
@@ -259,10 +258,10 @@ body.disabled .stop-banner{display:flex}
     <span class="t" data-page-node-id="iWoHmpAcnYkXIyF6ceW5d2"><b data-page-node-id="1fyjWwka3WmK0zckUNXRx1">你的课程已暂时停用。</b>老师之前带你学到了这里，如需恢复课程请联系老师。</span>
   </div>
 
-  <!-- 时间线 -->
+  <!-- 历史作业记录（与老师端学习记录同构） -->
   <section class="zone rise d2" data-page-node-id="0avBI2fpGcNDnJC9SfI5U8">
-    <div class="tl" id="tl" data-page-node-id="Xa2nGI8VAfDCzyVr5Gys1y"><!-- JS 渲染 --></div>
-    <div class="tl-empty" id="tlEmpty" data-page-node-id="Jip3aEWSCy9LzihT91Jm4J">
+    <div class="rec-list" id="recList" data-page-node-id="Xa2nGI8VAfDCzyVr5Gys1y"><!-- JS 渲染 --></div>
+    <div class="rec-empty" id="recEmpty" data-page-node-id="Jip3aEWSCy9LzihT91Jm4J">
       <span class="big" data-page-node-id="PlDwg2QOeu2kY1yedvEpTJ">还没有收到过<mark data-page-node-id="lQf2vNbn0AB1DElEnUdnAm">作业</mark></span>
       <span data-page-node-id="yNdt6u8qiYxvIfhzTnOAmq">老师布置作业后会出现在这里和首页</span>
     </div>
@@ -276,83 +275,70 @@ body.disabled .stop-banner{display:flex}
 </main>
 
 <script>
-/* ================= 假数据（每次推送 = 一个 operation） ================= */
+/* ================= 假数据（每次推送 = 一条独立作业记录） ================= */
 const OPS = [
-  {d:'9月9日', tm:'20:30', from:'李弦安',
-   msg:'重点看 P2 的段落衔接，跟练时开节拍器 60。',
-   items:[
-     {kd:'单课', nm:'卡农独奏 · 全曲精讲', img:'assets/covers/real-01.jpg', href:'track-point-detail.html'},
-     {kd:'P', p:'P2', nm:'卡农 · 分段讲解', img:'assets/covers/real-01.jpg', href:'track-point-detail.html'},
-   ]},
+  {d:'今天', tm:'20:30', from:'李弦安',
+   practice:'重点看 P2 的段落衔接，跟练时开节拍器 60。\n第二遍试着把速度提到 72。',
+   submit:'请拍摄完整练习视频，保持画面稳定并上传。',
+   items:['卡农独奏 · 全曲精讲','卡农 · P2 分段讲解']},
+  {d:'今天', tm:'18:00', from:'李弦安',
+   practice:'先完成基础指法练习。',
+   submit:'',
+   items:['指弹入门 30 首']},
   {d:'9月6日', tm:'19:12', from:'李弦安',
-   msg:'',
-   items:[
-     {kd:'合集', nm:'指弹入门 30 首', img:'assets/covers/real-15.jpg', href:'#'},
-   ]},
+   practice:'',
+   submit:'',
+   items:['指弹入门 30 首']},
   {d:'9月5日', tm:'21:47', from:'李弦安',
-   msg:'天空之城全曲过一遍，P2 慢速跟练三遍再提速。',
-   items:[
-     {kd:'单课', nm:'天空之城 · 指弹改编', img:'assets/covers/real-02.jpg', href:'#'},
-     {kd:'P', p:'P2', nm:'天空之城 · 分段讲解', img:'assets/covers/real-02.jpg', href:'#'},
-   ]},
+   practice:'天空之城全曲过一遍，P2 慢速跟练三遍再提速。',
+   submit:'请提交慢速跟练视频，能看清左右手动作。',
+   items:['天空之城 · 指弹改编','天空之城 · P2 分段讲解']},
   {d:'9月2日', tm:'18:05', from:'李弦安',
-   msg:'',
-   items:[
-     {kd:'单课', nm:'晴天 · 前奏精讲', img:'assets/covers/real-06.jpg', href:'#'},
-     {kd:'P', p:'P1', nm:'晴天 · 前奏演示', img:'assets/covers/real-06.jpg', href:'#'},
-   ]},
+   practice:'',
+   submit:'提交一段连续演奏视频即可。',
+   items:['晴天 · 前奏精讲','晴天 · P1 前奏演示']},
   {d:'8月29日', tm:'20:22', from:'李弦安',
-   msg:'这周把风之诗的引子磨下来，不用赶。',
-   items:[
-     {kd:'单课', nm:'风之诗 · Wind Song', img:'assets/covers/real-03.jpg', href:'#'},
-   ]},
+   practice:'这周把风之诗的引子磨下来，不用赶。',
+   submit:'',
+   items:['风之诗 · Wind Song']},
   {d:'8月25日', tm:'19:40', from:'李弦安',
-   msg:'',
-   items:[
-     {kd:'合集', nm:'宫崎骏动画曲集', img:'assets/covers/real-13.jpg', href:'#'},
-     {kd:'单课', nm:'千与千寻 · Always With Me', img:'assets/covers/real-13.jpg', href:'#'},
-   ]},
+   practice:'',
+   submit:'',
+   items:['宫崎骏动画曲集','千与千寻 · Always With Me'],
+   del:{by:'李弦安', reason:'重复布置'}},
   {d:'8月20日', tm:'20:11', from:'李弦安',
-   msg:'乐谱在附件里，看不懂的地方课上问。',
-   items:[
-     {kd:'单课', nm:'奇迹的山', img:'assets/covers/real-04.jpg', href:'#'},
-   ]},
-  {d:'8月16日', tm:'18:33', from:'李弦安',
-   msg:'',
-   items:[
-     {kd:'P', p:'P1', nm:'卡农 · 完整示范', img:'assets/covers/real-01.jpg', href:'track-point-detail.html'},
-   ]},
+   practice:'乐谱在附件里，看不懂的地方课上问。',
+   submit:'请录制并提交完整演奏视频。',
+   items:['奇迹的山']},
 ];
 
-/* ================= 渲染（按日期分组的时间线） ================= */
-const tl = document.getElementById('tl');
+/* ================= 渲染（按作业记录展示，不按日期合并） ================= */
+const recList = document.getElementById('recList');
 function render(){
   if(!OPS.length){
-    document.getElementById('tlEmpty').classList.add('show');
-    document.getElementById('cntHint').textContent = '暂无推送记录';
+    document.getElementById('recEmpty').classList.add('show');
+    document.getElementById('cntHint').textContent = '暂无记录';
     return;
   }
-  document.getElementById('cntHint').textContent = '共 ' + OPS.length + ' 次推送 · 按时间倒序';
-  let lastD = null;
-  tl.innerHTML = OPS.map(o=>{
-    const dateHead = (o.d !== lastD)
-      ? '<div class="tl-date num"><b>' + o.d + '</b></div>'
-      : '';
-    lastD = o.d;
-    return dateHead +
-    '<div class="op rise">' +
-      '<div class="op-side num"><div class="tm">' + o.tm + '</div><div class="dt">推送</div></div>' +
-      '<div class="op-main">' +
-        '<div class="op-from"><span class="tk">' + o.from[0] + '</span>' + o.from + '老师 布置了 ' + o.items.length + ' 项内容</div>' +
-        (o.msg ? '<div class="op-msg"><span class="who">留言</span>「' + o.msg + '」</div>' : '') +
-        '<div class="op-items">' +
-          o.items.map(it=>
-            '<span class="it num">' + it.nm +
-              '<em>' + (it.p ? it.p : it.kd) + '</em>' +
-            '</span>'
-          ).join('') +
-        '</div>' +
-      '</div>' +
+  document.getElementById('cntHint').textContent = '共 ' + OPS.length + ' 条记录 · 按时间倒序';
+  recList.innerHTML = OPS.map(o=>{
+    const practiceMsg = (o.practice || '').trim();
+    const submitMsg = (o.submit || '').trim();
+    return '<div class="hw-item' + (o.del ? ' deleted' : '') + '">' +
+      '<span class="hw-tm num"><span class="tm">' + o.tm + '</span><div class="lb">' + o.d + '</div></span>' +
+      '<span class="hw-main">' +
+        '<div class="hw-from"><b>' + o.from + '</b>老师 · 布置</div>' +
+        ((o.items && o.items.length) ? '<div class="hw-items">' +
+          o.items.map(t=>'<span class="it">' + t + '</span>').join('') +
+        '</div>' : '') +
+        ((practiceMsg || submitMsg) ? '<div class="hw-msg-pair">' +
+          (practiceMsg ? '<div class="hw-msg-line"><span class="hw-msg-label">练习要求：</span><span class="hw-msg-text">' + practiceMsg + '</span></div>' : '') +
+          (submitMsg ? '<div class="hw-msg-line"><span class="hw-msg-label">提交要求：</span><span class="hw-msg-text">' + submitMsg + '</span></div>' : '') +
+        '</div>' : '') +
+        (o.del
+          ? '<div class="hw-delnote">已删除 · 删除人：<b>' + o.del.by + '</b> · 原因：' + o.del.reason + '</div>'
+          : '') +
+      '</span>' +
     '</div>';
   }).join('');
 }

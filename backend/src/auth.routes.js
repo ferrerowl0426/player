@@ -33,7 +33,7 @@ authRouter.post('/login', async (req, res, next) => {
     if (admin) {
       const passwordMatched = await bcrypt.compare(password, admin.password_hash);
 
-      if (!passwordMatched || admin.status !== 'active') {
+      if (!passwordMatched) {
         res.status(401).json({ message: '账号或密码错误' });
         return;
       }
@@ -41,7 +41,7 @@ authRouter.post('/login', async (req, res, next) => {
       clearUserCookie(res);
       const token = signAdminToken(admin);
       res.cookie(config.auth.adminCookieName, token, getAdminCookieOptions());
-      res.json({ data: { username: admin.username, role: admin.role } });
+      res.json({ data: { id: admin.id, username: admin.username, account: admin.account, nickname: admin.nickname, role: admin.role, status: admin.status || 'active', isActive: admin.status !== 'disabled' } });
       return;
     }
 
@@ -60,7 +60,7 @@ authRouter.post('/login', async (req, res, next) => {
 
     const passwordMatched = await bcrypt.compare(password, user.password_hash);
 
-    if (!passwordMatched || user.status !== 'active' || !user.is_active) {
+    if (!passwordMatched) {
       res.status(401).json({ message: '账号或密码错误' });
       return;
     }
@@ -68,7 +68,7 @@ authRouter.post('/login', async (req, res, next) => {
     clearAdminCookie(res);
     const token = signUserToken(user);
     res.cookie(config.auth.userCookieName, token, getUserCookieOptions());
-    res.json({ data: { username: user.username, role: 'user' } });
+    res.json({ data: { id: user.id, username: user.username, account: user.account, nickname: user.nickname, role: 'user', status: user.status || (user.is_active ? 'active' : 'disabled'), isActive: Boolean(user.is_active) } });
   } catch (error) {
     next(error);
   }

@@ -9,15 +9,42 @@ import { userAuthRouter } from './user-auth.routes.js';
 import { tracksRouter } from './tracks.routes.js';
 import { knowledgeRouter } from './knowledge.routes.js';
 import { prerequisiteRouter } from './prerequisites.routes.js';
+import { libraryRouter } from './library.routes.js';
 import { videoRouter } from './videos.routes.js';
 
 const app = express();
 
+function getAllowedOrigins() {
+  const origins = new Set([config.frontendUrl]);
+
+  try {
+    const frontendUrl = new URL(config.frontendUrl);
+    if (frontendUrl.hostname === 'localhost') {
+      origins.add(`${frontendUrl.protocol}//127.0.0.1:${frontendUrl.port}`);
+    }
+    if (frontendUrl.hostname === '127.0.0.1') {
+      origins.add(`${frontendUrl.protocol}//localhost:${frontendUrl.port}`);
+    }
+  } catch {
+    // 保留原始配置即可。
+  }
+
+  return origins;
+}
+
+const allowedOrigins = getAllowedOrigins();
+
 // cors 允许前端项目跨域访问后端 API。
-// 前端运行在 3001 端口，后端运行在 3002 端口，浏览器会认为它们是不同来源。
+// 前端运行在 3001 端口，后端运行在 3000 端口，浏览器会认为它们是不同来源。
 app.use(
   cors({
-    origin: config.frontendUrl,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`不允许的跨域来源：${origin}`));
+    },
     credentials: true
   })
 );
@@ -52,6 +79,7 @@ app.use('/api/user', userAuthRouter);
 app.use('/api/tracks', tracksRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/prerequisites', prerequisiteRouter);
+app.use('/api/library', libraryRouter);
 
 // 视频相关接口统一挂载到 /api/videos。
 app.use('/api/videos', videoRouter);

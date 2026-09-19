@@ -1,0 +1,239 @@
+/* M5 学生管理 / 作业推送，严格对齐 docs/design/guitar-home/student-manage.html */
+.studentManage:global(.student-manage){ flex: none; height: calc(100dvh - 56px); min-height: 0; max-width: 1440px; width: 100%; margin: 0 auto; padding: 14px 36px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+.studentManage:global(.student-manage) :global(.toolrow){ flex: none; display: flex; align-items: center; gap: 16px; }
+.studentManage:global(.student-manage) :global(.toolrow .hint){ font-size: 10.5px; color: var(--ink-3); letter-spacing: .5px; }
+.studentManage:global(.student-manage) :global(.cols){ flex: 1 1 0; min-height: 0; align-items: stretch; display: flex; gap: 14px; }
+.studentManage:global(.student-manage) :global(.zone){ border: 1.5px solid var(--coffee); border-radius: 6px; background: var(--glass); box-shadow: 0 2px 10px rgba(64,45,20,.08); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.studentManage:global(.student-manage) :global(.zone-head){ flex: none; padding: 11px 16px 9px; border-bottom: 1px solid rgba(93,67,38,.28); display: flex; align-items: center; gap: 10px; position: relative; min-height: 40px; }
+.studentManage:global(.student-manage) :global(.side > .zone-head){ padding-right: 58px; }
+.studentManage:global(.student-manage) :global(.side > .zone-head .mk-clear){ position: absolute; right: 12px; top: 50%; margin: 0; transform: translateY(-50%); }
+.studentManage:global(.student-manage) :global(.zone-head h2){ flex: none; font-size: 13.5px; font-weight: 700; letter-spacing: 2px; color: var(--coffee); display: flex; align-items: center; gap: 9px; }
+.studentManage:global(.student-manage) :global(.zone-head h2::before){ content: ""; width: 4px; height: 14px; border-radius: 1px; flex: none; background: var(--orange); }
+.studentManage:global(.student-manage) :global(.zone-head .meta){ min-width: 0; font-size: 10.5px; color: var(--ink-3); letter-spacing: 1px; white-space: nowrap; }
+.studentManage:global(.student-manage) :global(.history-head .meta){ width: auto; }
+.studentManage:global(.student-manage) :global(.hist-top){ margin-left: auto; flex: none; border: 1px solid var(--hair-2); border-radius: 4px; background: var(--white); color: var(--coffee); font-size: 10px; letter-spacing: 1px; padding: 3px 9px; cursor: pointer; transition: all .2s; }
+.studentManage:global(.student-manage) :global(.hist-top:hover){ border-color: var(--orange); color: var(--orange); }
+.studentManage:global(.student-manage) :global(.zone-ops){ margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.studentManage:global(.student-manage) :global(.zone-head::after){ content: ""; position: absolute; left: 16px; bottom: -1px; width: 64px; height: 3px; border-radius: 1.5px; background: var(--orange); display: block; }
+.studentManage:global(.student-manage) :global(.side){ flex: none; width: 264px; grid-column: auto; gap: 0; min-height: 0; }
+.studentManage:global(.student-manage) :global(.side .zone-head){ min-height: 40px; }
+.studentManage:global(.student-manage) :global(.mark-tools){ flex: none; min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 14px 4px; border-bottom: 1px dashed var(--hair-2); background: rgba(123,94,167,.025); }
+.studentManage:global(.student-manage) :global(.mark-count){ font-size: 10px; color: var(--ink-3); letter-spacing: .6px; }
+.studentManage:global(.student-manage) :global(.mk-clear){ flex: none; }
+.studentManage:global(.student-manage) :global(.main){ flex: 1.35 1 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 14px; grid-column: auto; border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 0; overflow: hidden; }
+.studentManage:global(.student-manage) :global(.main > .history-zone){ flex: 1 1 0; min-height: 0; overflow: hidden; }
+.studentManage:global(.student-manage) :global(.aside){ flex: 1 1 0; min-width: 0; min-height: 0; display: flex; }
+.studentManage:global(.student-manage) :global(.aside > .zone){ flex: 1 1 0; min-height: 0; }
+.studentManage:global(.student-manage) :global(.filters){ flex: none; padding: 12px 14px 10px; border-bottom: 1px dashed var(--hair-2); display: flex; flex-direction: column; gap: 10px; }
+.studentManage:global(.student-manage) :global(.cls-dd){ position: relative; margin-top: 6px; }
+.studentManage:global(.student-manage) :global(.cls-dd-btn){ width: 100%; display: flex; align-items: center; gap: 8px; background: var(--white); border: 1px solid var(--hair-2); border-radius: 5px; padding: 6px 10px; font-size: 12px; color: var(--ink); letter-spacing: .4px; transition: border-color .25s; text-align: left; }
+.studentManage:global(.student-manage) :global(.cls-dd-btn .lb){ flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studentManage:global(.student-manage) :global(.cls-dd-btn svg){ width: 12px; height: 12px; color: var(--ink-3); flex: none; transition: transform .25s var(--ease); }
+.studentManage:global(.student-manage) :global(.cls-dd.open .cls-dd-btn){ border-color: var(--coffee); }
+.studentManage:global(.student-manage) :global(.cls-dd.open .cls-dd-btn svg){ transform: rotate(180deg); }
+.studentManage:global(.student-manage) :global(.cls-dd-panel){ display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; background: var(--white); border: 1.5px solid var(--coffee); border-radius: 6px; box-shadow: 0 10px 24px rgba(64,45,20,.16); padding: 8px; }
+.studentManage:global(.student-manage) :global(.cls-dd.open .cls-dd-panel){ display: block; }
+.studentManage:global(.student-manage) :global(.cls-dd-ops){ display: flex; gap: 6px; margin-bottom: 7px; }
+.studentManage:global(.student-manage) :global(.cls-dd-ops button){ flex: 1; font-size: 10.5px; letter-spacing: 1px; color: var(--coffee); border: 1px solid var(--hair-2); border-radius: 4px; padding: 3px 0; background: var(--white); }
+.studentManage:global(.student-manage) :global(.cls-dd-ops button:disabled){ opacity: .4; cursor: not-allowed; }
+.studentManage:global(.student-manage) :global(.cls-dd-list){ display: flex; flex-direction: column; gap: 6px; max-height: 176px; overflow-y: auto; padding-right: 2px; }
+.studentManage:global(.student-manage) :global(.cls-opt){ display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 5px 9px; border: 1px solid rgba(93,67,38,.46); border-radius: 5px; background: rgba(255,255,255,.92); box-shadow: none; outline: none; cursor: pointer; user-select: none; font-size: 12px; color: var(--ink-2); letter-spacing: .4px; text-align: left; transition: border-color .2s var(--ease), background .2s var(--ease), color .2s var(--ease); }
+.studentManage:global(.student-manage) :global(.cls-opt:hover){ border-color: var(--coffee); background: rgba(255,252,242,.88); color: var(--ink); }
+.studentManage:global(.student-manage) :global(.cls-opt:focus-visible){ outline: 1.5px solid var(--coffee); outline-offset: 1px; }
+.studentManage:global(.student-manage) :global(.cls-opt .cbx){ width: 15px; height: 15px; flex: none; border: 1px solid rgba(93,67,38,.5); border-radius: 3px; display: grid; place-items: center; font-size: 9px; color: transparent; line-height: 1; background: var(--white); }
+.studentManage:global(.student-manage) :global(.cls-opt.on){ color: var(--ink); border-color: var(--coffee); background: rgba(255,252,242,.72); }
+.studentManage:global(.student-manage) :global(.cls-opt.on .cbx){ background: var(--coffee); border-color: var(--coffee); color: var(--white); }
+.studentManage:global(.student-manage) :global(.f-lbl){ display: block; font-size: 10px; letter-spacing: 3px; line-height: 1.4; color: var(--ink-3); }
+.studentManage:global(.student-manage) :global(.f-lbl span){ letter-spacing: .5px; }
+.studentManage:global(.student-manage) :global(.class-chips){ display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.studentManage:global(.student-manage) :global(.cls-chip){ font-size: 10.5px; letter-spacing: 1px; color: var(--coffee); border: 1px solid var(--hair-2); border-radius: 4px; padding: 3px 8px; background: var(--white); transition: all .2s; }
+.studentManage:global(.student-manage) :global(.cls-chip.on){ background: var(--coffee); border-color: var(--coffee); color: var(--white); }
+.studentManage:global(.student-manage) :global(.stu-search){ display: flex; align-items: center; gap: 8px; background: var(--white); border: 1px solid var(--hair-2); border-radius: 5px; padding: 6px 10px; transition: border-color .25s; }
+.studentManage:global(.student-manage) :global(.stu-search:focus-within){ border-color: var(--coffee); }
+.studentManage:global(.student-manage) :global(.stu-search svg){ width: 13px; height: 13px; color: var(--ink-3); flex: none; }
+.studentManage:global(.student-manage) :global(.stu-search input){ flex: 1; border: none; background: none; outline: none; font-size: 12px; color: var(--ink); letter-spacing: .4px; min-width: 0; }
+.studentManage:global(.student-manage) :global(.stu-search input::placeholder){ color: #b3a58c; }
+.studentManage:global(.student-manage) :global(.stu-list){ flex: 1 1 auto; min-height: 0; height: 0; padding: 8px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.studentManage:global(.student-manage) :global(.stu-list::-webkit-scrollbar){ width: 0; height: 0; }
+.studentManage:global(.student-manage) :global(.stu-item){ width: 100%; text-align: left; display: flex; align-items: center; gap: 10px; border-radius: 5px; padding: 8px 10px; margin-bottom: 2px; transition: background .2s; border: 0; background: transparent; color: inherit; }
+.studentManage:global(.student-manage) :global(.stu-item:hover){ background: rgba(255,252,242,.75); }
+.studentManage:global(.student-manage) :global(.stu-item.on){ background: rgba(111,143,99,.16); box-shadow: inset 2px 0 0 #6f8f63; }
+.studentManage:global(.student-manage) :global(.stu-item.on .nm){ color: #4a6b3f; }
+.studentManage:global(.student-manage) :global(.stu-item.dis){ background: rgba(93,67,38,.05); }
+.studentManage:global(.student-manage) :global(.stu-item.dis:hover){ background: rgba(93,67,38,.09); }
+.studentManage:global(.student-manage) :global(.stu-item.dis .ava){ border-color: var(--hair-2); color: var(--ink-3); background: rgba(93,67,38,.04); }
+.studentManage:global(.student-manage) :global(.stu-item.dis .nm){ color: var(--ink-3); }
+.studentManage:global(.student-manage) :global(.stu-item .ava), .studentManage:global(.student-manage) :global(.stu-head .ava){ border-radius: 50%; flex: none; border: 1.5px solid var(--coffee); background: var(--white); display: grid; place-items: center; color: var(--coffee); font-weight: 600; }
+.studentManage:global(.student-manage) :global(.stu-item .ava){ width: 30px; height: 30px; font-size: 11.5px; }
+.studentManage:global(.student-manage) :global(.stu-item .info){ min-width: 0; flex: 1; }
+.studentManage:global(.student-manage) :global(.stu-item .nm){ font-size: 12.5px; font-weight: 600; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studentManage:global(.student-manage) :global(.stu-item .cls){ display: block; font-size: 10px; color: var(--ink-3); letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studentManage:global(.student-manage) :global(.stu-item .st), .studentManage:global(.student-manage) :global(.tag-dis){ font-size: 9.5px; letter-spacing: 1.5px; color: #b4452e; border: 1px solid rgba(180,69,46,.45); border-radius: 3px; padding: 1px 8px; background: rgba(180,69,46,.05); }
+.studentManage:global(.student-manage) :global(.stu-empty), .studentManage:global(.student-manage) :global(.rec-empty){ padding: 40px 10px; text-align: center; font-size: 11.5px; color: var(--ink-3); letter-spacing: .5px; }
+.studentManage:global(.student-manage) :global(.stu-head){ flex: none; display: flex; align-items: center; gap: 12px; padding: 9px 16px; border-bottom: 1px dashed var(--hair-2); flex-wrap: nowrap; min-width: 0; }
+.studentManage:global(.student-manage) :global(.stu-head .ava){ width: 38px; height: 38px; font-size: 14px; }
+.studentManage:global(.student-manage) :global(.stu-head .nm){ font-size: 15px; font-weight: 700; letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studentManage:global(.student-manage) :global(.stu-head .sub){ font-size: 10.5px; color: var(--ink-3); letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studentManage:global(.student-manage) :global(.stu-head .zone-ops){ margin-left: auto; flex: none; }
+.studentManage:global(.student-manage) :global(.hist-search){ flex: none; display: flex; align-items: center; gap: 8px; margin: 9px 16px 0; min-height: 32px; border: 1px solid var(--hair-2); border-radius: 5px; background: var(--white); padding: 5px 9px; transition: border-color .2s; }
+.studentManage:global(.student-manage) :global(.hist-search:focus-within){ border-color: var(--coffee); }
+.studentManage:global(.student-manage) :global(.hist-search svg){ flex: none; width: 13px; height: 13px; color: var(--ink-3); }
+.studentManage:global(.student-manage) :global(.hist-search input){ flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 12px; letter-spacing: .3px; }
+.studentManage:global(.student-manage) :global(.hist-search button){ flex: none; border: 1px solid var(--hair-2); border-radius: 4px; background: var(--white); color: var(--coffee); font-size: 10px; padding: 1px 7px; cursor: pointer; }
+.studentManage:global(.student-manage) :global(.hist-search button:hover){ border-color: var(--orange); color: var(--orange); }
+.studentManage:global(.student-manage) :global(.rec-list){ flex: 1 1 0; min-height: 0; height: 0; padding: 6px 14px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; }
+.studentManage:global(.student-manage) :global(.rec-list::-webkit-scrollbar){ width: 0; height: 0; }
+.studentManage:global(.student-manage) :global(.hw-item){ display: flex; gap: 12px; padding: 7px 0 9px; border-bottom: 1px solid rgba(221,208,180,.55); position: relative; background: transparent; color: inherit; }
+.studentManage:global(.student-manage) :global(.rec-list > .hw-item:last-child){ border-bottom: none; }
+.studentManage:global(.student-manage) :global(.hw-action){ flex: none; width: 52px; min-height: 22px; display: flex; justify-content: flex-end; }
+.studentManage:global(.student-manage) :global(.hw-del){ flex: none; align-self: flex-start; margin-top: 3px; font-size: 10px; letter-spacing: 1px; color: #b4452e; border: 1px solid rgba(180,69,46,.4); border-radius: 3px; padding: 1px 8px; background: var(--white); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .2s, visibility .2s; }
+.studentManage:global(.student-manage) :global(.hw-item:hover .hw-del){ opacity: 1; visibility: visible; pointer-events: auto; }
+.studentManage:global(.student-manage) :global(.hw-del:hover){ background: rgba(180,69,46,.08); border-color: #b4452e; }
+.studentManage:global(.student-manage) :global(.hw-del.latest){ opacity: 0; visibility: hidden; pointer-events: none; }
+.studentManage:global(.student-manage) :global(.hw-item:hover .hw-del.latest){ opacity: .55; visibility: visible; pointer-events: auto; cursor: not-allowed; }
+.studentManage:global(.student-manage) :global(.hw-item.deleted .hw-tm), .studentManage:global(.student-manage) :global(.hw-item.deleted .hw-main){ filter: grayscale(1); opacity: .45; }
+.studentManage:global(.student-manage) :global(.hw-delnote){ margin-top: 6px; font-size: 10px; letter-spacing: .4px; color: #8a7a60; border-top: 1px dashed var(--hair); padding-top: 5px; }
+.studentManage:global(.student-manage) :global(.hw-delnote b){ color: #8a5a3e; font-weight: 600; }
+.studentManage:global(.student-manage) :global(.hw-tm){ flex: none; width: 52px; padding-top: 2px; text-align: center; }
+.studentManage:global(.student-manage) :global(.hw-tm .tm){ font-size: 13px; font-weight: 700; color: var(--coffee); letter-spacing: .5px; }
+.studentManage:global(.student-manage) :global(.hw-tm .lb){ font-size: 9px; color: var(--ink-3); letter-spacing: 1px; margin-top: 1px; }
+.studentManage:global(.student-manage) :global(.hw-main){ flex: 1; min-width: 0; }
+.studentManage:global(.student-manage) :global(.hw-from){ font-size: 11px; color: var(--ink-3); letter-spacing: .4px; margin-bottom: 5px; }
+.studentManage:global(.student-manage) :global(.hw-from b){ color: var(--ink-2); font-weight: 600; }
+.studentManage:global(.student-manage) :global(.hw-msg){ font-size: 11px; line-height: 1.7; color: var(--ink-2); letter-spacing: .3px; background: rgba(93,67,38,.05); border: 1px dashed rgba(93,67,38,.28); border-radius: 4px; padding: 4px 9px; margin-bottom: 6px; }
+.studentManage:global(.student-manage) :global(.hw-items){ display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.studentManage:global(.student-manage) :global(.hw-items .it){ display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); letter-spacing: .3px; }
+.studentManage:global(.student-manage) :global(.hw-items .it::before){ content: ""; width: 4px; height: 4px; border-radius: 50%; background: #a06a35; flex: none; }
+.studentManage:global(.student-manage) :global(.push-body){ flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 14px 14px; gap: 10px; }
+.studentManage:global(.student-manage) :global(.push-notice){ flex: none; display: none; align-items: center; gap: 9px; border: 1.5px dashed rgba(180,69,46,.5); border-radius: 5px; background: rgba(180,69,46,.05); padding: 8px 12px; font-size: 11.5px; color: #b4452e; letter-spacing: .4px; line-height: 1.7; }
+.studentManage:global(.student-manage) :global(.push-notice.show){ display: flex; }
+.studentManage:global(.student-manage) :global(.hw-picker){ position: relative; flex: none; }
+.studentManage:global(.student-manage) :global(.hw-picker .stu-search){ min-width: 0; }
+.studentManage:global(.student-manage) :global(.hw-picker .stu-search input){ min-width: 0; }
+.studentManage:global(.student-manage) :global(.hw-scope){ flex: none; appearance: none; -webkit-appearance: none; font-size: 10.5px; letter-spacing: 1px; font-weight: 600; color: var(--coffee); border: 1px solid var(--hair-2); border-radius: 4px; padding: 3px 20px 3px 8px; background: var(--white); cursor: pointer; outline: none; transition: border-color .25s; }
+.studentManage:global(.student-manage) :global(.hw-scope:hover), .studentManage:global(.student-manage) :global(.hw-scope:focus){ border-color: var(--orange); }
+.studentManage:global(.student-manage) :global(.hw-drop){ position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40; background: var(--white); border: 1px solid var(--hair-2); border-radius: 6px; box-shadow: 0 10px 26px rgba(60,42,20,.16); max-height: 240px; overflow-y: auto; display: none; }
+.studentManage:global(.student-manage) :global(.hw-drop.open){ display: block; }
+.studentManage:global(.student-manage) :global(.hw-drop .hw-item){ display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 13px; text-align: left; font-size: 12.5px; color: var(--ink); border: 0; border-bottom: 1px dashed var(--hair); transition: background .2s; }
+.studentManage:global(.student-manage) :global(.hw-drop .hw-item:hover:not(.off)){ background: rgba(255,127,0,.08); }
+.studentManage:global(.student-manage) :global(.hw-drop .hw-item.off){ opacity: .38; cursor: not-allowed; }
+.studentManage:global(.student-manage) :global(.hw-item .ptag){ flex: none; font-size: 9.5px; letter-spacing: 1px; font-weight: 600; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+.studentManage:global(.student-manage) :global(.ptag.t-col){ color: #6b4d2e; background: rgba(93,67,38,.1); }
+.studentManage:global(.student-manage) :global(.ptag.t-les){ color: #4f7d3a; background: rgba(79,125,58,.12); }
+.studentManage:global(.student-manage) :global(.ptag.t-par){ color: #96702a; background: rgba(185,142,62,.16); }
+.studentManage:global(.student-manage) :global(.hw-item .hnm){ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studentManage:global(.student-manage) :global(.hw-item .hmeta){ flex: none; font-size: 10px; color: var(--ink-3); letter-spacing: .3px; }
+.studentManage:global(.student-manage) :global(.hw-hint){ flex: none; font-size: 10.5px; color: var(--ink-3); letter-spacing: .4px; }
+.studentManage:global(.student-manage) :global(.picked-box){ flex: none; display: none; flex-direction: column; gap: 5px; }
+.studentManage:global(.student-manage) :global(.picked-box.show){ display: flex; }
+.studentManage:global(.student-manage) :global(.picked-lbl){ font-size: 10px; letter-spacing: 2px; color: var(--ink-3); }
+.studentManage:global(.student-manage) :global(.picked-lbl b){ color: #4a6b3f; font-weight: 700; }
+.studentManage:global(.student-manage) :global(.picked-list){ display: flex; flex-direction: column; gap: 6px; flex: none; height: 164px; overflow-y: auto; margin: 0; flex-wrap: nowrap; scrollbar-width: thin; scrollbar-color: var(--hair-2) transparent; }
+.studentManage:global(.student-manage) :global(.picked-list::-webkit-scrollbar){ width: 4px; }
+.studentManage:global(.student-manage) :global(.picked-list::-webkit-scrollbar-thumb){ background: var(--hair-2); }
+.studentManage:global(.student-manage) :global(.picked-list::-webkit-scrollbar-track){ background: transparent; }
+.studentManage:global(.student-manage) :global(.picked-empty){ font-size: 10.5px; color: var(--ink-3); letter-spacing: .4px; border: 1px dashed var(--hair-2); border-radius: 4px; padding: 8px 10px; text-align: center; }
+.studentManage:global(.student-manage) :global(.picked-item){ flex: none; height: 28px; display: flex; align-items: center; gap: 8px; background: rgba(111,143,99,.10); border: 1px solid rgba(111,143,99,.42); border-radius: 4px; padding: 4px 6px 4px 10px; }
+.studentManage:global(.student-manage) :global(.picked-item .pn){ flex: 1; min-width: 0; font-size: 11.5px; color: var(--ink-2); letter-spacing: .3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studentManage:global(.student-manage) :global(.picked-item .pk-kind){ flex: none; font-size: 9px; letter-spacing: 1px; color: #5c7a4e; border: 1px solid rgba(111,143,99,.5); border-radius: 3px; padding: 0 5px; }
+.studentManage:global(.student-manage) :global(.picked-item .pk-del){ position: relative; flex: none; width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1px solid rgba(111,143,99,.5); color: #5c7a4e; font-size: 0; line-height: 0; display: inline-flex; align-items: center; justify-content: center; transition: all .2s; background: transparent; }
+.studentManage:global(.student-manage) :global(.picked-item .pk-del::before), .studentManage:global(.student-manage) :global(.picked-item .pk-del::after){ content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 1.5px; border-radius: 2px; background: currentColor; transform: translate(-50%, -50%) rotate(45deg); }
+.studentManage:global(.student-manage) :global(.picked-item .pk-del::after){ transform: translate(-50%, -50%) rotate(-45deg); }
+.studentManage:global(.student-manage) :global(.picked-item .pk-del:hover){ background: #b4452e; border-color: #b4452e; color: var(--white); }
+.studentManage:global(.student-manage) :global(.msg-box){ flex: 1 1 0; min-height: 48px; width: 100%; resize: none; height: auto; background: var(--white); border: 1px solid var(--hair-2); border-radius: 5px; padding: 8px 11px; font-size: 12px; color: var(--ink); letter-spacing: .3px; line-height: 1.6; transition: border-color .25s; outline: none; }
+.studentManage:global(.student-manage) :global(.msg-box:focus){ border-color: var(--coffee); }
+.studentManage:global(.student-manage) :global(.msg-box::placeholder){ color: #b3a58c; }
+.studentManage:global(.student-manage) :global(.push-foot){ flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; min-width: 0; }
+.studentManage:global(.student-manage) :global(.push-foot .tip){ flex: 1 1 auto; min-width: 0; white-space: normal; }
+.studentManage:global(.student-manage) :global(.btn-main){ flex: 0 0 auto; min-width: 118px; white-space: nowrap; background: var(--coffee); color: #f7f1e6; border: 1px solid #47331d; border-radius: 4px; font-size: 12px; font-weight: 600; letter-spacing: 3px; text-indent: 3px; padding: 7px 24px; transition: filter .25s var(--ease), transform .15s var(--ease); }
+.studentManage:global(.student-manage) :global(.btn-main:hover){ filter: brightness(1.15); }
+.studentManage:global(.student-manage) :global(.btn-main:disabled){ filter: grayscale(.5); cursor: not-allowed; transform: none; }
+.studentManage:global(.student-manage) :global(.push-foot .tip){ font-size: 10px; color: var(--ink-3); letter-spacing: .5px; }
+.studentManage:global(.student-manage) :global(.noclass-mask){ position: fixed; left: 0; right: 0; bottom: 0; top: 56px; z-index: 60; display: none; place-items: center; background: rgba(242,234,217,.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.studentManage:global(.student-manage) :global(.noclass-mask.show){ display: grid; }
+.studentManage:global(.student-manage) :global(.disabled-note){ width: min(430px,90%); text-align: center; background: var(--white); border: 1.5px solid var(--coffee); border-radius: 8px; box-shadow: 5px 7px 0 rgba(93,67,38,.22), 0 18px 38px rgba(64,45,20,.18); padding: 38px 40px 34px; }
+.studentManage:global(.student-manage) :global(.disabled-note h3){ font-size: 15px; font-weight: 700; letter-spacing: 2px; color: var(--coffee); margin-bottom: 8px; }
+.studentManage:global(.student-manage) :global(.disabled-note p){ font-size: 12px; color: var(--ink-2); letter-spacing: .5px; line-height: 1.9; }
+
+@media (max-width: 1280px) {
+.studentManage:global(.student-manage){ height: auto; min-height: calc(100dvh - 56px); padding: 14px 20px 40px; overflow: visible; }
+.studentManage:global(.student-manage) :global(.cols){ flex: none; flex-direction: column; }
+.studentManage:global(.student-manage) :global(.side){ width: 100%; height: 380px; }
+.studentManage:global(.student-manage) :global(.stu-list){ max-height: none; }
+.studentManage:global(.student-manage) :global(.main), .studentManage:global(.student-manage) :global(.aside){ min-height: 380px; height: 620px; }
+.studentManage:global(.student-manage) :global(.rec-list){ min-height: 0; }
+}
+
+@media (max-width: 640px) {
+.studentManage:global(.student-manage){ padding: 12px 14px 32px; }
+}
+
+.studentManage:global(.student-manage) :global(.mk){
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #7b5ea7;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.studentManage:global(.student-manage) :global(.mk i){ width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.2px currentColor; opacity: 0; transition: opacity .2s; }
+.studentManage:global(.student-manage) :global(.stu-item:hover .mk i), .studentManage:global(.student-manage) :global(.mk.on i){ opacity: 1; }
+.studentManage:global(.student-manage) :global(.mk.on i){ background: currentColor; box-shadow: none; }
+.studentManage:global(.student-manage) :global(.mk-tag), .studentManage:global(.student-manage) :global(.mk-clear){
+  flex: none;
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  color: #7b5ea7;
+  border: 1px dashed rgba(123,94,167,.5);
+  border-radius: 3px;
+  padding: 2px 8px;
+  background: var(--white);
+  cursor: pointer;
+  transition: all .25s;
+}
+.studentManage:global(.student-manage) :global(.mk-clear){
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  overflow: visible;
+}
+.studentManage:global(.student-manage) :global(.mk-clear-text){ font-size: 9px; line-height: 1; }
+.studentManage:global(.student-manage) :global(.mk-clear-dot){ position: absolute; right: -6px; top: -7px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; box-sizing: border-box; display: grid; place-items: center; background: #7b5ea7; color: var(--white); border: 1px solid var(--white); font-size: 8px; line-height: 1; letter-spacing: 0; }
+.studentManage:global(.student-manage) :global(.mk-tag:hover), .studentManage:global(.student-manage) :global(.mk-clear:hover){ background: rgba(123,94,167,.07); border-style: solid; border-color: #7b5ea7; }
+.studentManage:global(.student-manage) :global(.mk-tag::before){ content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; box-shadow: inset 0 0 0 1.2px currentColor; }
+.studentManage:global(.student-manage) :global(.mk-tag.on){ color: var(--white); background: #7b5ea7; border-color: #7b5ea7; }
+.studentManage:global(.student-manage) :global(.mk-tag.on::before){ background: var(--white); box-shadow: none; }
+.studentManage:global(.student-manage) :global(.msg-pair){ display: flex; flex-direction: column; gap: 8px; flex: 1 1 0; min-height: 0; }
+.studentManage:global(.student-manage) :global(.msg-pair .msg-box){ flex: 1 1 0; min-height: 48px; height: auto; resize: none; }
+.studentManage:global(.student-manage) :global(.hw-msg-pair){ display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
+.studentManage:global(.student-manage) :global(.hw-msg-line){ display: flex; align-items: flex-start; gap: 5px; min-width: 0; font-size: 11px; line-height: 1.7; color: var(--ink-2); letter-spacing: .3px; background: rgba(185,142,62,.045); border: 1px dashed rgba(185,142,62,.32); border-radius: 4px; padding: 4px 9px; }
+.studentManage:global(.student-manage) :global(.hw-msg-label){ flex: none; width: 70px; color: var(--coffee); font-weight: 700; white-space: nowrap; }
+.studentManage:global(.student-manage) :global(.hw-msg-text){ display: block; min-width: 0; min-height: 0; flex: 1; max-height: calc(1.7em * 5); overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; overflow-wrap: anywhere; white-space: pre-wrap; word-break: break-word; }
+.studentManage:global(.student-manage) :global(.hw-msg-text::-webkit-scrollbar){ width: 0; height: 0; }
+.studentManage:global(.student-manage) :global(.hw-msg-text::-webkit-scrollbar-thumb){ background: transparent; }
+.studentManage:global(.student-manage) :global(.hw-msg-text::-webkit-scrollbar-track){ background: transparent; }
+.studentManage:global(.student-manage) :global(.hw-del.latest){ opacity: .45; cursor: not-allowed; }
+.studentManage:global(.student-manage) :global(.hw-del:disabled){ pointer-events: auto; }
+.studentManage:global(.student-manage) :global(.hw-picker.disabled){ opacity: .55; }
+.studentManage:global(.student-manage) :global(.push-body textarea:disabled), .studentManage:global(.student-manage) :global(.push-body input:disabled), .studentManage:global(.student-manage) :global(.push-body select:disabled){ cursor: not-allowed; background: rgba(93,67,38,.05); }
+.studentManage:global(.student-manage) :global(.btn-shortcut){ flex: 0 0 auto; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--hair-2); border-radius: 4px; background: var(--white); color: var(--coffee); font-size: 10.5px; letter-spacing: 1px; cursor: pointer; }
+.studentManage:global(.student-manage) :global(.btn-shortcut:hover:not(:disabled)){ border-color: var(--orange); color: var(--orange); }
+.studentManage:global(.student-manage) :global(.btn-shortcut:disabled){ opacity: .45; cursor: not-allowed; }
+.studentManage:global(.student-manage) :global(.manage-modal-mask){ position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: rgba(60,42,20,.38); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.studentManage:global(.student-manage) :global(.manage-modal){ width: min(420px, calc(100% - 32px)); max-height: 86vh; overflow-y: auto; padding: 20px 22px; border: 1.5px solid var(--coffee); border-radius: 8px; background: var(--white); box-shadow: 0 12px 32px rgba(60,42,20,.18); }
+.studentManage:global(.student-manage) :global(.manage-modal h3){ margin: 0 0 14px; padding-bottom: 9px; border-bottom: 1px dashed var(--hair-2); color: var(--coffee); font-size: 14px; letter-spacing: 2px; }
+.studentManage:global(.student-manage) :global(.manage-modal p){ margin: 0 0 14px; color: var(--ink); font-size: 12px; line-height: 1.9; }
+.studentManage:global(.student-manage) :global(.manage-modal label){ display: block; margin-bottom: 12px; color: var(--ink-2); font-size: 11px; font-weight: 600; letter-spacing: .8px; }
+.studentManage:global(.student-manage) :global(.manage-modal input), .studentManage:global(.student-manage) :global(.manage-modal select), .studentManage:global(.student-manage) :global(.manage-modal textarea){ display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--hair-2); border-radius: 4px; background: var(--white); color: var(--ink); font-size: 12px; }
+.studentManage:global(.student-manage) :global(.manage-modal textarea){ min-height: 86px; resize: vertical; line-height: 1.7; }
+.studentManage:global(.student-manage) :global(.manage-modal-ops){ display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.studentManage:global(.student-manage) :global(.manage-modal .mbtn.primary){ color: var(--white); background: var(--coffee); border-color: var(--coffee); }
+.studentManage:global(.student-manage) :global(.manage-modal .mbtn.mark){ color: var(--white); background: #7b5ea7; border-color: #7b5ea7; }
+

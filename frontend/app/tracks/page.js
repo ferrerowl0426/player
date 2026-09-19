@@ -4,9 +4,39 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import AppNav from '../../components/ui/AppNav.js';
 import ContentCard from '../../components/ui/ContentCard.js';
-import { fetchAdminMe, fetchTrackLibrary } from '../../lib/api.js';
+import { fetchCurrentViewer, fetchTrackLibrary, deleteTrack, deleteTrackCollection } from '../../lib/api.js';
 
-const PAGE_SIZE = 16;
+const COLLECTION_ROWS = 1;
+const TRACK_ROWS = 2;
+
+function getGridColumns() {
+  if (typeof window === 'undefined') {
+    return 8;
+  }
+  if (window.matchMedia('(max-width: 640px)').matches) {
+    return 2;
+  }
+  if (window.matchMedia('(max-width: 1024px)').matches) {
+    return 4;
+  }
+  return 8;
+}
+
+function useGridColumns() {
+  const [columns, setColumns] = useState(8);
+
+  useEffect(() => {
+    function syncColumns() {
+      setColumns(getGridColumns());
+    }
+
+    syncColumns();
+    window.addEventListener('resize', syncColumns);
+    return () => window.removeEventListener('resize', syncColumns);
+  }, []);
+
+  return columns;
+}
 
 function formatDate(value) {
   return value ? new Date(value).toLocaleDateString('zh-CN') : '暂无更新';
@@ -33,21 +63,25 @@ function sortItems(items, order) {
   });
 }
 
-function paginate(items, page) {
-  return items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+function paginate(items, page, pageSize) {
+  return items.slice((page - 1) * pageSize, page * pageSize);
 }
 
-function Zone({ title, meta, order, onOrderChange, children, className = '' }) {
+function Zone({ title, meta, order, onOrderChange, actions = null, children, className = '' }) {
   return (
     <section className={`zone ${className}`.trim()}>
       <div className="zone-head">
         <h2>{title}</h2>
         <span className="meta num">{meta}</span>
-        <select className="order" aria-label={`${title}排序方式`} value={order} onChange={(event) => onOrderChange(event.target.value)}>
-          <option value="new">按更新时间倒序</option>
-          <option value="old">按更新时间正序</option>
-          <option value="az">按首字母</option>
-        </select>
+        <span className="order-wrap">
+          <select className="order" aria-label={`${title}排序方式`} value={order} onChange={(event) => onOrderChange(event.target.value)}>
+            <option value="new">按更新时间倒序</option>
+            <option value="old">按更新时间正序</option>
+            <option value="az">按首字母</option>
+          </select>
+          <svg className="order-chevron" viewBox="0 0 12 18" aria-hidden="true" focusable="false"><path d="m3 7 3-3 3 3M3 11l3 3 3-3" /></svg>
+        </span>
+        {actions ? <div className="zone-ops">{actions}</div> : null}
       </div>
       {children}
     </section>
@@ -71,24 +105,36 @@ function Pager({ page, total, onChange }) {
   );
 }
 
-function CardGrid({ items, type, emptyText }) {
+function CardGrid({ items, type, emptyText, isSuperAdmin, onDelete }) {
   if (items.length === 0) {
     return <div className="grid"><p className="zone-empty show">{emptyText}</p></div>;
   }
 
   return (
     <div className="grid">
-      {items.map((item) => (
-        <ContentCard
-          key={`${type}-${item.id}`}
-          href={type === 'track' ? `/tracks/${item.id}` : `/tracks/collections/${item.id}`}
-          title={item.name}
-          cover={item.cover}
-          collection={type === 'collection'}
-          countLabel={type === 'collection' ? `收录 ${item.track_count || 0} 首` : `${item.part_count || 0} 个 P`}
-          meta={formatDate(item.updated_at)}
-        />
-      ))}
+      {items.map((item) => {
+        const href = type === 'track' ? `/tracks/${item.id}` : `/tracks/collections/${item.id}`;
+        const editHref = type === 'track' ? `/admin/tracks?id=${item.id}` : `/admin/tracks/collections?id=${item.id}`;
+
+        return (
+          <ContentCard
+            key={`${type}-${item.id}`}
+            href={href}
+            title={item.name}
+            cover={item.cover}
+            collection={type === 'collection'}
+            countLabel={type === 'collection' ? `收录 ${item.track_count || 0} 首` : `${item.part_count || 0} 个 P`}
+            meta={formatDate(item.updated_at)}
+            actions={isSuperAdmin ? (
+              <>
+                <Link href={href}>查看详情</Link>
+                <Link href={editHref}>编辑</Link>
+                <button type="button" className="op-del" onClick={(event) => onDelete(event, type, item)}>删除</button>
+              </>
+            ) : null}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -102,6 +148,7 @@ export default function TracksPage() {
   const [trackPage, setTrackPage] = useState(1);
   const [collectionPage, setCollectionPage] = useState(1);
   const [admin, setAdmin] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [status, setStatus] = useState('正在加载曲目库...');
 
   async function loadLibrary(nextKeyword = keyword) {
@@ -122,7 +169,7 @@ export default function TracksPage() {
 
   useEffect(() => {
     loadLibrary('');
-    fetchAdminMe().then((result) => setAdmin(result.data)).catch(() => setAdmin(null));
+    fetchCurrentViewer().then((result) => setAdmin(result.data)).catch(() => setAdmin(null));
   }, []);
 
   function handleSubmit(event) {
@@ -145,27 +192,60 @@ export default function TracksPage() {
     setCollectionPage(1);
   }
 
+  function handleDelete(event, type, item) {
+    event.preventDefault();
+    event.stopPropagation();
+    setDeleteTarget({ type, item });
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) {
+      return;
+    }
+
+    try {
+      if (deleteTarget.type === 'collection') {
+        await deleteTrackCollection(deleteTarget.item.id);
+      } else {
+        await deleteTrack(deleteTarget.item.id);
+      }
+      setDeleteTarget(null);
+      await loadLibrary(keyword);
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  const gridColumns = useGridColumns();
+  const collectionPageSize = gridColumns * COLLECTION_ROWS;
+  const trackPageSize = gridColumns * TRACK_ROWS;
   const sortedTracks = useMemo(() => sortItems(tracks, trackOrder), [tracks, trackOrder]);
   const sortedCollections = useMemo(() => sortItems(collections, collectionOrder), [collections, collectionOrder]);
-  const trackTotal = Math.max(1, Math.ceil(sortedTracks.length / PAGE_SIZE));
-  const collectionTotal = Math.max(1, Math.ceil(sortedCollections.length / PAGE_SIZE));
+  const trackTotal = Math.max(1, Math.ceil(sortedTracks.length / trackPageSize));
+  const collectionTotal = Math.max(1, Math.ceil(sortedCollections.length / collectionPageSize));
   const isFiltering = keyword.trim().length > 0;
   const allEmpty = !status && tracks.length === 0 && collections.length === 0;
   const isSuperAdmin = admin?.role === 'super_admin';
-  const navRole = isSuperAdmin ? 'super_admin' : 'guest';
+  const navRole = admin?.role || 'guest';
+  const accountName = admin?.nickname || admin?.username || '访客';
+
+  useEffect(() => {
+    setCollectionPage((page) => Math.min(page, collectionTotal));
+    setTrackPage((page) => Math.min(page, trackTotal));
+  }, [collectionTotal, trackTotal]);
+
+  useEffect(() => {
+    document.body.classList.toggle('dean', isSuperAdmin);
+    document.body.classList.add('library-index-page');
+    return () => {
+      document.body.classList.remove('dean');
+      document.body.classList.remove('library-index-page');
+    };
+  }, [isSuperAdmin]);
 
   return (
     <>
-      <AppNav
-        role={navRole}
-        accountName={isSuperAdmin ? (admin.nickname || admin.username) : '访客'}
-        actions={isSuperAdmin ? (
-          <div className="nav-actions">
-            <Link className="fbtn" href="/admin/tracks">新建单曲目</Link>
-            <Link className="fbtn solid" href="/admin/tracks/collections">新建曲谱集</Link>
-          </div>
-        ) : null}
-      />
+      <AppNav role={navRole} accountName={accountName} />
       <main className="home">
         <form className="toolrow rise" onSubmit={handleSubmit}>
           <div className={`searchbar${isFiltering ? ' filtering' : ''}`}>
@@ -179,7 +259,6 @@ export default function TracksPage() {
             />
             <button type="button" className="clr" onClick={clearSearch}>清除</button>
           </div>
-          <span className="hint">同时搜索曲目与曲谱集 · 结果按更新时间倒序</span>
         </form>
 
         {status ? <p className="track-status">{status}</p> : null}
@@ -190,15 +269,52 @@ export default function TracksPage() {
           </div>
         ) : null}
 
-        <Zone title="曲目" meta={`共 ${tracks.length} 首`} order={trackOrder} onOrderChange={changeTrackOrder} className="tracks rise d1">
-          <CardGrid items={paginate(sortedTracks, trackPage)} type="track" emptyText={isFiltering ? `曲目中未找到与「${keyword}」相关的内容` : '暂无曲目'} />
+        <Zone
+          title="曲谱集"
+          meta={`共 ${collections.length} 套`}
+          order={collectionOrder}
+          onOrderChange={changeCollectionOrder}
+          className="sets rise d1"
+          actions={isSuperAdmin ? <Link className="zbtn ghost" href="/admin/tracks/collections">＋ 新建合集</Link> : null}
+        >
+          <CardGrid
+            items={paginate(sortedCollections, collectionPage, collectionPageSize)}
+            type="collection"
+            emptyText={isFiltering ? `曲谱集中未找到与「${keyword}」相关的内容` : '暂无曲谱集'}
+            isSuperAdmin={isSuperAdmin}
+            onDelete={handleDelete}
+          />
+          <Pager page={collectionPage} total={collectionTotal} onChange={setCollectionPage} />
+        </Zone>
+
+        <Zone
+          title="曲目"
+          meta={`共 ${tracks.length} 首`}
+          order={trackOrder}
+          onOrderChange={changeTrackOrder}
+          className="tracks rise d2"
+          actions={isSuperAdmin ? <Link className="zbtn ghost" href="/admin/tracks">＋ 新建单课</Link> : null}
+        >
+          <CardGrid
+            items={paginate(sortedTracks, trackPage, trackPageSize)}
+            type="track"
+            emptyText={isFiltering ? `曲目中未找到与「${keyword}」相关的内容` : '暂无曲目'}
+            isSuperAdmin={isSuperAdmin}
+            onDelete={handleDelete}
+          />
           <Pager page={trackPage} total={trackTotal} onChange={setTrackPage} />
         </Zone>
 
-        <Zone title="曲谱集" meta={`共 ${collections.length} 套`} order={collectionOrder} onOrderChange={changeCollectionOrder} className="sets rise d2">
-          <CardGrid items={paginate(sortedCollections, collectionPage)} type="collection" emptyText={isFiltering ? `曲谱集中未找到与「${keyword}」相关的内容` : '暂无曲谱集'} />
-          <Pager page={collectionPage} total={collectionTotal} onChange={setCollectionPage} />
-        </Zone>
+        <div className={`modal-mask${deleteTarget ? ' show' : ''}`} role="dialog" aria-modal="true" aria-label="删除确认">
+          <div className="modal">
+            <div className="modal-title">删除确认</div>
+            <p>确定要删除「<b>{deleteTarget?.item.name}</b>」吗？<br />删除后该内容将不可恢复。</p>
+            <div className="modal-ops">
+              <button type="button" className="mbtn" onClick={() => setDeleteTarget(null)}>取消</button>
+              <button type="button" className="mbtn danger" onClick={confirmDelete}>确认删除</button>
+            </div>
+          </div>
+        </div>
       </main>
     </>
   );

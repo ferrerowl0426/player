@@ -22,6 +22,7 @@
   --orange: #ff7f00;
   --amber:  #b98e3e;
   --green:  #4f7d3a;
+  --mark:   #7b5ea7;   /* 标记紫 · 仅供「学生标记」使用，与危险红 #b4452e（停用/删除）区分 */
   --wood:   #3a2a18;
   --glass:      rgba(255, 255, 255, .85);
   --glass-line: rgba(93, 67, 38, .32);
@@ -218,6 +219,22 @@ body:not([data-view="dean"]) .dean-only{display:none!important}
   flex:none;font-size:9px;letter-spacing:1px;color:#b4452e;
   border:1px solid rgba(180,69,46,.45);border-radius:3px;padding:1px 6px;
 }
+/* ---- 学生标记（教导主任专属） ----
+   未标记 = 咖啡色空心点，hover 该行才浮现；已标记 = 紫色实心点，常驻显示。点击即切换。 */
+.mk{
+  flex:none;width:22px;height:22px;display:grid;place-items:center;
+  border-radius:50%;opacity:0;transition:opacity .2s, background .2s;
+}
+.stu-item:hover .mk,.mk.on,.mk:focus-visible{opacity:1}
+.mk:focus-visible{outline:1.5px solid var(--ink);outline-offset:0}
+.mk i{
+  width:9px;height:9px;border-radius:50%;
+  box-shadow:inset 0 0 0 1.2px rgba(93,67,38,.38);
+  transition:background .2s var(--ease), box-shadow .2s var(--ease);
+}
+.mk:hover{background:rgba(123,94,167,.10)}
+.mk:hover i{box-shadow:inset 0 0 0 1.2px var(--mark)}
+.mk.on i{background:var(--mark);box-shadow:inset 0 0 0 1.2px var(--mark), 0 0 0 3px rgba(123,94,167,.16)}
 .stu-empty{padding:26px 10px;text-align:center;font-size:11px;color:var(--ink-3);letter-spacing:.5px}
 
 /* ---- 中列：历史作业（学生作业时间轴） ---- */
@@ -235,13 +252,38 @@ body:not([data-view="dean"]) .dean-only{display:none!important}
   border:1px solid rgba(180,69,46,.45);border-radius:3px;padding:1px 8px;
   background:rgba(180,69,46,.05);
 }
+/* 学生头部 · 标记按钮（教导主任专属 · 一键标记 / 一键取消） */
+.mk-tag{
+  flex:none;display:inline-flex;align-items:center;gap:5px;
+  font-size:9.5px;letter-spacing:1.5px;color:var(--mark);
+  border:1px solid rgba(123,94,167,.45);border-radius:3px;padding:2px 8px;
+  background:var(--white);transition:all .25s;
+}
+.mk-tag::before{content:"";width:5px;height:5px;border-radius:50%;box-shadow:inset 0 0 0 1.2px currentColor;flex:none}
+.mk-tag:hover{background:rgba(123,94,167,.07);border-color:var(--mark)}
+.mk-tag.on{color:var(--white);background:var(--mark);border-color:var(--mark)}
+.mk-tag.on::before{background:var(--white);box-shadow:none}
+.mk-tag.on:hover{background:#6b4f92;border-color:#6b4f92}
+/* 区头 · 一键清除全部标记（教导主任专属 · 有标记时才出现）
+   造型与「共 N 人」meta 同级：小徽标、并排紧跟其后，不另起一行 */
+.mk-clear{
+  flex:none;
+  font-size:9.5px;letter-spacing:1px;color:var(--mark);
+  border:1px dashed rgba(123,94,167,.5);border-radius:3px;padding:1px 7px;
+  background:var(--white);transition:all .25s;
+}
+.mk-clear b{font-weight:700}
+.mk-clear:hover{background:rgba(123,94,167,.07);border-style:solid;border-color:var(--mark)}
+/* 清除标记的确认按钮：紫底，不用危险红（不是删除操作） */
+.mbtn.mark{color:var(--white);background:var(--mark);border-color:var(--mark)}
+.mbtn.mark:hover{background:#6b4f92;border-color:#6b4f92}
 .rec-list{flex:1;min-height:0;padding:6px 14px}
 .hw-date{display:flex;align-items:center;gap:10px;margin:8px 0 4px;font-size:10px;letter-spacing:2px;color:var(--ink-3)}
 .hw-date::after{content:"";flex:1;border-top:1px dashed var(--hair-2)}
 .hw-date b{color:var(--coffee);font-weight:700}
 .hw-item{display:flex;gap:12px;padding:7px 0 9px;border-bottom:1px solid rgba(221,208,180,.55);position:relative}
 .hw-item:last-child{border-bottom:none}
-/* 删除按钮：悬停该条记录时出现（红色警示） */
+/* 删除按钮：悬停该条记录时出现（红色警示）；留言框不随记录 hover 改变 */
 .hw-del{
   flex:none;align-self:flex-start;margin-top:3px;
   font-size:10px;letter-spacing:1px;color:#b4452e;
@@ -250,6 +292,8 @@ body:not([data-view="dean"]) .dean-only{display:none!important}
 }
 .hw-item:hover .hw-del{opacity:1}
 .hw-del:hover{background:rgba(180,69,46,.08);border-color:#b4452e}
+.hw-del.latest{opacity:.55;cursor:not-allowed;color:var(--ink-3);border-color:var(--hair-2)}
+.hw-item:hover .hw-del.latest{opacity:.75}
 /* 已删除记录：整条变灰留痕 */
 .hw-item.deleted .hw-tm,.hw-item.deleted .hw-main{filter:grayscale(1);opacity:.45}
 .hw-delnote{
@@ -257,17 +301,27 @@ body:not([data-view="dean"]) .dean-only{display:none!important}
   border-top:1px dashed var(--hair);padding-top:5px;
 }
 .hw-delnote b{color:#8a5a3e;font-weight:600}
-.hw-tm{flex:none;width:42px;padding-top:2px;text-align:center}
+.hw-tm{flex:none;width:52px;padding-top:2px;text-align:center}
 .hw-tm .tm{font-size:13px;font-weight:700;color:var(--coffee);letter-spacing:.5px}
 .hw-tm .lb{font-size:9px;color:var(--ink-3);letter-spacing:1px;margin-top:1px}
 .hw-main{flex:1;min-width:0}
 .hw-from{font-size:11px;color:var(--ink-3);letter-spacing:.4px;margin-bottom:5px}
 .hw-from b{color:var(--ink-2);font-weight:600}
-.hw-msg{
+.hw-msg-pair{display:flex;flex-direction:column;gap:5px;margin-bottom:7px}
+.hw-msg-line{
+  display:flex;align-items:flex-start;gap:5px;min-width:0;
   font-size:11px;line-height:1.7;color:var(--ink-2);letter-spacing:.3px;
   background:rgba(93,67,38,.05);border:1px dashed rgba(93,67,38,.28);border-radius:4px;
-  padding:4px 9px;margin-bottom:6px;
+  padding:4px 9px;
 }
+.hw-msg-label{flex:none;width:70px;color:var(--coffee);font-weight:700;white-space:nowrap}
+.hw-msg-text{
+  min-width:0;flex:1;max-height:calc(1.7em * 5);overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
+  overflow-wrap:anywhere;white-space:pre-wrap;word-break:break-word;
+}
+.hw-msg-text::-webkit-scrollbar{width:3px}
+.hw-msg-text::-webkit-scrollbar-thumb{background:var(--hair-2)}
 .hw-items{display:flex;flex-wrap:wrap;gap:4px 16px}
 .hw-items .it{
   display:inline-flex;align-items:center;gap:6px;
@@ -315,7 +369,9 @@ body:not([data-view="dean"]) .dean-only{display:none!important}
   border-bottom:1px dashed var(--hair);transition:background .2s;
 }
 .hw-item:last-child{border-bottom:none}
-.hw-item:hover:not(.off){background:rgba(255,127,0,.08)}
+.hw-item:hover:not(.off){  background:rgba(255,127,0,.08)}
+/* 历史作业记录保持中性底色，避免 hover 触发橘红色整块框感 */
+.rec-list .hw-item:hover{background:transparent}
 .hw-item.off{opacity:.38;cursor:not-allowed}
 .hw-item .ptag{flex:none;font-size:9.5px;letter-spacing:1px;font-weight:600;padding:2px 7px;border-radius:3px;white-space:nowrap}
 .ptag.t-col{color:#6b4d2e;background:rgba(93,67,38,.1)}
@@ -324,8 +380,8 @@ body:not([data-view="dean"]) .dean-only{display:none!important}
 .hw-item .hnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hw-item .hmeta{flex:none;font-size:10px;color:var(--ink-3);letter-spacing:.3px}
 .hw-hint{flex:none;font-size:10.5px;color:var(--ink-3);letter-spacing:.4px}
+.msg-pair{flex:1;min-height:96px;display:flex;flex-direction:column;gap:8px}
 .msg-box{
-  /* 自适应撑满剩余高度，底部与整体底边对齐；min-height 收窄给已选区让位 */
   flex:1;min-height:48px;width:100%;resize:none;height:auto;
   background:var(--white);border:1px solid var(--hair-2);border-radius:5px;
   padding:8px 11px;font-size:12px;color:var(--ink);letter-spacing:.3px;line-height:1.6;
@@ -333,7 +389,15 @@ body:not([data-view="dean"]) .dean-only{display:none!important}
 }
 .msg-box:focus{border-color:var(--coffee)}
 .msg-box::placeholder{color:#b3a58c}
-.push-foot{flex:none;display:flex;align-items:center;gap:10px}
+.msg-box:disabled{background:rgba(93,67,38,.04);cursor:not-allowed}
+.push-foot{flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn-shortcut{
+  flex:none;color:var(--coffee);background:var(--white);border:1px solid var(--hair-2);
+  border-radius:4px;font-size:11px;letter-spacing:1.5px;font-weight:600;padding:7px 12px;
+  transition:all .25s var(--ease);
+}
+.btn-shortcut:hover{border-color:var(--orange);color:var(--orange);background:rgba(255,127,0,.04)}
+.btn-shortcut:disabled{opacity:.45;cursor:not-allowed}
 .btn-main{
   background:var(--coffee);
   color:#f7f1e6;
@@ -529,6 +593,7 @@ body[data-view="noclass"] .cols{opacity:.6;pointer-events:none}
       <div class="zone-head" data-page-node-id="wsYdm1WfRkq7rFMW7TW6YU">
         <h2 data-page-node-id="T3ZNClveQ3UyBQ5wbH7nSE">选择学生</h2>
         <span class="meta num" id="stuMeta" data-page-node-id="a7Fg5vOikYVtyPk4EXdy93">共 0 人</span>
+        <button type="button" class="mk-clear dean-only" id="mkClear" style="display:none" data-page-node-id="mkClearNxde1a">清除全部标记</button>
       </div>
       <div class="filters" data-page-node-id="Z6EYPd9UzbOqxfi9DAXe6M">
         <div data-page-node-id="GIrYCZyayZQ5ZWgqdI9Hu3">
@@ -572,6 +637,7 @@ body[data-view="noclass"] .cols{opacity:.6;pointer-events:none}
             <div class="sub num" id="headSub" data-page-node-id="RJ27V3cH8wATDS01UHP1pX">—</div>
           </div>
           <span class="tag-dis" id="headDis" style="display:none" data-page-node-id="6WsHuXZuxxLUKqF7NGCorP">已停用</span>
+          <button type="button" class="mk-tag dean-only" id="headMk" style="display:none" aria-pressed="false" data-page-node-id="headMkNxde1a">标记学生</button>
         </div>
         <div class="rec-list scroll" id="recList" data-page-node-id="EuEFdeFJApVBK7t8jBeibj">
           <div class="rec-empty" id="recEmpty" data-page-node-id="91GjCsx2UDOjJ6ivM0jIUw">在左侧选择一位学生，查看 TA 的历史作业</div>
@@ -600,15 +666,19 @@ body[data-view="noclass"] .cols{opacity:.6;pointer-events:none}
             </div>
             <div class="hw-drop" id="pushDrop" data-page-node-id="pushDropNxde0a"><!-- JS 渲染 --></div>
           </div>
-          <div class="hw-hint" data-page-node-id="hwHintNxde0a">输入关键词搜索后点击结果加入作业 · 最多 5 项</div>
+          <div class="hw-hint" data-page-node-id="hwHintNxde0a">三个栏目独立保存：视频作业、练习要求、提交要求互不覆盖 · 可用「上次作业」回填修改</div>
           <div class="picked-box show" id="pickedBox" data-page-node-id="pickedBoxNxde0a">
             <div class="picked-lbl" data-page-node-id="pickedLblNxde0a">已选作业 <b class="num" id="pickedCnt" data-page-node-id="pickedCntNxde0a">0/5</b> · 点击 × 可移除</div>
             <div id="pickedList" data-page-node-id="pickedListNxde0a"><!-- JS 渲染 --></div>
           </div>
-          <textarea class="msg-box" id="msgBox" placeholder="作业备注 / 给学生的留言（选填）…" aria-label="作业留言"></textarea>
+          <div class="msg-pair" aria-label="作业留言">
+            <textarea class="msg-box" id="practiceMsg" placeholder="练习要求（选填）…" aria-label="练习要求"></textarea>
+            <textarea class="msg-box" id="submitMsg" placeholder="视频提交要求（选填）…" aria-label="视频提交要求"></textarea>
+          </div>
           <div class="push-foot" data-page-node-id="vvuwNA4m276D50FlB7KKoN">
+            <button type="button" class="btn-shortcut" id="prevHwBtn" data-page-node-id="prevHwBtnNxde0a">上次作业</button>
             <button class="btn-main" id="pushBtn" data-page-node-id="x4IAp0q3YVu0SsI2D7L3Vh">推送作业</button>
-            <span class="tip" data-page-node-id="N5FBeIFGqY6pfNQolBpyNq">推送后将出现在学员首页「今日作业」</span>
+            <span class="tip" data-page-node-id="N5FBeIFGqY6pfNQolBpyNq">每次推送新增一条记录：留空栏目表示本次作业不含该项，不影响其他栏目</span>
           </div>
         </div>
       </div>
@@ -661,6 +731,17 @@ body[data-view="noclass"] .cols{opacity:.6;pointer-events:none}
   </div>
 </div>
 
+<div class="modal-mask" id="mkModal" role="dialog" aria-modal="true" aria-label="清除全部标记确认" data-page-node-id="mkModalNxde1a">
+  <div class="modal" data-page-node-id="mkModalBoxNxde1a">
+    <div class="modal-title" data-page-node-id="mkModalTitleNxde1a">清 除 标 记</div>
+    <p data-page-node-id="mkModalTipNxde1a">确定要清除全部学生的标记吗？<br data-page-node-id="mkModalTipBrNxde1a">当前共 <b class="num" id="mkModalCnt" data-page-node-id="mkModalCntNxde1a">0</b> 位学生被标记，清除不受班级与搜索筛选影响。</p>
+    <div class="modal-ops" data-page-node-id="mkModalOpsNxde1a">
+      <button type="button" class="mbtn" id="mkCancel" data-page-node-id="mkCancelNxde1a">取 消</button>
+      <button type="button" class="mbtn mark" id="mkOk" data-page-node-id="mkOkNxde1a">确认清除</button>
+    </div>
+  </div>
+</div>
+
 <div class="dean-toast" id="toast" data-page-node-id="MeQCykC79G3lHS6oD8quD4"></div>
 
 <script>
@@ -671,25 +752,25 @@ let TEACHER_CLASSES = BASE_TEACHER_CLASSES.slice();      /* 视角可切换：�
 const STUDENTS = [
   {nm:'陈一一', cls:'启蒙一班', dis:false,
    hw:[
-     {d:'9月9日', tm:'20:30', msg:'重点看 P2 的段落衔接，跟练时开节拍器 60。', items:['卡农独奏 · 全曲精讲','卡农 · P2 分段讲解']},
-     {d:'9月6日', tm:'19:12', msg:'', items:['指弹入门 30 首']},
+     {d:'9月9日', tm:'20:30', practice:'重点看 P2 的段落衔接，跟练时开节拍器 60。', submit:'请拍摄完整练习视频，保持画面稳定并上传。', items:['卡农独奏 · 全曲精讲','卡农 · P2 分段讲解']},
+     {d:'9月6日', tm:'19:12', practice:'先完成基础指法练习。', submit:'提交一段连续演奏视频即可。', items:['指弹入门 30 首']},
    ]},
-  {nm:'林小满', cls:'启蒙一班', dis:false,
+  {nm:'林小满', cls:'启蒙一班', dis:false, mk:true,
    hw:[
-     {d:'9月8日', tm:'19:00', msg:'P2 慢速跟练三遍再提速。', items:['天空之城 · 指弹改编']},
+     {d:'9月8日', tm:'19:00', practice:'P2 慢速跟练三遍再提速。', submit:'请提交慢速跟练视频，能看清左右手动作。', items:['天空之城 · 指弹改编']},
    ]},
   {nm:'王梓航', cls:'启蒙一班', dis:false,
    hw:[
-     {d:'9月7日', tm:'18:30', msg:'跟练时打开节拍器 60。', items:['卡农 · P3 跟练']},
+     {d:'9月7日', tm:'18:30', practice:'跟练时打开节拍器 60。', submit:'请提交完整 P3 视频。', items:['卡农 · P3 跟练']},
    ]},
-  {nm:'周予安', cls:'启蒙二班', dis:false, hw:[]},
+  {nm:'周予安', cls:'启蒙二班', dis:false, mk:true, hw:[]},
   {nm:'吴思远', cls:'启蒙二班', dis:true,
    hw:[
-     {d:'8月26日', tm:'20:05', msg:'', items:['天空之城 · 指弹改编']},
+     {d:'8月26日', tm:'20:05', practice:'完成本周指定练习。', submit:'提交练习视频。', items:['天空之城 · 指弹改编']},
    ]},
   {nm:'郑亦飞', cls:'进阶一班', dis:false,
    hw:[
-     {d:'9月9日', tm:'21:00', msg:'从千与千寻开始。', items:['宫崎骏动画曲集']},
+     {d:'9月9日', tm:'21:00', practice:'从千与千寻开始。', submit:'请录制并提交完整演奏视频。', items:['宫崎骏动画曲集']},
    ]},
   {nm:'刘北辰', cls:'考级班', dis:false, hw:[]},
   {nm:'赵知夏', cls:'考级班', dis:false, hw:[]},
@@ -814,6 +895,7 @@ function visibleStus(){
     .sort((a,b)=>(a.s.dis?1:0) - (b.s.dis?1:0));   /* 已停用统一排末尾 */
 }
 function renderStuList(){
+  normalizeMarks();   /* 停用学生一律回到未标记 */
   const vis = visibleStus();
   document.getElementById('stuMeta').textContent = '共 ' + vis.length + ' 人';
   const box = document.getElementById('stuList');
@@ -823,21 +905,94 @@ function renderStuList(){
         ? '暂无带班学生<br>请联系教导主任获取工作内容'
         : '该范围内未找到学生') +
       '</div>';
+    syncMkClear();
     return;
   }
   box.innerHTML = vis.map(({s,i})=>
     '<button type="button" class="stu-item' + (selected===i?' on':'') + (s.dis?' dis':'') + '" data-i="' + i + '">' +
       '<span class="ava">' + s.nm[0] + '</span>' +
       '<span class="info"><span class="nm">' + s.nm + '</span><br><span class="cls">' + s.cls + '</span></span>' +
+      (isDean() && !s.dis
+        ? '<span class="mk' + (s.mk ? ' on' : '') + '" role="button" tabindex="0" data-mk="' + i + '"' +
+          ' aria-pressed="' + (s.mk ? 'true' : 'false') + '"' +
+          ' title="' + (s.mk ? '取消标记' : '标记学生') + '"' +
+          ' aria-label="' + (s.mk ? '取消标记 ' : '标记 ') + s.nm + '"><i></i></span>'
+        : '') +
       (s.dis ? '<span class="st">停用</span>' : '') +
     '</button>'
   ).join('');
+  syncMkClear();
 }
 stuKw.addEventListener('input', renderStuList);
 stuKw.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ stuKw.value=''; renderStuList(); } });
 document.getElementById('stuList').addEventListener('click', e=>{
+  const mk = e.target.closest('.mk');
+  if(mk){ e.stopPropagation(); toggleMark(parseInt(mk.dataset.mk, 10)); return; }
   const it = e.target.closest('.stu-item'); if(!it) return;
   selectStu(parseInt(it.dataset.i, 10));
+});
+/* 标记圆点可键盘操作（Enter / Space），避免与整行「选中学生」冲突 */
+document.getElementById('stuList').addEventListener('keydown', e=>{
+  const mk = e.target.closest('.mk'); if(!mk) return;
+  if(e.key === 'Enter' || e.key === ' '){
+    e.preventDefault(); e.stopPropagation();
+    const i = parseInt(mk.dataset.mk, 10);
+    toggleMark(i);
+    const again = document.querySelector('.mk[data-mk="' + i + '"]');
+    if(again) again.focus();   /* 列表重绘后找回焦点 */
+  }
+});
+
+/* ================= 学生标记（教导主任专属 · 一键标记 / 一键取消） ================= */
+function toggleMark(i){
+  if(!isDean()) return;
+  const s = STUDENTS[i];
+  if(s.dis) return;          /* 停用学生不可标记 */
+  s.mk = !s.mk;
+  renderStuList();
+  if(selected === i) syncHeadMark();
+  toast(s.mk ? '已标记「' + s.nm + '」' : '已取消标记「' + s.nm + '」');
+}
+function syncHeadMark(){
+  const hm = document.getElementById('headMk');
+  if(selected === null || !isDean()){ hm.style.display = 'none'; return; }
+  const s = STUDENTS[selected];
+  hm.style.display = s.dis ? 'none' : 'inline-flex';   /* 停用学生不给标记入口 */
+  hm.classList.toggle('on', !!s.mk);
+  hm.textContent = s.mk ? '取消标记' : '标记学生';
+  hm.setAttribute('aria-pressed', s.mk ? 'true' : 'false');
+}
+document.getElementById('headMk').addEventListener('click', ()=>{ if(selected !== null) toggleMark(selected); });
+
+/* ================= 一键清除全部标记（教导主任专属 · 区头入口） ================= */
+const mkModal = document.getElementById('mkModal');
+const mkClearBtn = document.getElementById('mkClear');
+/* 停用学生不参与标记：一旦停用即清除标记，回到未标记状态 */
+function normalizeMarks(){ STUDENTS.forEach(s=>{ if(s.dis) s.mk = false; }); }
+function markCount(){ return STUDENTS.filter(s=>s.mk).length; }
+function syncMkClear(){
+  const n = markCount();
+  mkClearBtn.style.display = (isDean() && n > 0) ? '' : 'none';   /* 无标记时不占位 */
+  mkClearBtn.innerHTML = '清除全部标记 · <b class="num">' + n + '</b>';
+}
+mkClearBtn.addEventListener('click', ()=>{
+  if(!isDean() || markCount() === 0) return;
+  document.getElementById('mkModalCnt').textContent = markCount();
+  mkModal.classList.add('show');
+  document.getElementById('mkOk').focus();
+});
+function closeMkModal(){ mkModal.classList.remove('show'); }
+document.getElementById('mkCancel').addEventListener('click', closeMkModal);
+mkModal.addEventListener('click', e=>{ if(e.target === mkModal) closeMkModal(); });
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && mkModal.classList.contains('show')) closeMkModal(); });
+document.getElementById('mkOk').addEventListener('click', ()=>{
+  if(!isDean()) return closeMkModal();
+  const n = markCount();
+  STUDENTS.forEach(s=>{ s.mk = false; });
+  closeMkModal();
+  renderStuList();
+  syncHeadMark();
+  toast('演示：已清除全部标记（' + n + ' 位学生）');
 });
 
 /* ================= 选中学生：渲染头部 / 历史作业 / 作业 ================= */
@@ -852,6 +1007,7 @@ function selectStu(i, keep){
     empty.style.display = 'block';
     list.querySelectorAll('.hw-date,.hw-item').forEach(n=>n.remove());
     document.getElementById('recMeta').textContent = '—';
+    syncHeadMark();
     return;
   }
   const s = STUDENTS[i];
@@ -860,30 +1016,34 @@ function selectStu(i, keep){
   document.getElementById('headNm').textContent = s.nm;
   document.getElementById('headSub').textContent = s.cls + ' · 最近布置 ' + (s.hw.length ? s.hw[0].d : '暂无');
   document.getElementById('headDis').style.display = s.dis ? '' : 'none';
+  syncHeadMark();
   document.getElementById('recMeta').textContent = s.hw.length + ' 次布置';
   empty.style.display = s.hw.length ? 'none' : 'block';
   empty.textContent = s.hw.length ? '' : '暂无历史作业';
-  list.querySelectorAll('.hw-date,.hw-item').forEach(n=>n.remove());
-  let lastD = null;
+  list.querySelectorAll('.hw-item').forEach(n=>n.remove());
+  const latestIdx = s.hw.findIndex(h => !h.del);
   s.hw.forEach((h,hi)=>{
-    const dateHead = (h.d !== lastD)
-      ? '<div class="hw-date num"><b>' + h.d + '</b></div>'
-      : '';
-    lastD = h.d;
-    list.insertAdjacentHTML('beforeend', dateHead +
+    const practiceMsg = (h.practice || h.msg || '').trim();
+    const submitMsg = (h.submit || '').trim();
+    list.insertAdjacentHTML('beforeend',
       '<div class="hw-item' + (h.del ? ' deleted' : '') + '">' +
-        '<span class="hw-tm num"><span class="tm">' + h.tm + '</span><div class="lb">布置</div></span>' +
+        '<span class="hw-tm num"><span class="tm">' + h.tm + '</span><div class="lb">' + h.d + '</div></span>' +
         '<span class="hw-main">' +
-          '<div class="hw-from"><b>李弦安</b>老师 布置了 ' + h.items.length + ' 项内容</div>' +
-          (h.msg ? '<div class="hw-msg">留言「' + h.msg + '」</div>' : '') +
-          '<div class="hw-items">' +
+          '<div class="hw-from"><b>李弦安</b>老师 · 布置</div>' +
+          ((h.items && h.items.length) ? '<div class="hw-items">' +
             h.items.map(t=>'<span class="it">' + t + '</span>').join('') +
-          '</div>' +
+          '</div>' : '') +
+          ((practiceMsg || submitMsg) ? '<div class="hw-msg-pair">' +
+            (practiceMsg ? '<div class="hw-msg-line"><span class="hw-msg-label">练习要求：</span><span class="hw-msg-text">' + practiceMsg + '</span></div>' : '') +
+            (submitMsg ? '<div class="hw-msg-line"><span class="hw-msg-label">提交要求：</span><span class="hw-msg-text">' + submitMsg + '</span></div>' : '') +
+          '</div>' : '') +
           (h.del
             ? '<div class="hw-delnote">已删除 · 删除人：<b>' + h.del.by + '</b> · 原因：' + h.del.reason + '</div>'
             : '') +
         '</span>' +
-        (h.del ? '' : '<button type="button" class="hw-del" data-h="' + hi + '" title="删除这条记录">删除</button>') +
+        (h.del ? '' : (hi === latestIdx
+          ? '<button type="button" class="hw-del latest" data-h="' + hi + '" title="最新作业不能删除，请先布置一条新的作业">删除</button>'
+          : '<button type="button" class="hw-del" data-h="' + hi + '" title="删除这条记录">删除</button>')) +
       '</div>');
   });
   /* 已停用的学生不可布置作业 */
@@ -906,8 +1066,10 @@ function updatePushLock(){
   document.getElementById('hwPicker').style.pointerEvents = lock ? 'none' : '';
   document.getElementById('hwPicker').style.opacity = lock ? .45 : '';
   document.getElementById('pushKw').disabled = lock;
-  document.getElementById('msgBox').disabled = lock;
+  document.getElementById('practiceMsg').disabled = lock;
+  document.getElementById('submitMsg').disabled = lock;
   document.getElementById('pushBtn').disabled = lock;
+  document.getElementById('prevHwBtn').disabled = lock;
   document.getElementById('pushBtn').style.opacity = lock ? .45 : '';
 }
 updatePushLock();
@@ -985,6 +1147,19 @@ document.getElementById('pickedList').addEventListener('click', e=>{
 renderPicked();
 
 /* ================= 推送 / 已布置 ================= */
+function findPushItemByName(name){
+  return PUSH_ALL.find(({o}) => o.nm === name || o.nm.replace(/ · P\d+.*/, '') === name);
+}
+function pickItemsByName(items){
+  pushPicked.clear();
+  items.slice(0, HW_MAX).forEach(n=>{
+    const hit = findPushItemByName(n);
+    if(hit) pushPicked.set(hit.kind + ':' + hit.i, {kind:hit.kind, i:hit.i});
+  });
+  renderDrop(); renderPicked();
+}
+function todayHw(s){ return (s.hw || []).find(h => h.d === '今天') || null; }
+function latestHw(s){ return todayHw(s) || (s.hw || []).find(h => !h.del) || null; }
 const toastBox = document.getElementById('toast');
 let toastTimer = null;
 function toast(msg){
@@ -993,16 +1168,37 @@ function toast(msg){
   clearTimeout(toastTimer);
   toastTimer = setTimeout(()=>toastBox.classList.remove('show'), 1800);
 }
-document.getElementById('pushBtn').addEventListener('click', ()=>{
-  if(!pushPicked.size){ toast('请先在上方选择要推送的内容（可搜索、可多选）'); return; }
+document.getElementById('prevHwBtn').addEventListener('click', ()=>{
+  if(selected === null) return;
   const s = STUDENTS[selected];
+  const h = latestHw(s);
+  if(!h){ toast('暂无可回填的作业数据'); return; }
+  pickItemsByName(h.items || []);
+  document.getElementById('practiceMsg').value = h.practice || h.msg || '';
+  document.getElementById('submitMsg').value = h.submit || '';
+  toast('已回填「' + s.nm + '」学生首页/上次作业数据');
+});
+document.getElementById('pushBtn').addEventListener('click', ()=>{
+  if(selected === null) return;
+  const practice = document.getElementById('practiceMsg').value.trim();
+  const submit = document.getElementById('submitMsg').value.trim();
   const items = [...pushPicked.values()].map(v=>PUSH[v.kind][v.i].nm.replace(/ · P\d+.*/, ''));
-  s.hw.unshift({d:'今天', tm:'刚刚', msg:document.getElementById('msgBox').value.trim(), items});
-  document.getElementById('msgBox').value = '';
+  /* 三个栏目均为空时不生成空作业记录 */
+  if(!practice && !submit && !items.length){
+    toast('请至少填写一项作业内容（视频作业、练习要求或提交要求）');
+    return;
+  }
+  const s = STUDENTS[selected];
+  /* 每次推送都新增一条操作记录：同一天可多次布置，不覆盖既有作业 */
+  s.hw.unshift({
+    d:'今天', tm:'刚刚', practice, submit, items
+  });
+  document.getElementById('practiceMsg').value = '';
+  document.getElementById('submitMsg').value = '';
   pushPicked.clear();
   closeDrop(); renderPicked();
   selectStu(selected, true);
-  toast('演示：已向「' + s.nm + '」推送 ' + items.length + ' 项作业');
+  toast('演示：已向「' + s.nm + '」新增一条作业');
 });
 
 /* 停用学生的管理（停用/恢复）移至「班级管理」页，本页仅展示停用状态 */
@@ -1014,6 +1210,10 @@ const delErr = document.getElementById('delErr');
 let pendingDel = null;   /* {stu, idx} */
 document.getElementById('recList').addEventListener('click', e=>{
   const d = e.target.closest('.hw-del'); if(!d) return;
+  if(d.classList.contains('latest')){
+    toast('最新作业不能删除，请先布置一条新的作业');
+    return;
+  }
   pendingDel = {stu:selected, idx:parseInt(d.dataset.h, 10)};
   delReason.value = ''; delErr.textContent = '';
   delModal.classList.add('show');
@@ -1027,10 +1227,11 @@ document.getElementById('delOk').addEventListener('click', ()=>{
   if(!pendingDel) return closeDelModal();
   const reason = delReason.value.trim();
   if(!reason){ delErr.textContent = '请填写删除原因'; delReason.focus(); return; }
-  const h = STUDENTS[pendingDel.stu].hw[pendingDel.idx];
+  const target = pendingDel;
+  const h = STUDENTS[target.stu].hw[target.idx];
   h.del = {by: isDean() ? '管理员' : '李弦安（老师）', reason};
   closeDelModal();
-  selectStu(pendingDel.stu, true);
+  selectStu(target.stu, true);
   toast('演示：该条记录已删除留痕');
 });
 

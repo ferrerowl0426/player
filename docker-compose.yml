@@ -28,19 +28,19 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/video_player
     ports:
-      - "3002:3000"
+      - "3000:3000"
 
   frontend:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3002/api}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api}
     container_name: video_player_frontend
     restart: always
     depends_on:
       - backend
     environment:
-      SERVER_API_BASE_URL: http://backend:3002/api
+      SERVER_API_BASE_URL: http://backend:3000/api
     ports:
       - "3001:3001"
 

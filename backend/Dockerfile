@@ -8,6 +8,6 @@ RUN npm ci --omit=dev
 COPY . .
 RUN mkdir -p uploads/temp
 
-EXPOSE 3002
+EXPOSE 3000
 
 CMD ["npm", "start"]

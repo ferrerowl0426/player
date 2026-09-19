@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchAdminMe } from '../../../lib/api.js';
+import styles from '../redirect.module.css';
 
 function resolveCreateTarget() {
   const params = new URLSearchParams(window.location.search);
@@ -25,7 +26,7 @@ export default function AdminUploadPage() {
         const response = await fetchAdminMe();
 
         if (response.data.role !== 'super_admin') {
-          router.replace('/admin');
+          router.replace('/tracks');
           return;
         }
 
@@ -38,9 +39,5 @@ export default function AdminUploadPage() {
     initPage();
   }, [router]);
 
-  return (
-    <main className="create-entry-page">
-      <p>正在打开创建页…</p>
-    </main>
-  );
+  return <main className={styles.redirectPage}>正在打开创建页…</main>;
 }

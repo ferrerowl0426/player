@@ -1,0 +1,516 @@
+.adminWrap {
+  flex: 1 0 auto;
+  display: flex;
+  justify-content: center;
+  padding: 16px 36px 44px;
+}
+
+.adminWrap :global(.wizard) {
+  width: min(1080px, 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px 0;
+}
+
+.adminWrap :global(.wiz-head) {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--hair-2);
+}
+
+.adminWrap :global(.wiz-head h1) {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.adminWrap :global(.wiz-head h1 mark) {
+  background: linear-gradient(180deg, transparent 55%, rgba(255, 127, 0, .46) 55%);
+  color: inherit;
+  padding: 0 2px;
+}
+
+.adminWrap :global(.zone-badge) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--coffee);
+  font-weight: 600;
+  border: 1px dashed var(--hair-2);
+  border-radius: 4px;
+  padding: 3px 11px;
+  background: rgba(255, 127, 0, .12);
+  white-space: nowrap;
+}
+
+.adminWrap :global(.zone-badge::before) {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orange);
+}
+
+.adminWrap :global(.wiz-head .eyebrow) {
+  margin-left: auto;
+}
+
+.adminWrap :global(.form-body) {
+  flex: 1;
+  padding: 2px 2px 6px;
+}
+
+.adminWrap :global(.form-cols) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0 48px;
+  align-items: start;
+}
+
+.adminWrap :global(.fsec) {
+  padding: 12px 0 4px;
+}
+
+.adminWrap :global(.fsec.full) {
+  grid-column: 1 / -1;
+}
+
+.adminWrap :global(.fsec-title) {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--coffee);
+  margin-bottom: 10px;
+}
+
+.adminWrap :global(.fsec-title::before) {
+  content: "";
+  width: 4px;
+  height: 13px;
+  border-radius: 1px;
+  background: var(--orange);
+  flex: none;
+}
+
+.adminWrap :global(.fsec-title .note) {
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: .5px;
+  color: var(--ink-3);
+}
+
+.adminWrap :global(.fsec-title .note.req) {
+  color: var(--orange);
+  font-weight: 600;
+}
+
+.adminWrap :global(.field) {
+  margin-bottom: 14px;
+}
+
+.adminWrap :global(.field label) {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .8px;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+
+.adminWrap :global(.field input[type=text]),
+.adminWrap :global(.field textarea) {
+  width: 100%;
+  padding: 9px 13px;
+  background: var(--white);
+  border: 1px solid var(--hair-2);
+  border-radius: 4px;
+  font-size: 13.5px;
+  color: var(--ink);
+  letter-spacing: .3px;
+  transition: border-color .25s var(--ease), box-shadow .25s var(--ease);
+}
+
+.adminWrap :global(.field textarea) {
+  resize: vertical;
+  min-height: 96px;
+  line-height: 1.7;
+}
+
+.adminWrap :global(.field input::placeholder),
+.adminWrap :global(.field textarea::placeholder) {
+  color: #b3a58c;
+}
+
+.adminWrap :global(.field input:focus),
+.adminWrap :global(.field textarea:focus) {
+  outline: none;
+  border-color: var(--coffee);
+  box-shadow: 0 2px 8px rgba(93, 67, 38, .1);
+}
+
+.adminWrap :global(.field.error input),
+.adminWrap :global(.field.error textarea),
+.adminWrap :global(.field.error .a4-box),
+.adminWrap :global(.field.error .pmanage) {
+  border-color: #b4452e;
+}
+
+.adminWrap :global(.err-msg) {
+  margin-top: 6px;
+  font-size: 10.5px;
+  letter-spacing: .4px;
+  color: #b4452e;
+}
+
+.adminWrap :global(.cover-flex) {
+  display: flex;
+  gap: 26px;
+  align-items: flex-start;
+}
+
+.adminWrap :global(.a4-box) {
+  flex: none;
+  width: 200px;
+  aspect-ratio: 210 / 297;
+  border: 1.5px dashed var(--hair-2);
+  border-radius: 6px;
+  background: var(--white) center / cover no-repeat;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.adminWrap :global(.a4-box.has) {
+  border-style: solid;
+  border-color: var(--coffee);
+}
+
+.adminWrap :global(.a4-box .cov-rm) {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--coffee);
+  background: var(--white);
+  border: 1px solid var(--hair-2);
+  box-shadow: 0 1px 4px rgba(93, 67, 38, .18);
+  transition: all .2s;
+  z-index: 2;
+}
+
+.adminWrap :global(.a4-box .cov-rm:hover) {
+  color: #b4452e;
+  border-color: #b4452e;
+  background: rgba(180, 69, 46, .08);
+}
+
+.adminWrap :global(.a4-empty) {
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  text-align: center;
+  font-size: 10.5px;
+  letter-spacing: .8px;
+}
+
+.adminWrap :global(.a4-empty svg) {
+  width: 28px;
+  height: 28px;
+  color: var(--orange);
+}
+
+.adminWrap :global(.a4-empty b) {
+  font-size: 12px;
+  color: var(--coffee);
+  letter-spacing: 1.5px;
+}
+
+.adminWrap :global(.a4-empty em) {
+  font-style: normal;
+  color: var(--ink-3);
+}
+
+.adminWrap :global(.cover-field) {
+  width: 220px;
+}
+
+.adminWrap :global(.pv-card) {
+  width: 200px;
+}
+
+.adminWrap :global(.pv-cover) {
+  aspect-ratio: 210 / 297;
+  border-radius: 4px;
+  background: var(--white) center / cover no-repeat;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--hair-2);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(93, 67, 38, .1), 0 4px 12px rgba(93, 67, 38, .06);
+}
+
+.adminWrap :global(.pdf-badge) {
+  position: absolute;
+  left: 7px;
+  bottom: 7px;
+  z-index: 2;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: var(--white);
+  background: rgba(180, 69, 46, .92);
+  border-radius: 3px;
+  padding: 1.5px 6px;
+}
+
+.adminWrap :global(.pv-card .pv-name) {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  margin-top: 8px;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adminWrap :global(.pv-card .pv-meta) {
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: .4px;
+  margin-top: 2px;
+}
+
+.adminWrap :global(.pmanage) {
+  border: 1px solid #c3ab88;
+  border-radius: 6px;
+  background: var(--white);
+  overflow: hidden;
+}
+
+.adminWrap :global(.pmanage-head) {
+  flex: none;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(160, 106, 53, .07);
+}
+
+.adminWrap :global(.pmanage-head .pm-t) {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--coffee);
+}
+
+.adminWrap :global(.pmanage-head .pm-note),
+.adminWrap :global(.pm-state) {
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: .4px;
+}
+
+.adminWrap :global(.pm-state) {
+  margin-left: auto;
+}
+
+.adminWrap :global(.pm-state.ok) {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.adminWrap :global(.pm-body) {
+  padding: 14px;
+}
+
+.adminWrap :global(.drop-box) {
+  width: 100%;
+  border: 1.5px dashed var(--hair-2);
+  border-radius: 6px;
+  background: var(--white);
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: all .25s var(--ease);
+  text-align: left;
+}
+
+.adminWrap :global(.drop-box:hover) {
+  border-color: var(--orange);
+}
+
+.adminWrap :global(.drop-box.has) {
+  border-style: solid;
+  border-color: var(--coffee);
+  background: rgba(255, 127, 0, .06);
+}
+
+.adminWrap :global(.drop-box .pd-t) {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  color: var(--ink-2);
+}
+
+.adminWrap :global(.drop-box .pd-s) {
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: .4px;
+  margin-left: auto;
+}
+
+.adminWrap :global(.link-picker) {
+  border: 1px solid var(--hair-2);
+  border-radius: 6px;
+  background: var(--white);
+  padding: 12px;
+}
+
+.adminWrap :global(.link-picker input) {
+  width: 100%;
+  border: 1px solid var(--hair-2);
+  border-radius: 4px;
+  padding: 8px 12px;
+  outline: none;
+  font-size: 12.5px;
+}
+
+.adminWrap :global(.link-options) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.adminWrap :global(.link-options button) {
+  text-align: left;
+  border: 1px solid var(--hair-2);
+  border-radius: 4px;
+  padding: 6px 9px;
+  color: var(--ink-2);
+  background: var(--white);
+  font-size: 11px;
+  letter-spacing: .4px;
+}
+
+.adminWrap :global(.link-options button.on) {
+  border-color: var(--coffee);
+  background: rgba(255, 127, 0, .08);
+  color: var(--coffee);
+  font-weight: 600;
+}
+
+.adminWrap :global(.link-options span) {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 9.5px;
+  color: var(--orange);
+}
+
+.adminWrap :global(.picked-links) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.adminWrap :global(.picked-links span) {
+  font-size: 10px;
+  color: var(--ink-3);
+  border: 1px solid var(--hair-2);
+  border-radius: 3px;
+  padding: 2px 8px;
+}
+
+.adminWrap :global(.wiz-foot) {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 14px;
+  margin-top: 6px;
+  border-top: 1px dashed var(--hair-2);
+}
+
+.adminWrap :global(.btn) {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-indent: 3px;
+  border-radius: 4px;
+  padding: 9px 26px;
+  transition: all .3s var(--ease);
+  text-decoration: none;
+}
+
+.adminWrap :global(.btn-main) {
+  background: var(--coffee);
+  color: var(--white);
+  border: 1.5px solid var(--coffee);
+}
+
+.adminWrap :global(.btn-main:disabled) {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.adminWrap :global(.btn-ghost) {
+  color: var(--coffee);
+  border: 1px solid var(--hair-2);
+  background: var(--white);
+  font-weight: 500;
+}
+
+.adminWrap :global(.btn-ghost:hover) {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.adminWrap :global(.wiz-foot .spacer) {
+  flex: 1;
+}
+
+.adminWrap :global(.foot-hint) {
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: .5px;
+}
+
+@media (max-width: 1024px) {
+  .adminWrap {
+    padding: 16px 20px 40px;
+  }
+
+  .adminWrap :global(.form-cols) {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .adminWrap :global(.link-options) {
+    grid-template-columns: 1fr 1fr;
+  }
+}

@@ -6,7 +6,7 @@
 <title>首页 · 能学慧吉他教室</title>
 <style>
 /* ============================================================
-   学员首页 · 左「老师留言板（信纸）」/ 右「今日学习资源」（含停用态）
+   学员首页 · 左「练习要求 / 提交要求」/ 右「今日学习资源」（含停用态）
    视觉遵循 design-spec v2.0：纯白底 / 焦糖格纹 / 咖啡描边 / 亮橙强调
 ============================================================ */
 :root{
@@ -136,7 +136,9 @@ body.disabled .stop-banner{display:flex}
   grid-template-columns:minmax(0,45fr) minmax(0,55fr);
   align-items:stretch;
 }
-.sec{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sec{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0}
+.sec.assignment-sec,.sec.requirement-sec{min-height:0}
+.sec.requirement-sec .req-stack,.sec.assignment-sec .grid{flex:1 1 auto}
 .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:0 2px}
 .sec-head h2{
   font-size:15px;font-weight:700;letter-spacing:2px;color:var(--coffee);
@@ -146,86 +148,42 @@ body.disabled .stop-banner{display:flex}
 .sec-head .meta{font-size:10.5px;color:var(--ink-3);letter-spacing:1px}
 .sec-head .note{margin-left:auto;font-size:10.5px;color:var(--ink-3);letter-spacing:.5px}
 
-/* ============ 左：老师留言板（信纸） ============ */
-.letter{
-  position:relative;flex:1;min-height:340px;
-  background:var(--pc-paper);
+/* ============ 左：练习要求 / 提交要求 ============ */
+.req-stack{
+  display:grid;gap:14px;
+  grid-template-rows:var(--req-rows, auto);
+  flex:1 1 auto;min-height:0;
+}
+.req-card{
+  min-height:0;
+  height:var(--req-card-h, auto);
+  background:var(--white);
   border:1px solid var(--hair-2);
-  border-radius:2px;
-  box-shadow:0 1px 2px rgba(93,67,38,.10), 0 10px 26px rgba(93,67,38,.10);
-  padding:24px 26px 20px;
-  display:flex;flex-direction:column;
+  border-radius:6px;
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.05);
+  padding:14px 16px;
+  display:flex;flex-direction:column;gap:10px;
 }
-/* 邮票（齿孔） */
-.pc-stamp{
-  position:absolute;right:22px;top:20px;width:52px;height:62px;
-  background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  box-shadow:1px 2px 5px rgba(93,67,38,.18);
+.req-card.empty{display:none}
+.req-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex:none}
+.req-title{font-size:13px;font-weight:700;letter-spacing:1.6px;color:var(--coffee)}
+.req-meta{font-size:10px;color:var(--ink-3);letter-spacing:.8px;white-space:nowrap}
+.req-text{
+  flex:1 1 auto;min-height:0;max-height:none;
+  overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
+  white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;
+  font-size:13px;line-height:1.75;color:var(--ink-2);letter-spacing:.35px;
+  background:transparent;border:1px dashed rgba(93,67,38,.18);border-radius:4px;
+  padding:8px 10px;
 }
-.pc-stamp::after{
-  content:"";position:absolute;inset:-1px;pointer-events:none;
-  background:
-    radial-gradient(circle 2.4px at 50% 0,    var(--pc-paper) 98%, transparent 100%) 0 0/9px 9px repeat-x,
-    radial-gradient(circle 2.4px at 50% 100%, var(--pc-paper) 98%, transparent 100%) 0 100%/9px 9px repeat-x,
-    radial-gradient(circle 2.4px at 0 50%,    var(--pc-paper) 98%, transparent 100%) 0 0/9px 9px repeat-y,
-    radial-gradient(circle 2.4px at 100% 50%, var(--pc-paper) 98%, transparent 100%) 100% 0/9px 9px repeat-y;
-}
-.pc-stamp-art{display:grid;place-items:center;color:var(--coffee)}
-.pc-stamp-art svg{width:19px;height:19px}
-.pc-stamp-txt{font-size:7px;font-weight:700;letter-spacing:1.5px;color:var(--ink-3)}
-/* 邮戳 */
-.pc-mark{
-  position:absolute;right:62px;top:28px;width:54px;height:54px;border-radius:50%;
-  border:1.4px solid rgba(122,74,38,.38);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  color:rgba(122,74,38,.55);transform:rotate(-13deg);
-  background:rgba(255,253,247,.42);
-}
-.pc-mark::after{content:"";position:absolute;inset:3px;border-radius:50%;border:1px dashed rgba(122,74,38,.3)}
-.pc-mark-d{font-size:12.5px;font-weight:700;line-height:1;letter-spacing:.5px}
-.pc-mark-t{font-size:5.5px;letter-spacing:1px;transform:scale(.92)}
-
-/* 信纸正文：横线贯穿整张纸 */
-.lt-body{
-  flex:1;min-height:0;
-  background:repeating-linear-gradient(180deg, transparent 0 29px, var(--pc-line) 29px 30px);
-  background-position:0 0;
-}
-.lt-h{
-  font-size:12px;font-weight:700;letter-spacing:3px;color:var(--coffee);
-  line-height:30px;padding-right:126px;
-}
-.lt-list{
-  list-style:none;counter-reset:n;margin:0;padding:0;
-  font-family:var(--font-hand);font-size:15px;color:var(--pc-ink);letter-spacing:.4px;
-}
-.lt-list li{
-  counter-increment:n;position:relative;line-height:30px;
-  padding-left:24px;padding-right:126px;
-}
-.lt-list li::before{
-  content:counter(n) ".";position:absolute;left:0;top:0;
-  font-size:12px;font-weight:700;color:var(--coffee);letter-spacing:0;
-}
-/* 收尾话术（与横线行距对齐） */
-.lt-note{
-  margin-top:30px;
-  font-family:var(--font-hand);font-size:15px;line-height:30px;
-  color:var(--pc-ink);letter-spacing:.4px;padding-right:126px;
-}
-/* 署名（信纸底部） */
-.lt-sign{
-  flex:none;margin-top:16px;padding-top:12px;
-  border-top:1px dashed rgba(122,74,38,.22);
-  display:flex;align-items:baseline;justify-content:flex-end;gap:12px;
-}
-.lt-sign-nm{font-family:var(--font-hand);font-size:16px;color:var(--pc-ink);letter-spacing:1px}
-.lt-sign-t{font-size:10px;color:var(--ink-3);letter-spacing:1.5px}
+.req-text::-webkit-scrollbar{width:6px}.req-text::-webkit-scrollbar-thumb{background:var(--hair-2);border-radius:999px}
 
 /* ============ 右：今日学习资源（直排无框） ============ */
 .grid{
   display:grid;gap:14px;
   grid-template-columns:repeat(3, minmax(0,1fr));
+  grid-auto-rows:auto;
   align-content:start;
 }
 .hw{
@@ -284,7 +242,8 @@ body.disabled .stop-banner{display:flex}
 @media (max-width:1024px){
   .home{padding:14px 20px 40px}
   .cols{grid-template-columns:1fr;gap:22px}
-  .letter{min-height:300px}
+  .req-stack{height:auto;grid-template-rows:none;flex:none}
+  .req-card{height:auto;min-height:150px}
 }
 @media (max-width:640px){
   .nav-inner{padding:0 20px}
@@ -293,10 +252,9 @@ body.disabled .stop-banner{display:flex}
   .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .viewseg{margin-left:0}
   .greet{align-items:center}
-  .letter{padding:20px 16px 16px}
-  .pc-stamp{right:14px;top:16px;width:44px;height:52px}
-  .pc-mark{right:50px;top:22px;width:46px;height:46px}
-  .lt-h,.lt-list li,.lt-note{padding-right:0}
+  .req-stack{gap:12px}
+  .req-card{padding:12px 13px;min-height:142px}
+  .req-text{font-size:12.5px}
 }
 </style>
 </head>
@@ -327,8 +285,6 @@ body.disabled .stop-banner{display:flex}
 
   <!-- 问候 + 视角切换（演示） -->
   <div class="greet rise" data-page-node-id="HIG4Mti94aWBr3z4q3H96h">
-    <h1 data-page-node-id="OSH5IZhOWwj7SM1FCqO7tf">陈一一，今天练琴了吗？</h1>
-    <span class="sub num" data-page-node-id="fUkrWyKsjrmYf032wYiNuF">启蒙一班 · 老师李弦安 · 9 月 10 日 周四</span>
     <div class="viewseg" role="group" aria-label="预览视角" data-page-node-id="DQTly62RdzyPCMwAh8O3r7">
       <span class="lbl" data-page-node-id="NKfPwCntt9JYJMqJzKdrAX">预览视角</span>
       <button type="button" class="on" data-v="normal" data-page-node-id="wTBF9R5eHLJBJuGGfdBODd">学员</button>
@@ -347,49 +303,35 @@ body.disabled .stop-banner{display:flex}
   <!-- ============ 左右分区 ============ -->
   <div class="cols rise d2">
 
-    <!-- 左：老师留言板（信纸） -->
-    <section class="sec" aria-label="老师留言板">
+    <!-- 左：练习要求 / 提交要求 -->
+    <section class="sec requirement-sec" aria-label="练习要求和提交要求">
       <div class="sec-head">
-        <h2>老师留言板</h2>
-        <span class="meta">作业细则</span>
+        <h2>作业要求</h2>
       </div>
-      <article class="letter">
-        <div class="pc-stamp" aria-hidden="true">
-          <span class="pc-stamp-art">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 17.5V5.2l10-2v12.3"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/></svg>
-          </span>
-          <span class="pc-stamp-txt num">NXH</span>
-        </div>
-        <div class="pc-mark" aria-hidden="true">
-          <span class="pc-mark-d num">9.10</span>
-          <span class="pc-mark-t">NXH GUITAR</span>
-        </div>
-
-        <div class="lt-body">
-          <h3 class="lt-h">作业细则</h3>
-          <ol class="lt-list">
-            <li>卡农 P2 段落衔接，先慢速跟练三遍，节拍器 60。</li>
-            <li>天空之城重点练右手分解和弦，低音要保持住。</li>
-            <li>指弹入门 30 首，本周先拿下前 3 首，录一段发我。</li>
-            <li>练琴前热身 10 分钟，手腕放松，别硬撑。</li>
-            <li>每天 20 分钟，坚持比时长更重要。</li>
-          </ol>
-          <p class="lt-note">这周的重点是把节奏稳住，宁可慢，不要错。<br>下周课上我们一起过一遍 P2 的衔接。<br>有不懂的地方随时来问我。</p>
-        </div>
-
-        <div class="lt-sign">
-          <span class="lt-sign-nm">李弦安 老师</span>
-          <span class="lt-sign-t num">2026 · 09 · 10</span>
-        </div>
-      </article>
+      <div class="req-stack">
+        <article class="req-card">
+          <div class="req-top">
+            <h3 class="req-title">练习要求</h3>
+          </div>
+          <div class="req-text">卡农 P2 段落衔接，先慢速跟练三遍，节拍器 60。
+天空之城重点练右手分解和弦，低音要保持住。
+每天练琴 20 分钟，手腕放松，保持稳定节奏。</div>
+        </article>
+        <article class="req-card">
+          <div class="req-top">
+            <h3 class="req-title">提交要求</h3>
+          </div>
+          <div class="req-text">完成后录制一段卡农 P2 衔接视频，上传到作业记录。
+视频请保持画面稳定，声音清晰；遇到问题可以在下次课前留言。</div>
+        </article>
+      </div>
     </section>
 
     <!-- 右：今日学习资源 -->
-    <section class="sec" aria-label="今日学习资源">
+    <section class="sec assignment-sec" aria-label="今日学习资源">
       <div class="sec-head">
         <h2>今天你需要用到的学习资源</h2>
         <span class="meta num" id="hwMeta">老师布置了 5 项</span>
-        <span class="note">点击封面开始学习 · 单 P 直达对应段落</span>
       </div>
       <div class="grid" id="hwGrid" data-page-node-id="GIARrj8qUK0IQ6HdmM2Csu"><!-- JS 渲染 --></div>
     </section>
@@ -410,6 +352,29 @@ const HW = [
 
 /* ================= 渲染 ================= */
 const grid = document.getElementById('hwGrid');
+const reqStack = document.querySelector('.req-stack');
+function syncRequirementRows(){
+  if (!reqStack || window.matchMedia('(max-width: 1024px)').matches) {
+    reqStack?.style.removeProperty('--req-rows');
+    document.documentElement.style.removeProperty('--req-card-h');
+    return;
+  }
+  const cards = [...reqStack.querySelectorAll('.req-card:not(.empty)')];
+  const resources = [...grid.querySelectorAll('.hw')];
+  if (!cards.length || !resources.length) return;
+  const rows = [];
+  for (let i = 0; i < resources.length; i += 3) {
+    const row = resources.slice(i, i + 3);
+    rows.push(Math.max(...row.map(card => card.getBoundingClientRect().height)));
+  }
+  const rowHeights = cards.map((_, index) => {
+    if (rows[index] != null) return Math.max(150, Math.floor(rows[index]));
+    const average = rows.reduce((sum, value) => sum + value, 0) / rows.length;
+    return Math.max(150, Math.floor(average));
+  });
+  reqStack.style.setProperty('--req-rows', rowHeights.map(value => `${value}px`).join(' '));
+  document.documentElement.style.setProperty('--req-card-h', 'auto');
+}
 function render(){
   document.getElementById('hwMeta').textContent = '老师布置了 ' + HW.length + ' 项';
   grid.innerHTML = HW.map(h=>
@@ -426,6 +391,8 @@ function render(){
     '<div class="hw-empty"><span class="big">今天还没有作业</span><span>去曲目库和图书馆逛逛，或查看历史作业复习</span></div>');
 }
 render();
+requestAnimationFrame(syncRequirementRows);
+window.addEventListener('resize', syncRequirementRows);
 
 /* ================= 视角切换（学员 / 停用学员） ================= */
 document.querySelectorAll('.viewseg button').forEach(b=>{

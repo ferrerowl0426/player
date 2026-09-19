@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { config } from './config.js';
 
-const DEFAULT_PASSWORD_HASH = '$2b$10$WIZqC5E5V1U5Q/52CpY0h.KT25NEQXksDBStnUaXbydcn5cqvaPxm';
+const DEFAULT_PASSWORD_HASH = '$2b$10$Wg6YkgUtnWlAtaQrv/q55eYBXt8RR8HxO3iYxFbJW8hG7eAzITGwu';
 
 export const pool = new pg.Pool({
   connectionString: config.databaseUrl
@@ -11,32 +11,17 @@ async function addColumnIfMissing(tableName, columnSql) {
   await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${columnSql}`);
 }
 
-async function seedAdmin({ username, role }) {
+async function seedInitialAdmin() {
   await pool.query(
     `INSERT INTO admins (username, account, nickname, password_hash, role, status)
-     VALUES ($1, $1, $1, $2, $3, 'active')
+     VALUES ('admin', 'admin', 'admin', $1::text, 'super_admin', 'active')
      ON CONFLICT (username) DO UPDATE SET
        account = EXCLUDED.account,
        nickname = EXCLUDED.nickname,
        password_hash = EXCLUDED.password_hash,
        role = EXCLUDED.role,
        status = EXCLUDED.status`,
-    [username, DEFAULT_PASSWORD_HASH, role]
-  );
-}
-
-async function seedUser({ username, className }) {
-  await pool.query(
-    `INSERT INTO users (username, account, nickname, password_hash, class_id, status, is_active)
-     VALUES ($1, $1, $1, $2, (SELECT id FROM teaching_classes WHERE name = $3), 'active', TRUE)
-     ON CONFLICT (username) DO UPDATE SET
-       account = EXCLUDED.account,
-       nickname = EXCLUDED.nickname,
-       password_hash = EXCLUDED.password_hash,
-       class_id = EXCLUDED.class_id,
-       status = EXCLUDED.status,
-       is_active = EXCLUDED.is_active`,
-    [username, DEFAULT_PASSWORD_HASH, className]
+    [DEFAULT_PASSWORD_HASH]
   );
 }
 
@@ -83,6 +68,8 @@ export async function ensureAppSchema() {
     )
   `);
   await addColumnIfMissing('admins', "account VARCHAR(50) UNIQUE");
+  await pool.query('ALTER TABLE admins ALTER COLUMN username TYPE TEXT');
+  await pool.query('ALTER TABLE admins ALTER COLUMN account TYPE TEXT');
   await addColumnIfMissing('admins', "nickname VARCHAR(50) NOT NULL DEFAULT ''");
   await addColumnIfMissing('admins', "role VARCHAR(20) NOT NULL DEFAULT 'teacher'");
   await addColumnIfMissing('admins', "status VARCHAR(20) NOT NULL DEFAULT 'active'");
@@ -98,9 +85,13 @@ export async function ensureAppSchema() {
       id SERIAL PRIMARY KEY,
       name VARCHAR(100) NOT NULL UNIQUE,
       teacher_id INTEGER REFERENCES admins(id) ON DELETE SET NULL,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  await addColumnIfMissing('teaching_classes', 'is_active BOOLEAN NOT NULL DEFAULT TRUE');
+  await pool.query('UPDATE teaching_classes SET is_active = TRUE WHERE is_active IS NULL');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_teaching_classes_is_active ON teaching_classes (is_active)');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -112,14 +103,19 @@ export async function ensureAppSchema() {
       class_id INTEGER REFERENCES teaching_classes(id) ON DELETE SET NULL,
       status VARCHAR(20) NOT NULL DEFAULT 'active',
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_marked BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
   await addColumnIfMissing('users', "account VARCHAR(50) UNIQUE");
+  await pool.query('ALTER TABLE users ALTER COLUMN username TYPE TEXT');
+  await pool.query('ALTER TABLE users ALTER COLUMN account TYPE TEXT');
   await addColumnIfMissing('users', "nickname VARCHAR(50) NOT NULL DEFAULT ''");
   await addColumnIfMissing('users', 'class_id INTEGER REFERENCES teaching_classes(id) ON DELETE SET NULL');
   await addColumnIfMissing('users', "status VARCHAR(20) NOT NULL DEFAULT 'active'");
   await addColumnIfMissing('users', 'is_active BOOLEAN NOT NULL DEFAULT TRUE');
+  await addColumnIfMissing('users', 'is_marked BOOLEAN NOT NULL DEFAULT FALSE');
+  await pool.query("UPDATE users SET is_marked = FALSE WHERE is_marked IS NULL");
   await pool.query("UPDATE users SET account = username WHERE account IS NULL OR account = ''");
   await pool.query("UPDATE users SET nickname = username WHERE nickname = ''");
   await pool.query("UPDATE users SET status = CASE WHEN is_active THEN 'active' ELSE 'disabled' END WHERE status = '' OR status IS NULL");
@@ -146,6 +142,8 @@ export async function ensureAppSchema() {
       object_type VARCHAR(30) NOT NULL DEFAULT 'video',
       object_id INTEGER,
       message TEXT NOT NULL DEFAULT '',
+      practice_requirement TEXT NOT NULL DEFAULT '',
+      submit_requirement TEXT NOT NULL DEFAULT '',
       assigned_by_admin_id INTEGER REFERENCES admins(id) ON DELETE SET NULL,
       is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
       delete_reason TEXT NOT NULL DEFAULT '',
@@ -163,6 +161,9 @@ export async function ensureAppSchema() {
   await addColumnIfMissing('user_assignments', 'object_id INTEGER');
   await addColumnIfMissing('user_assignments', 'part_id INTEGER');
   await addColumnIfMissing('user_assignments', "assigned_object_title TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing('user_assignments', "practice_requirement TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing('user_assignments', "submit_requirement TEXT NOT NULL DEFAULT ''");
+  await pool.query("UPDATE user_assignments SET practice_requirement = message WHERE practice_requirement = '' AND submit_requirement = '' AND object_type = 'message' AND message <> ''");
   await pool.query("UPDATE user_assignments SET assigned_video_title = v.title FROM videos v WHERE user_assignments.video_id = v.id AND user_assignments.assigned_video_title = ''");
   await pool.query("UPDATE user_assignments SET object_type = 'video', object_id = video_id WHERE object_id IS NULL AND video_id IS NOT NULL");
   await pool.query('CREATE INDEX IF NOT EXISTS idx_user_assignments_user_id_created_at ON user_assignments (user_id, created_at DESC)');
@@ -285,6 +286,7 @@ export async function ensureAppSchema() {
     )
   `);
   await pool.query('CREATE INDEX IF NOT EXISTS idx_content_attachments_object ON content_attachments (object_type, object_id)');
+  await pool.query('ALTER TABLE content_attachments ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS video_attachments (
@@ -315,6 +317,10 @@ export async function ensureAppSchema() {
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // 上传人（冗余存名字，避免详情页再 join）
+  await pool.query('ALTER TABLE library_resources ADD COLUMN IF NOT EXISTS uploader_id INTEGER');
+  await pool.query("ALTER TABLE library_resources ADD COLUMN IF NOT EXISTS uploader_name VARCHAR(64) NOT NULL DEFAULT ''");
+
   await pool.query('CREATE INDEX IF NOT EXISTS idx_library_resources_updated_at ON library_resources (updated_at DESC)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_library_resources_title ON library_resources (title)');
 
@@ -368,38 +374,5 @@ export async function ensureAppSchema() {
   await pool.query('CREATE INDEX IF NOT EXISTS idx_video_prerequisites_video_id ON video_prerequisites (video_id)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_video_prerequisites_prerequisite_id ON video_prerequisites (prerequisite_video_id)');
 
-  await seedAdmin({ username: 'admin', role: 'super_admin' });
-  await seedAdmin({ username: 'teacher_a', role: 'teacher' });
-  await seedAdmin({ username: 'teacher_b', role: 'teacher' });
-
-  await pool.query(`
-    INSERT INTO teaching_classes (name, teacher_id)
-    SELECT '一班', id FROM admins WHERE username = 'teacher_a'
-    ON CONFLICT DO NOTHING
-  `);
-  await pool.query(`
-    INSERT INTO teaching_classes (name, teacher_id)
-    SELECT '二班', id FROM admins WHERE username = 'teacher_b'
-    ON CONFLICT DO NOTHING
-  `);
-
-  await pool.query(`
-    INSERT INTO teacher_classes (teacher_id, class_id)
-    SELECT a.id, c.id FROM admins a, teaching_classes c
-    WHERE a.username = 'teacher_a' AND c.name = '一班'
-    ON CONFLICT DO NOTHING
-  `);
-  await pool.query(`
-    INSERT INTO teacher_classes (teacher_id, class_id)
-    SELECT a.id, c.id FROM admins a, teaching_classes c
-    WHERE a.username = 'teacher_b' AND c.name = '二班'
-    ON CONFLICT DO NOTHING
-  `);
-
-  await seedUser({ username: 'student_a1', className: '一班' });
-  await seedUser({ username: 'student_a2', className: '一班' });
-  await seedUser({ username: 'student_a3', className: '一班' });
-  await seedUser({ username: 'student_b1', className: '二班' });
-  await seedUser({ username: 'student_b2', className: '二班' });
-  await seedUser({ username: 'student_b3', className: '二班' });
+  await seedInitialAdmin();
 }

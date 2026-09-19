@@ -1,0 +1,109 @@
+.library:global(.home) {
+  gap: 14px;
+}
+
+.library :global(.grid) {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-content: center;
+  overflow: hidden;
+}
+
+.library :global(.card) {
+  position: relative;
+}
+
+.library :global(.card .cover) {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 210 / 297;
+  border-radius: 4px;
+  background: var(--wood) center / cover no-repeat;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.library :global(.card .cover)::before {
+  content: "";
+  position: absolute;
+  inset: 10% 12%;
+  background: repeating-linear-gradient(180deg, transparent 0 14px, rgba(122, 74, 38, .14) 14px 15px);
+  border-radius: 2px;
+}
+
+.library :global(.card .cover[style])::before {
+  display: none;
+}
+
+.library :global(.pdf-badge) {
+  position: absolute;
+  left: 7px;
+  bottom: 7px;
+  z-index: 2;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: var(--white);
+  background: rgba(180, 69, 46, .92);
+  border-radius: 3px;
+  padding: 1.5px 6px;
+}
+
+.library :global(.card .ops) {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  display: none;
+  flex-direction: column;
+  background: rgba(252, 249, 242, .55);
+  border: 1px solid rgba(255, 255, 255, .45);
+  border-radius: 8px;
+  padding: 4px;
+  backdrop-filter: blur(12px) saturate(1.08);
+  -webkit-backdrop-filter: blur(12px) saturate(1.08);
+  box-shadow: 0 4px 16px rgba(40, 28, 12, .16);
+}
+
+:global(body.dean) .library :global(.card:hover .ops) {
+  display: flex;
+}
+
+.library :global(.card .ops button) {
+  flex: none;
+  min-width: 64px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--coffee);
+  border: none;
+  border-radius: 5px;
+  padding: 4px 12px;
+  background: transparent;
+  transition: all .2s;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.library :global(.card .ops button:hover) {
+  background: rgba(180, 69, 46, .12);
+  color: #b4452e;
+}
+
+@media (max-width: 1180px) {
+  .library :global(.grid) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .library :global(.grid) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .library :global(.grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

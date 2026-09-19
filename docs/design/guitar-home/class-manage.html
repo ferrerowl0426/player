@@ -7,7 +7,7 @@
 <style>
 /* ============================================================
    班级管理 · 仅教导主任
-   四个功能框：教导主任列表 / 老师列表 / 班级列表 / 学员列表
+   三个主体组件：教导主任列表 / 老师列表 / 班级·学员联合列表
    视觉遵循 design-spec v2.0
 ============================================================ */
 :root{
@@ -37,7 +37,7 @@ body{
   font-size:14.5px;line-height:1.65;
   -webkit-font-smoothing:antialiased;
   display:flex;flex-direction:column;
-  overflow:hidden;
+  overflow:hidden;overflow-x:hidden;
 }
 /* 格纹底饰：焦糖咖啡色 · 下浓上淡 · 近页头逐渐消失（design-spec v2.0 §3） */
 body::after{display:none}
@@ -163,24 +163,41 @@ input{font-family:inherit}
 
 /* ---- 行 ---- */
 .rows{flex:1;min-height:0;padding:2px 0}
-.row{padding:8px 14px;border-bottom:1px solid rgba(221,208,180,.55);transition:background .2s}
-.row:last-child{border-bottom:none}
+.row{
+  position:relative;display:flex;align-items:center;gap:9px;min-height:54px;
+  padding:8px 14px;border-bottom:1px solid rgba(221,208,180,.55);transition:background .2s;
+}
+/* 正常列表最后一行保留下边缘线；只有发生盒内滚动时去掉，避免滚动底部出现截断线 */
+.rows.has-scroll .row:last-child,.rows.has-scroll .cls-row:last-child{border-bottom:none}
 .row:hover{background:rgba(255,252,242,.7)}
-.row.off{background:rgba(93,67,38,.05)}
+.row.off{background:#eeeae3}
 .row.off .nm,.row.off .acct{color:var(--ink-3)}
-.r-top{display:flex;align-items:center;gap:9px}
+.r-top{display:flex;align-items:center;gap:7px;min-width:0;flex:1}
 .ava{
   width:30px;height:30px;border-radius:50%;flex:none;
   border:1.5px solid var(--coffee);background:var(--white);
   display:grid;place-items:center;font-size:11.5px;color:var(--coffee);font-weight:600;
 }
 .row.off .ava{border-color:var(--hair-2);color:var(--ink-3)}
-.r-top .txt{min-width:0;flex:1;display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
-.r-top .nm{font-size:12.5px;font-weight:600;letter-spacing:.5px;white-space:nowrap}
-.r-top .acct{font-size:10px;color:var(--ink-3);letter-spacing:.4px}
-.r-bot{display:flex;align-items:center;gap:8px;margin-top:6px;padding-left:39px;flex-wrap:wrap}
-.r-bot .row-ops{margin-left:auto}
+.r-top .txt{min-width:0;display:flex;align-items:center;gap:7px;overflow:hidden;flex-wrap:wrap;flex:1}
+.r-top .txt .cls-chips{flex:0 0 100%;width:100%;}
+.r-top .nm,.r-top .acct{
+  flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.r-top .nm{width:76px;font-size:12.5px;font-weight:600;letter-spacing:.5px}
+.r-top .acct{width:106px;font-size:10px;color:var(--ink-3);letter-spacing:.4px}
+.r-bot{display:flex;align-items:center;gap:8px;min-width:0;flex:none;margin-top:0;padding-left:0;flex-wrap:nowrap}
+.r-bot .row-ops{margin-left:0}
 .row-ops{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.row.off .rbtn{color:var(--ink-3);border-color:var(--hair-2)}
+.row.off .rbtn:hover{border-color:var(--ink-3);background:rgba(255,255,255,.6)}
+/* 账号列表保持统一的一行高度与单行信息格式 */
+.rows .row{min-height:54px}
+.rows .r-top{flex-wrap:nowrap}
+.rows .r-top .txt{flex-wrap:nowrap}
+.rows .r-top .txt .cls-chips{display:none}
+.rows .r-bot{margin-left:auto}
+.rows .r-bot .row-ops{flex-wrap:nowrap}
 .rbtn{
   font-size:10px;letter-spacing:1px;color:var(--coffee);
   border:1px solid var(--hair-2);border-radius:4px;padding:2.5px 10px;
@@ -189,12 +206,18 @@ input{font-family:inherit}
 .rbtn:hover{border-color:var(--coffee);background:rgba(255,252,242,.9)}
 .rbtn.danger{color:#b4452e;border-color:rgba(180,69,46,.45)}
 .rbtn.danger:hover{border-color:#b4452e;color:#b4452e;background:rgba(180,69,46,.06)}
+.rbtn:disabled,.rbtn:disabled:hover{color:#b8ad9a;border-color:var(--hair);background:rgba(93,67,38,.04);cursor:not-allowed;filter:none}
 .rbtn.acc{color:var(--orange);border-color:rgba(255,127,0,.5)}
 .rbtn.acc:hover{border-color:var(--orange);background:rgba(255,127,0,.08)}
-.st-chip{flex:none;width:fit-content;font-size:9.5px;letter-spacing:1.5px;border-radius:3px;padding:1.5px 9px}
-.st-chip.ok{color:var(--green);border:1px solid rgba(79,125,58,.4);background:rgba(79,125,58,.07)}
-.st-chip.off{color:#b4452e;border:1px solid rgba(180,69,46,.45);background:rgba(180,69,46,.05)}
+.st-chip{flex:none;font-size:9.5px;letter-spacing:1.5px;border-radius:3px;padding:1.5px 9px}
+/* 正常状态不再额外占位；停用状态统一用灰色底承载 */
+.st-chip.ok{display:none}
+.st-chip.off{color:var(--ink-3);border:1px solid var(--hair-2);background:rgba(93,67,38,.10)}
 .cls-chips{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+/* 老师班级标签放在手机号下一行，避免姓名/账号列被挤歪 */
+.r-bot .cls-chips{width:100%;padding-left:0}
+.r-bot .cls-mini{display:inline-block}
+
 .cls-mini{
   font-size:9.5px;letter-spacing:.5px;color:var(--ink-2);
   border:1px solid var(--hair-2);border-radius:3px;padding:1px 7px;background:var(--white);
@@ -209,7 +232,8 @@ input{font-family:inherit}
   padding:9px 14px;border-bottom:1px solid rgba(221,208,180,.55);
   border-left:3px solid transparent;transition:background .2s,border-color .2s;
 }
-.cls-row:last-child{border-bottom:none}
+/* 最后一行是否去底线由容器是否真的发生滚动统一控制 */
+.cls-row:last-child{border-bottom:1px solid rgba(221,208,180,.55)}
 .cls-row:hover{background:rgba(255,252,242,.7)}
 .cls-row.on{background:rgba(111,143,99,.14);border-left-color:#6f8f63}
 .cls-row.on .nm{color:#4a6b3f;font-weight:700}
@@ -278,7 +302,7 @@ input{font-family:inherit}
 .pwd-row input{flex:1}
 .pwd-row .mbtn{white-space:nowrap}
 .f-tip{font-size:10px;color:var(--ink-3);letter-spacing:.4px;line-height:1.7;margin:-4px 0 0}
-/* 勾选列表（分班 / 添加学员） */
+/* 勾选列表（学员选择等场景） */
 .cls-check{display:flex;flex-direction:column;gap:7px}
 .cls-check.grid{
   display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;
@@ -301,8 +325,35 @@ input{font-family:inherit}
 .cls-check .mini-cls{font-size:9.5px;color:var(--ink-3);letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .f-note{margin-top:10px;font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;border-top:1px dashed var(--hair);padding-top:8px}
 
+/* ---- 编辑资料弹层 ---- */
+/* 只读字段（账号）：灰底不可改 */
+.f-row input[type=text][readonly]{
+  background:rgba(93,67,38,.05);color:var(--ink-2);cursor:default;
+}
+.f-row input[type=text][readonly]:focus{border-color:var(--hair-2)}
+/* 密码两态：默认「已设置 · 不保存明文」+ 重置按钮；点击重置后才出现新密码输入 */
+.pwd-line{display:flex;align-items:center;gap:10px;min-height:36px}
+.pwd-dots{font-size:15px;letter-spacing:3px;color:var(--ink-3);line-height:1}
+.lnk{
+  font-size:10px;letter-spacing:.5px;color:var(--coffee);
+  text-decoration:underline;text-underline-offset:2px;padding:0 1px;
+}
+.lnk:hover{color:var(--orange)}
+/* 可移除的班级 chip（编辑资料 · 老师） */
+.chip-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.cls-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;letter-spacing:.5px;color:var(--ink-2);
+  border:1px solid var(--hair-2);border-radius:3px;padding:2px 3px 2px 8px;background:var(--white);
+}
+.cls-chip .x{
+  width:15px;height:15px;border-radius:3px;display:grid;place-items:center;
+  font-size:11px;line-height:1;color:var(--ink-3);transition:all .2s;
+}
+.cls-chip .x:hover{background:rgba(180,69,46,.08);color:#b4452e}
+
 .dean-toast{
-  position:fixed;left:50%;bottom:28px;transform:translate(-50%, 12px);z-index:99;
+  position:fixed;top:70px;bottom:auto;left:50%;transform:translate(-50%, -12px);z-index:1000;
   font-size:11.5px;letter-spacing:.5px;color:var(--coffee);
   background:var(--white);border:1.5px solid var(--coffee);border-radius:6px;
   padding:7px 18px;box-shadow:0 6px 18px rgba(60,42,20,.15);
@@ -359,15 +410,7 @@ input{font-family:inherit}
 
 <main class="home" data-page-node-id="gC1QvwH1fxgVQ2zTCS9cjt">
 
-  <!-- 工具行 -->
-  <div class="toolrow rise" data-page-node-id="3uGJkE5LL5FO2IRfGiGBvS">
-    <span class="hint" data-page-node-id="fgmOGjL0dAvqWSLbEFcrEn">教导主任管理全校账号与班级 · 学员归属唯一班级 · 老师可带多个班级</span>
-    <span class="zbtn-wrap" data-page-node-id="eiY3RBrqSiPNSPM2zgMdLM">
-      <button class="zbtn main" id="newBtn" data-page-node-id="FsDjW4tZNFBdfseYHsE7vv">＋ 新建账号</button>
-    </span>
-  </div>
-
-  <div class="grid4 rise d1" data-page-node-id="grid4Nxde0a">
+  <div class="grid4 rise" data-page-node-id="grid4Nxde0a">
 
     <!-- ============ 1 · 教导主任列表 ============ -->
     <section class="zone" data-page-node-id="qv8MxdgdFSHKRNls80ZhQd">
@@ -375,7 +418,7 @@ input{font-family:inherit}
         <h2 data-page-node-id="7YimRWUH00SvujJeW71G6c">教导主任</h2>
         <span class="meta num" id="deanMeta" data-page-node-id="H0Sh2G4cGTtBiDCrAL8ZyY">共 0 人</span>
         <div class="zone-ops" data-page-node-id="deanOpsNxde0a">
-          <button class="zbtn mini" id="addDean" data-page-node-id="addDeanBtnNxde0a">＋ 新增教导主任</button>
+          <button class="zbtn mini" id="addDean" data-page-node-id="addDeanBtnNxde0a">＋ 新建教导主任</button>
         </div>
       </div>
       <div class="rows scroll" id="deanRows" data-page-node-id="HGYxJ4hZkKYWtVEgbIc5mt"><!-- JS 渲染 --></div>
@@ -387,7 +430,7 @@ input{font-family:inherit}
         <h2 data-page-node-id="teaTitleNxde0a">老师</h2>
         <span class="meta num" id="teaMeta" data-page-node-id="teaMetaNxde0a">共 0 人</span>
         <div class="zone-ops" data-page-node-id="teaOpsNxde0a">
-          <button class="zbtn mini" id="addTea" data-page-node-id="addTeaBtnNxde0a">＋ 新增老师</button>
+          <button class="zbtn mini" id="addTea" data-page-node-id="addTeaBtnNxde0a">＋ 新建老师</button>
         </div>
       </div>
       <div class="rows scroll" id="teaRows" data-page-node-id="teaRowsNxde0a"><!-- JS 渲染 --></div>
@@ -398,12 +441,8 @@ input{font-family:inherit}
       <div class="zone-head" data-page-node-id="clsHeadNxde0a">
         <h2 data-page-node-id="clsTitleNxde0a">班级 / 学员</h2>
         <div class="zone-ops" data-page-node-id="clsOpsNxde0a">
-          <div class="minisearch wide" data-page-node-id="stuSearchNxde0a">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" data-page-node-id="stuSearchIcoNxde0a"><circle cx="11" cy="11" r="7" data-page-node-id="stuSearchC1Nxde0a"/><path d="m20 20-3.5-3.5" data-page-node-id="stuSearchP1Nxde0a"/></svg>
-            <input type="text" id="stuKw" placeholder="搜索学员 · 自动定位所在班级…" aria-label="搜索学员" data-page-node-id="stuKwInpNxde0a">
-          </div>
           <button class="zbtn mini" id="addCls" data-page-node-id="addClsBtnNxde0a">＋ 新建班级</button>
-          <button class="zbtn mini" id="addStu" data-page-node-id="addStuBtnNxde0a">＋ 添加学员</button>
+          <button class="zbtn mini" id="addStu" data-page-node-id="addStuBtnNxde0a">＋ 新建学员</button>
         </div>
       </div>
       <div class="split" data-page-node-id="splitNxde0a">
@@ -428,11 +467,11 @@ input{font-family:inherit}
 
 </main>
 
-<!-- ============ 新建账号 ============ -->
-<div class="modal-mask" id="newModal" role="dialog" aria-modal="true" aria-label="新建账号" data-page-node-id="mKmlsVnccDMdGEdUoGp5sJ">
+<!-- ============ 新建账号（按入口显示角色） ============ -->
+<div class="modal-mask" id="newModal" role="dialog" aria-modal="true" aria-label="新建" data-page-node-id="mKmlsVnccDMdGEdUoGp5sJ">
   <div class="modal" data-page-node-id="6RCLGXe4uHh2wH8cr5OdhO">
-    <div class="modal-title" data-page-node-id="KG1AkSFaKlB8jwBvGSLSdx">新 建 账 号</div>
-    <div class="f-row" data-page-node-id="GyIOQvp1gK3SutTK8UHY0e">
+    <div class="modal-title" id="newTitle" data-page-node-id="KG1AkSFaKlB8jwBGSLSdx">新 建 学 员</div>
+    <div class="f-row" id="fRoleRow" data-page-node-id="GyIOQvp1gK3SutTK8UHY0e">
       <label data-page-node-id="7SQXfeuofpqII3DcYWZZ1B">角色</label>
       <select id="fRole" aria-label="选择角色" data-page-node-id="fRoleSelNxde0a">
         <option value="教导主任" data-page-node-id="fRoleOpt3Nxde0a">教导主任</option>
@@ -454,13 +493,13 @@ input{font-family:inherit}
       <div class="f-tip" id="fClsTip" style="margin-top:6px" data-page-node-id="fClsTipNxde0a">学员只能属于一个班级，可创建后再调整。</div>
     </div>
     <div class="f-row" data-page-node-id="MgsgLK8JVRVSHjLrVTFvTk">
-      <label data-page-node-id="jqANOPJqCBzKaJp21Q8u4U">初始密码（系统生成 · 只能重置不能修改）</label>
+      <label data-page-node-id="jqANOPJqCBzKaJp21Q8u4U">初始密码（可手动输入，也可随机生成）</label>
       <div class="pwd-row" data-page-node-id="mZn9S0DmcmMSRNXH5b0gVx">
-        <input type="text" id="fPwd" readonly data-page-node-id="sjK9TGu2nJrpAYwdKpyXNN">
-        <button type="button" class="mbtn" id="genPwd" data-page-node-id="YPdVPVr8QUCzGOdKUtXQ4C">重新生成</button>
+        <input type="text" id="fPwd" placeholder="输入密码（5~30 位）" maxlength="30" data-page-node-id="sjK9TGu2nJrpAYwdKpyXNN">
+        <button type="button" class="mbtn" id="genPwd" data-page-node-id="YPdVPVr8QUCzGOdKUtXQ4C">随机生成</button>
         <button type="button" class="mbtn" id="copyPwd" data-page-node-id="0PdPCBqkyDbUTljtsyyPkb">复制</button>
       </div>
-      <div class="f-tip" style="margin-top:6px" data-page-node-id="bpTVDJNavsK1ukVJHZrGBK">密码发放给本人后请提醒其妥善保管；平台无自助改密，忘记只能由教导主任重置。</div>
+      <div class="f-tip" style="margin-top:6px" data-page-node-id="bpTVDJNavsK1ukVJHZrGBK">密码不会保存明文；可直接输入，或点击「随机生成」后再保存。</div>
     </div>
     <div class="modal-ops" data-page-node-id="WoNwrTsAPE2ASWB6xjp34w">
       <button type="button" class="mbtn" id="newCancel" data-page-node-id="WTwGWHhGkVmd1DApe62WFH">取 消</button>
@@ -469,16 +508,54 @@ input{font-family:inherit}
   </div>
 </div>
 
-<!-- ============ 分班 / 转班 ============ -->
-<div class="modal-mask" id="clsModal" role="dialog" aria-modal="true" aria-label="分班" data-page-node-id="oZiQEvwODu5qBBfzLhBeqG">
-  <div class="modal" data-page-node-id="xa6j7dXzYi11sIWVBoWhlt">
-    <div class="modal-title" id="clsTitle" data-page-node-id="VvpzjqO9KBTHao1nCyo5vH">分 班</div>
-    <p id="clsWho" style="margin-bottom:10px" data-page-node-id="Zx646TWy4wJaBKaSmvxT07"></p>
-    <div class="cls-check" id="clsCheck" data-page-node-id="s0KzC5oxJfBCdh5EI1Xs3I"><!-- JS 渲染 --></div>
-    <div class="f-note" id="clsNote" data-page-node-id="lezdvjluqXdajVOiHOutfT">学员只能属于一个班级；老师可同时绑定多个班级。</div>
-    <div class="modal-ops" data-page-node-id="uuA5uZCQ3GAEvJCxxNEGZ0">
-      <button type="button" class="mbtn" id="clsCancel" data-page-node-id="7e1GB1x17KP81mRtt7XqjP">取 消</button>
-      <button type="button" class="mbtn primary" id="clsOk" data-page-node-id="9qN8X8AsMqFjzzquPCQjKC">保 存</button>
+<!-- ============ 编辑资料（教导主任 / 老师 / 学员 通用） ============ -->
+<div class="modal-mask" id="editModal" role="dialog" aria-modal="true" aria-label="编辑资料" data-page-node-id="editModalNxde1b">
+  <div class="modal" data-page-node-id="editBoxNxde1b">
+    <div class="modal-title" data-page-node-id="edTitleNxde1b">编 辑 资 料</div>
+    <p id="edWho" style="margin-bottom:12px" data-page-node-id="edWhoNxde1b"></p>
+
+    <div class="f-row" data-page-node-id="edAcctRowNxde1b">
+      <label data-page-node-id="edAcctLblNxde1b">账号（登录账号 · 不可更改）</label>
+      <input type="text" id="edAcct" readonly data-page-node-id="edAcctInpNxde1b">
+    </div>
+
+    <div class="f-row" data-page-node-id="edNickRowNxde1b">
+      <label data-page-node-id="edNickLblNxde1b">昵称</label>
+      <input type="text" id="edNick" maxlength="10" placeholder="仅用于界面展示（列表 / 留言署名）" data-page-node-id="edNickInpNxde1b">
+      <div class="f-tip" style="margin-top:6px" data-page-node-id="edNickTipNxde1b">≤ 10 字，仅中文 / 字母 / 数字 / 下划线。</div>
+    </div>
+
+    <div class="f-row" data-page-node-id="edPwdRowNxde1b">
+      <label data-page-node-id="edPwdLblNxde1b">密码</label>
+      <div class="pwd-line" id="edPwdView" data-page-node-id="edPwdViewNxde1b">
+        <span class="pwd-dots" data-page-node-id="edPwdDotsNxde1b">••••••••</span>
+        <button type="button" class="mbtn" id="edPwdBtn" data-page-node-id="edPwdBtnNxde1b">重置密码</button>
+      </div>
+      <div id="edPwdEdit" style="display:none" data-page-node-id="edPwdEditNxde1b">
+        <div class="pwd-row">
+          <input type="text" id="edPwd" placeholder="输入新密码（5~30 位）" maxlength="30" data-page-node-id="edPwdInpNxde1b">
+          <button type="button" class="mbtn" id="edGenPwd" data-page-node-id="edGenPwdNxde1b">随机生成</button>
+        </div>
+        <div class="f-tip" style="margin-top:6px" data-page-node-id="edPwdEditTipNxde1b">保存后原密码立即失效 · <button type="button" class="lnk" id="edPwdUndo" data-page-node-id="edPwdUndoNxde1b">取消重置</button></div>
+      </div>
+      <div class="f-tip" id="edPwdTip" style="margin-top:6px" data-page-node-id="edPwdTipNxde1b">平台不保存明文密码；只有点击「重置密码」并保存后才会覆盖。</div>
+    </div>
+
+    <div class="f-row" id="edClsTeaRow" data-page-node-id="edClsTeaRowNxde1b">
+      <label data-page-node-id="edClsTeaLblNxde1b">所带班级</label>
+      <div class="chip-wrap" id="edClsChips" data-page-node-id="edClsChipsNxde1b"><!-- JS 渲染 --></div>
+      <div class="f-tip" style="margin-top:6px" data-page-node-id="edClsTeaTipNxde1c">班级归属请在「班级」列表中编辑对应班级；一个班级只能有一位负责老师。</div>
+    </div>
+
+    <div class="f-row" id="edClsStuRow" data-page-node-id="edClsStuRowNxde1b">
+      <label data-page-node-id="edClsStuLblNxde1b">所在班级（只能一个）</label>
+      <select id="edClsSel" aria-label="选择班级" data-page-node-id="edClsSelNxde1b"><!-- JS 渲染 --></select>
+      <div class="f-tip" style="margin-top:6px" data-page-node-id="edClsStuTipNxde1b">选择「未分班学员」即转入待分班，账号与学习记录保留。</div>
+    </div>
+
+    <div class="modal-ops" data-page-node-id="edOpsNxde1b">
+      <button type="button" class="mbtn" id="edCancel" data-page-node-id="edCancelNxde1b">取 消</button>
+      <button type="button" class="mbtn primary" id="edOk" data-page-node-id="edOkNxde1b">保 存</button>
     </div>
   </div>
 </div>
@@ -491,11 +568,7 @@ input{font-family:inherit}
       <label data-page-node-id="classModalLbl1Nxde0a">班级名称</label>
       <input type="text" id="clsName" placeholder="如 进阶二班" maxlength="12" data-page-node-id="clsNameInpNxde0a">
     </div>
-    <div class="f-row" data-page-node-id="classModalRow2Nxde0a">
-      <label data-page-node-id="classModalLbl2Nxde0a">备注（选填）</label>
-      <input type="text" id="clsMemo" placeholder="如 每周六上午 · 计划 4 人" maxlength="20" data-page-node-id="clsMemoInpNxde0a">
-    </div>
-    <div class="f-tip" data-page-node-id="classModalTipNxde0a">创建后可在「老师」列表中为其设置所带班级，在右侧学员列表中把学员加入该班级。</div>
+    <div class="f-tip" data-page-node-id="classModalTipNxde0a">先建名字即可，负责老师可稍后在班级「编辑」中分配。</div>
     <div class="modal-ops" data-page-node-id="classModalOpsNxde0a">
       <button type="button" class="mbtn" id="classCancel" data-page-node-id="classCancelNxde0a">取 消</button>
       <button type="button" class="mbtn primary" id="classOk" data-page-node-id="classOkNxde0a">创建班级</button>
@@ -503,42 +576,22 @@ input{font-family:inherit}
   </div>
 </div>
 
-<!-- ============ 添加学员到班级 ============ -->
-<div class="modal-mask" id="addStuModal" role="dialog" aria-modal="true" aria-label="添加学员" data-page-node-id="addStuModalNxde0a">
-  <div class="modal wide" data-page-node-id="addStuBoxNxde0a">
-    <div class="modal-title" data-page-node-id="addStuTitleNxde0a">添 加 学 员</div>
-    <div class="f-row" data-page-node-id="addStuClsRowNxde0a">
-      <label data-page-node-id="addStuClsLblNxde0a">加入班级</label>
-      <select id="addStuCls" aria-label="选择目标班级" data-page-node-id="addStuClsSelNxde0a"><!-- JS 渲染 --></select>
-      <div class="f-tip" style="margin-top:6px" data-page-node-id="addStuClsTipNxde0a">可选择具体班级，也可以先不分班（进入「未分班学员」）。</div>
+<!-- ============ 编辑班级（改名 + 更换负责老师） ============ -->
+<div class="modal-mask" id="ceditModal" role="dialog" aria-modal="true" aria-label="编辑班级" data-page-node-id="ceditModalNxde1b">
+  <div class="modal" data-page-node-id="ceditBoxNxde1b">
+    <div class="modal-title" data-page-node-id="ceditTitleNxde1b">编 辑 班 级</div>
+    <div class="f-row" data-page-node-id="ceditNameRowNxde1b">
+      <label data-page-node-id="ceditNameLblNxde1b">班级名称</label>
+      <input type="text" id="ceName" maxlength="12" placeholder="如 进阶二班" data-page-node-id="ceNameInpNxde1b">
     </div>
-    <p id="addStuWho" style="margin:2px 0 6px" data-page-node-id="addStuWhoNxde0a"></p>
-    <div class="cls-check grid" id="addStuList" data-page-node-id="addStuListNxde0a"><!-- JS 渲染 --></div>
-    <div class="f-note" data-page-node-id="addStuNoteNxde0a">学员只能属于一个班级，加入新班级后将自动从原班级转出。</div>
-    <div class="modal-ops" data-page-node-id="addStuOpsNxde0a">
-      <button type="button" class="mbtn" id="addStuCancel" data-page-node-id="addStuCancelNxde0a">取 消</button>
-      <button type="button" class="mbtn primary" id="addStuOk" data-page-node-id="addStuOkNxde0a">确认添加</button>
+    <div class="f-row" data-page-node-id="ceditTeaRowNxde1b">
+      <label data-page-node-id="ceditTeaLblNxde1b">负责老师</label>
+      <select id="ceTeacher" aria-label="选择负责老师" data-page-node-id="ceTeacherSelNxde1c"><!-- JS 渲染 --></select>
+      <div class="f-tip" style="margin-top:6px" data-page-node-id="ceditTipNxde1b">一个班级只能有一位负责老师；可先不分配，后续再编辑。</div>
     </div>
-  </div>
-</div>
-
-<!-- ============ 重置密码 ============ -->
-<div class="modal-mask" id="pwdModal" role="dialog" aria-modal="true" aria-label="重置密码" data-page-node-id="pwdModalNxde0a">
-  <div class="modal" data-page-node-id="pwdModalBoxNxde0a">
-    <div class="modal-title" data-page-node-id="pwdModalTitleNxde0a">重 置 密 码</div>
-    <p id="pwdWho" style="margin-bottom:10px" data-page-node-id="pwdWhoNxde0a"></p>
-    <div class="f-row" data-page-node-id="pwdModalRowNxde0a">
-      <label data-page-node-id="pwdModalLblNxde0a">新密码（系统生成）</label>
-      <div class="pwd-row" data-page-node-id="pwdModalPwdRowNxde0a">
-        <input type="text" id="rPwd" readonly data-page-node-id="rPwdInpNxde0a">
-        <button type="button" class="mbtn" id="rGen" data-page-node-id="rGenBtnNxde0a">重新生成</button>
-        <button type="button" class="mbtn" id="rCopy" data-page-node-id="rCopyBtnNxde0a">复制</button>
-      </div>
-      <div class="f-tip" style="margin-top:6px" data-page-node-id="pwdModalTipNxde0a">密码只能重置、不能修改；重置后原密码立即失效，请把新密码发给本人。</div>
-    </div>
-    <div class="modal-ops" data-page-node-id="pwdModalOpsNxde0a">
-      <button type="button" class="mbtn" id="pwdCancel" data-page-node-id="pwdCancelNxde0a">取 消</button>
-      <button type="button" class="mbtn primary" id="pwdOk" data-page-node-id="pwdOkNxde0a">确认重置</button>
+    <div class="modal-ops" data-page-node-id="ceditOpsNxde1b">
+      <button type="button" class="mbtn" id="ceCancel" data-page-node-id="ceCancelNxde1b">取 消</button>
+      <button type="button" class="mbtn primary" id="ceOk" data-page-node-id="ceOkNxde1b">保 存</button>
     </div>
   </div>
 </div>
@@ -560,13 +613,13 @@ input{font-family:inherit}
 <script>
 /* ================= 假数据 ================= */
 let CLASSES = [
-  {nm:'启蒙一班', off:false},
-  {nm:'启蒙二班', off:false},
-  {nm:'进阶一班', off:false},
-  {nm:'考级班',   off:false},
+  {nm:'启蒙一班', off:false, teacher:'13900002201'},
+  {nm:'启蒙二班', off:false, teacher:'13900002201'},
+  {nm:'进阶一班', off:false, teacher:'13900002202'},
+  {nm:'考级班',   off:false, teacher:'13900002202'},
 ];
 let ACCOUNTS = [
-  {nick:'王砚秋', acct:'13700003301', role:'教导主任', cls:[], off:false},
+  {nick:'王砚秋', acct:'13700003301', role:'教导主任', cls:[], off:false, root:true},
   {nick:'沈砚清', acct:'13700003302', role:'教导主任', cls:[], off:false},
   {nick:'李弦安', acct:'13900002201', role:'老师', cls:['启蒙一班','启蒙二班'], off:false},
   {nick:'赵木声', acct:'13900002202', role:'老师', cls:['进阶一班','考级班'],   off:false},
@@ -589,9 +642,28 @@ function byRole(role){ return ACCOUNTS.map((a,i)=>({a,i})).filter(x=>x.a.role===
 function clsOf(a){ return a.cls[0] || UNASSIGNED; }
 /* 是否属于某班级（含系统「未分班学员」） */
 function inCls(a, nm){ return nm === UNASSIGNED ? a.cls.length === 0 : a.cls.includes(nm); }
-function clsCount(nm, role){ return ACCOUNTS.filter(a=>a.role===role && inCls(a,nm)).length; }
-function matchStu(a, kw){ return !kw || a.nick.toLowerCase().includes(kw) || a.acct.includes(kw); }
+function clsCount(nm, role){
+  if(role === '老师') return CLASSES.find(c=>c.nm===nm && c.teacher) ? 1 : 0;
+  return ACCOUNTS.filter(a=>a.role===role && inCls(a,nm)).length;
+}
+function teacherName(acct){
+  const t = ACCOUNTS.find(a=>a.role==='老师' && a.acct===acct);
+  return t ? t.nick : '';
+}
+function syncTeacherClasses(){
+  ACCOUNTS.forEach(a=>{ if(a.role === '老师') a.cls = []; });
+  CLASSES.forEach(c=>{
+    if(!c.teacher) return;
+    const t = ACCOUNTS.find(a=>a.role==='老师' && a.acct===c.teacher);
+    if(t && !t.cls.includes(c.nm)) t.cls.push(c.nm);
+  });
+}
 function offLast(arr){ return arr.sort((p,q)=>(p.a.off?1:0)-(q.a.off?1:0)); }
+function sortStudents(arr){ return arr.sort((p,q)=>{
+  const offOrder = (p.a.off?1:0) - (q.a.off?1:0);
+  if(offOrder) return offOrder;
+  return p.a.nick.localeCompare(q.a.nick, 'zh-Hans-CN');
+}); }
 function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 /* ================= 1 · 教导主任列表 ================= */
@@ -603,12 +675,12 @@ function renderDean(){
       '<div class="r-top">' +
         '<span class="ava">' + esc(a.nick[0]) + '</span>' +
         '<span class="txt"><span class="nm">' + esc(a.nick) + '</span><span class="acct num">' + a.acct + '</span></span>' +
-        '<span class="st-chip ' + (a.off?'off':'ok') + '">' + (a.off?'已停用':'正常') + '</span>' +
       '</div>' +
       '<div class="r-bot">' +
         '<span class="row-ops">' +
-          '<button class="rbtn" data-act="pwd" data-i="' + i + '">重置密码</button>' +
-          '<button class="rbtn danger" data-act="del" data-i="' + i + '">删除</button>' +
+          '<button class="rbtn" data-act="edit" data-i="' + i + '">编辑</button>' +
+          '<button class="rbtn" data-act="off" data-i="' + i + '">' + (a.off?'恢复':'停用') + '</button>' +
+          '<button class="rbtn danger" ' + (a.root ? 'disabled aria-disabled="true" title="初始超级管理员不可删除"' : 'data-act="del" data-i="' + i + '"') + '>删除</button>' +
         '</span>' +
       '</div>' +
     '</div>'
@@ -624,15 +696,10 @@ function renderTea(){
       '<div class="r-top">' +
         '<span class="ava">' + esc(a.nick[0]) + '</span>' +
         '<span class="txt"><span class="nm">' + esc(a.nick) + '</span><span class="acct num">' + a.acct + '</span></span>' +
-        '<span class="st-chip ' + (a.off?'off':'ok') + '">' + (a.off?'已停用':'正常') + '</span>' +
       '</div>' +
       '<div class="r-bot">' +
-        '<span class="cls-chips">' + (a.cls.length
-            ? a.cls.map(c=>'<span class="cls-mini">' + esc(c) + '</span>').join('')
-            : '<span class="cls-mini none">未带班</span>') + '</span>' +
         '<span class="row-ops">' +
-          '<button class="rbtn acc" data-act="cls" data-i="' + i + '">设置班级</button>' +
-          '<button class="rbtn" data-act="pwd" data-i="' + i + '">重置密码</button>' +
+          '<button class="rbtn" data-act="edit" data-i="' + i + '">编辑</button>' +
           '<button class="rbtn" data-act="off" data-i="' + i + '">' + (a.off?'恢复':'停用') + '</button>' +
           '<button class="rbtn danger" data-act="del" data-i="' + i + '">删除</button>' +
         '</span>' +
@@ -656,23 +723,16 @@ function renderCls(){
         (c.sys ? '' : ' · ' + clsCount(c.nm,'老师') + ' 老师') + '</span>' +
       (c.sys ? '' :
         '<span class="row-ops">' +
-          '<button class="rbtn" data-act="coff" data-nm="' + esc(c.nm) + '">' + (c.off?'恢复':'停用') + '</button>' +
+          '<button class="rbtn" data-act="cedit" data-nm="' + esc(c.nm) + '">编辑</button>' +
           '<button class="rbtn danger" data-act="cdel" data-nm="' + esc(c.nm) + '">删除</button>' +
         '</span>') +
     '</div>'
   ).join('');
 }
 
-/* ================= 4 · 学员列表（跟随选中班级 · 搜索自动定位班级） ================= */
-const stuKw = document.getElementById('stuKw');
+/* ================= 4 · 学员列表（跟随选中班级 · 字典序排列 · 停用置底） ================= */
 function renderStu(){
   const box = document.getElementById('stuRows');
-  const kw = stuKw.value.trim().toLowerCase();
-  /* 搜索联动：当前班级未命中时，自动切到第一个命中学员所在的班级 */
-  if(kw && !ACCOUNTS.some(a=>a.role==='学员' && clsOf(a)===curCls && matchStu(a,kw))){
-    const hit = ACCOUNTS.find(a=>a.role==='学员' && matchStu(a,kw));
-    if(hit){ curCls = clsOf(hit); renderCls(); }
-  }
   const c = CLASSES.find(x=>x.nm===curCls);
   const isSys = curCls === UNASSIGNED;
   if(!c && !isSys){
@@ -680,31 +740,32 @@ function renderStu(){
     box.innerHTML = '<div class="list-empty">请在左侧「班级」列表中选择一个班级<br>右侧将显示该班级的全部学员</div>';
     return;
   }
-  let list = offLast(ACCOUNTS.map((a,i)=>({a,i})).filter(x=>x.a.role==='学员' && inCls(x.a, curCls)));
-  if(kw) list = list.filter(x=>matchStu(x.a, kw));
+  const list = sortStudents(ACCOUNTS.map((a,i)=>({a,i})).filter(x=>x.a.role==='学员' && inCls(x.a, curCls)));
   document.getElementById('stuMeta').textContent = curCls + ' · ' + list.length + ' 人' + (c && c.off ? ' · 已停用' : '');
   box.innerHTML = list.length ? list.map(({a,i})=>
     '<div class="row' + (a.off?' off':'') + '">' +
       '<div class="r-top">' +
         '<span class="ava">' + esc(a.nick[0]) + '</span>' +
         '<span class="txt"><span class="nm">' + esc(a.nick) + '</span><span class="acct num">' + a.acct + '</span></span>' +
-        '<span class="st-chip ' + (a.off?'off':'ok') + '">' + (a.off?'已停用':'正常') + '</span>' +
       '</div>' +
       '<div class="r-bot">' +
         '<span class="row-ops">' +
-          '<button class="rbtn acc" data-act="move" data-i="' + i + '">转班</button>' +
-          (isSys ? '' : '<button class="rbtn" data-act="out" data-i="' + i + '">移出本班</button>') +
+          '<button class="rbtn" data-act="edit" data-i="' + i + '">编辑</button>' +
           '<button class="rbtn" data-act="off" data-i="' + i + '">' + (a.off?'恢复':'停用') + '</button>' +
           '<button class="rbtn danger" data-act="del" data-i="' + i + '">删除</button>' +
         '</span>' +
       '</div>' +
     '</div>'
-  ).join('') : '<div class="list-empty">' + (kw ? '未找到相关学员' : (isSys ? '暂无未分班学员' : '该班级暂无学员')) + '</div>';
+  ).join('') : '<div class="list-empty">' + (isSys ? '暂无未分班学员' : '该班级暂无学员') + '</div>';
 }
-stuKw.addEventListener('input', renderStu);
-stuKw.addEventListener('keydown', e=>{ if(e.key==='Escape'){ stuKw.value=''; renderStu(); } });
 
-function renderAll(){ renderDean(); renderTea(); renderCls(); renderStu(); }
+function syncScrollState(){
+  document.querySelectorAll('.rows.scroll').forEach(box=>{
+    box.classList.toggle('has-scroll', box.scrollHeight > box.clientHeight + 1);
+  });
+}
+function renderAll(){ syncTeacherClasses(); renderDean(); renderTea(); renderCls(); renderStu(); requestAnimationFrame(syncScrollState); }
+window.addEventListener('resize', syncScrollState);
 
 /* ================= Toast / 确认弹层 ================= */
 const toastBox = document.getElementById('toast');
@@ -730,21 +791,13 @@ cfmModal.addEventListener('click', e=>{ if(e.target===cfmModal) cfmModal.classLi
 
 /* ================= 行操作分发 ================= */
 function handleRowAct(act, el){
+  if(!act) return;
   const i = el.dataset.i === undefined ? -1 : parseInt(el.dataset.i, 10);
   const a = i >= 0 ? ACCOUNTS[i] : null;
 
-  if(act === 'pwd'){ openPwd(a); return; }
-  if(act === 'cls'){ openCls(a); return; }
-  if(act === 'move'){ openCls(a); return; }        /* 学员转班 */
-  if(act === 'out'){
-    confirmBox('移 出 本 班',
-      '确定把「<b>' + esc(a.nick) + '</b>」从「<b class="hl">' + esc(curCls) + '</b>」移出吗？<br>移出后 TA 将进入系统班级「未分班学员」，账号仍然保留。',
-      '确认移出', ()=>{
-        a.cls = [];
-        renderAll(); toast('演示：已将「' + a.nick + '」移入「未分班学员」');
-      });
-    return;
-  }
+  if(a && a.root && (act === 'edit' || act === 'del')) return;
+  if(act === 'edit'){ openEdit(a); return; }
+  if(act === 'cedit'){ openClsEdit(el.dataset.nm); return; }
   if(act === 'off'){
     if(a.off){
       a.off = false; renderAll(); toast('演示：已恢复「' + a.nick + '」');
@@ -760,12 +813,15 @@ function handleRowAct(act, el){
   if(act === 'del'){
     const extra = a.role === '教导主任'
       ? '<br>系统至少需保留 1 位教导主任。'
-      : '<br>删除后账号与登录凭证将不可恢复。';
+      : (a.role === '学员'
+        ? '<br>删除后将彻底删除该学员数据，账号、班级关系与学习记录均不可恢复。'
+        : '<br>删除后账号与登录凭证将不可恢复。');
     if(a.role === '教导主任' && byRole('教导主任').length <= 1){ toast('至少保留 1 位教导主任'); return; }
     confirmBox('删 除 账 号',
       '确定要删除「<b>' + esc(a.nick) + '</b>」（' + a.acct + '）吗？' + extra,
       '确认删除', ()=>{
         const nm = a.nick;
+        if(a.role === '老师') CLASSES.forEach(c=>{ if(c.teacher === a.acct) c.teacher = ''; });
         ACCOUNTS.splice(i,1); renderAll(); toast('演示：已删除「' + nm + '」');
       });
     return;
@@ -792,7 +848,11 @@ function handleRowAct(act, el){
       '确定要删除班级「<b class="hl">' + esc(nm) + '</b>」吗？<br>班内 ' + n + ' 名学员将进入「未分班学员」，账号与历史记录保留。',
       '确认删除', ()=>{
         CLASSES = CLASSES.filter(x=>x.nm!==nm);
-        ACCOUNTS.forEach(x=>{ x.cls = x.cls.filter(c=>c!==nm); });
+        /* 删除班级后，所有归属学生统一转入系统班级「未分班学员」 */
+        ACCOUNTS.forEach(x=>{
+          if(x.role === '学员' && x.cls.includes(nm)) x.cls = [];
+          else x.cls = x.cls.filter(c=>c!==nm);
+        });
         if(curCls === nm) curCls = CLASSES.length ? CLASSES[0].nm : UNASSIGNED;
         renderAll(); toast('演示：已删除班级「' + nm + '」');
       });
@@ -815,53 +875,119 @@ document.getElementById('clsRows').addEventListener('click', e=>{
   if(b){ handleRowAct(b.dataset.act, b); return; }
   const row = e.target.closest('.cls-row'); if(!row) return;
   curCls = row.dataset.nm;
-  stuKw.value = '';
   renderCls(); renderStu();
 });
 document.getElementById('clsRows').addEventListener('keydown', e=>{
   if(e.key !== 'Enter' && e.key !== ' ') return;
   const row = e.target.closest('.cls-row'); if(!row) return;
   e.preventDefault();
-  curCls = row.dataset.nm; stuKw.value = '';
+  curCls = row.dataset.nm;
   renderCls(); renderStu();
 });
 
-/* ================= 分班 / 转班弹层 ================= */
-const clsModal = document.getElementById('clsModal');
-let clsTarget = null;
-function openCls(a){
-  if(!a) return;
-  clsTarget = a;
-  const isStu = a.role === '学员';
-  document.getElementById('clsTitle').textContent = isStu ? '转 班' : '设 置 班 级';
-  document.getElementById('clsWho').innerHTML = isStu
-    ? '为「<b class="hl">' + esc(a.nick) + '</b>」选择目标班级：'
-    : '为老师「<b class="hl">' + esc(a.nick) + '</b>」选择所带班级：';
-  const opts = CLASSES.filter(c=>!c.off || a.cls.includes(c.nm));
-  document.getElementById('clsCheck').innerHTML = opts.length ? opts.map(c=>
-      '<label><input type="checkbox" value="' + esc(c.nm) + '"' + (a.cls.includes(c.nm)?' checked':'') + '>' +
-      '<span class="cbx">✓</span>' + esc(c.nm) + (c.off ? '<span class="mini-cls">已停用</span>' : '') + '</label>'
-    ).join('') : '<div class="list-empty" style="padding:14px 0">暂无可选班级</div>';
-  document.getElementById('clsNote').textContent = isStu
-    ? '学员只能属于一个班级，勾选新班级后将自动从原班级转出。'
-    : '老师可同时绑定多个班级（一师多班），其学生管理范围 = 所绑班级的并集。';
-  clsModal.classList.add('show');
+/* ================= 编辑资料（账号只读 · 昵称可改 · 密码按需重置） ================= */
+const editModal = document.getElementById('editModal');
+let editTarget = null;
+let editPwdDirty = false;
+let editClsDraft = [];
+function activeClasses(keep){
+  keep = keep || [];
+  return CLASSES.filter(c=>!c.off || keep.includes(c.nm));
 }
-document.getElementById('clsCheck').addEventListener('change', e=>{
-  if(clsTarget && clsTarget.role === '学员' && e.target.checked){
-    document.querySelectorAll('#clsCheck input').forEach(x=>{ if(x !== e.target) x.checked = false; });
+function setEditPwdReset(on){
+  editPwdDirty = !!on;
+  document.getElementById('edPwdView').style.display = on ? 'none' : 'flex';
+  document.getElementById('edPwdEdit').style.display = on ? '' : 'none';
+  document.getElementById('edPwd').value = '';
+  if(on) setTimeout(()=>document.getElementById('edPwd').focus(), 30);
+}
+document.getElementById('edGenPwd').addEventListener('click', ()=>{
+  setEditPwdReset(true);
+  document.getElementById('edPwd').value = makePwd();
+});
+function renderEditClasses(){
+  const teaRow = document.getElementById('edClsTeaRow');
+  const stuRow = document.getElementById('edClsStuRow');
+  teaRow.style.display = editTarget && editTarget.role === '老师' ? '' : 'none';
+  stuRow.style.display = editTarget && editTarget.role === '学员' ? '' : 'none';
+  if(!editTarget) return;
+  if(editTarget.role === '老师'){
+    document.getElementById('edClsChips').innerHTML = editClsDraft.length
+      ? editClsDraft.map(c=>'<span class="cls-chip">' + esc(c) + '</span>').join('')
+      : '<span class="cls-mini none">未带班</span>';
   }
-});
-document.getElementById('clsOk').addEventListener('click', ()=>{
-  let picked = [...document.querySelectorAll('#clsCheck input:checked')].map(x=>x.value);
-  if(clsTarget.role === '学员' && picked.length > 1) picked = [picked[picked.length-1]];
-  clsTarget.cls = picked;
-  clsModal.classList.remove('show');
+  if(editTarget.role === '学员'){
+    const cur = clsOf(editTarget);
+    document.getElementById('edClsSel').innerHTML = '<option value="">未分班学员</option>' +
+      activeClasses(cur === UNASSIGNED ? [] : [cur]).map(c=>'<option value="' + esc(c.nm) + '">' + esc(c.nm) + (c.off ? '（已停用）' : '') + '</option>').join('');
+    document.getElementById('edClsSel').value = cur === UNASSIGNED ? '' : cur;
+  }
+}
+function openEdit(a){
+  if(!a) return;
+  editTarget = a;
+  editClsDraft = a.cls.slice();
+  document.getElementById('edWho').innerHTML = '编辑「<b class="hl">' + esc(a.nick) + '</b>」的' + a.role + '资料：';
+  document.getElementById('edAcct').value = a.acct;
+  document.getElementById('edNick').value = a.nick;
+  setEditPwdReset(false);
+  renderEditClasses();
+  editModal.classList.add('show');
+  setTimeout(()=>document.getElementById('edNick').focus(), 60);
+}
+document.getElementById('edPwdBtn').addEventListener('click', ()=>setEditPwdReset(true));
+document.getElementById('edPwdUndo').addEventListener('click', ()=>setEditPwdReset(false));
+document.getElementById('edOk').addEventListener('click', ()=>{
+  if(!editTarget) return;
+  const nick = document.getElementById('edNick').value.trim();
+  const pwd = document.getElementById('edPwd').value;
+  if(!nick){ toast('请填写昵称'); return; }
+  if(!/^[\u4e00-\u9fa5A-Za-z0-9_]{1,10}$/.test(nick)){ toast('昵称限 10 字，且不能包含特殊符号'); return; }
+  if(editPwdDirty && (pwd.length < 5 || pwd.length > 30)){ toast('新密码需为 5~30 位'); return; }
+  editTarget.nick = nick;
+  if(editTarget.role === '学员'){
+    const v = document.getElementById('edClsSel').value;
+    editTarget.cls = v ? [v] : [];
+    curCls = v || UNASSIGNED;
+  }
+  editModal.classList.remove('show');
   renderAll();
-  toast('演示：已保存「' + clsTarget.nick + '」的班级（' + (picked.length ? picked.join('、') : '未分班') + '）');
+  toast('演示：已保存「' + nick + '」资料' + (editPwdDirty ? '，并重置密码' : ''));
 });
-document.getElementById('clsCancel').addEventListener('click', ()=>clsModal.classList.remove('show'));
-clsModal.addEventListener('click', e=>{ if(e.target===clsModal) clsModal.classList.remove('show'); });
+document.getElementById('edCancel').addEventListener('click', ()=>editModal.classList.remove('show'));
+editModal.addEventListener('click', e=>{ if(e.target===editModal) editModal.classList.remove('show'); });
+
+/* ================= 编辑班级（改名 + 更换负责老师） ================= */
+const ceditModal = document.getElementById('ceditModal');
+let ceditOldName = '';
+function openClsEdit(nm){
+  const c = CLASSES.find(x=>x.nm===nm);
+  if(!c){ toast('未找到班级'); return; }
+  ceditOldName = nm;
+  document.getElementById('ceName').value = nm;
+  const teas = byRole('老师');
+  document.getElementById('ceTeacher').innerHTML = '<option value="">暂不分配</option>' +
+    teas.map(({a})=>'<option value="' + esc(a.acct) + '">' + esc(a.nick) + ' · ' + esc(a.acct) + (a.off ? '（已停用）' : '') + '</option>').join('');
+  document.getElementById('ceTeacher').value = c.teacher || '';
+  ceditModal.classList.add('show');
+  setTimeout(()=>document.getElementById('ceName').focus(), 60);
+}
+document.getElementById('ceOk').addEventListener('click', ()=>{
+  const nm = document.getElementById('ceName').value.trim();
+  if(!nm){ toast('请填写班级名称'); return; }
+  if(CLASSES.some(c=>c.nm === nm && c.nm !== ceditOldName)){ toast('该班级已存在'); return; }
+  const c = CLASSES.find(x=>x.nm===ceditOldName);
+  if(!c) return;
+  c.nm = nm;
+  c.teacher = document.getElementById('ceTeacher').value;
+  ACCOUNTS.forEach(a=>{ if(a.role === '学员') a.cls = a.cls.map(x=>x===ceditOldName ? nm : x); });
+  if(curCls === ceditOldName) curCls = nm;
+  ceditModal.classList.remove('show');
+  renderAll();
+  toast('演示：已保存班级「' + nm + '」');
+});
+document.getElementById('ceCancel').addEventListener('click', ()=>ceditModal.classList.remove('show'));
+ceditModal.addEventListener('click', e=>{ if(e.target===ceditModal) ceditModal.classList.remove('show'); });
 
 /* ================= 新建账号（角色下拉 + 系统生成密码） ================= */
 const newModal = document.getElementById('newModal');
@@ -884,19 +1010,22 @@ function refreshRoleCls(){
   sel.innerHTML = '<option value="">' + (role === '老师' ? '暂不设置（可稍后设置）' : '先不分班（进入「未分班学员」）') + '</option>' +
     opts.map(c=>'<option value="' + esc(c.nm) + '">' + esc(c.nm) + '</option>').join('');
   tip.textContent = role === '老师'
-    ? '老师可带多个班级，此处先选一个，之后可在列表中「设置班级」调整。'
+    ? '老师可带多个班级，此处先选一个，之后可在列表中「编辑」调整。'
     : '学员只能属于一个班级，可创建后再调整。';
 }
 function openNew(role){
+  const fixedStudent = role === '学员';
   document.getElementById('fAccount').value = '';
   document.getElementById('fNick').value = '';
   document.getElementById('fRole').value = role || '学员';
+  document.getElementById('fRoleRow').style.display = fixedStudent ? 'none' : '';
+  document.getElementById('newTitle').textContent = fixedStudent ? '新 建 学 员' : (role === '老师' ? '新 建 老 师' : '新 建 教 导 主 任');
+  document.getElementById('newOk').textContent = fixedStudent ? '创建学员' : '创建账号';
   refreshRoleCls();
   genPwd();
   newModal.classList.add('show');
   setTimeout(()=>document.getElementById('fAccount').focus(), 60);
 }
-document.getElementById('newBtn').addEventListener('click', ()=>openNew('学员'));
 document.getElementById('addDean').addEventListener('click', ()=>openNew('教导主任'));
 document.getElementById('addTea').addEventListener('click', ()=>openNew('老师'));
 document.getElementById('fRole').addEventListener('change', refreshRoleCls);
@@ -915,8 +1044,13 @@ document.getElementById('newOk').addEventListener('click', ()=>{
   if(!/^\d{11}$/.test(acct)){ toast('请填写 11 位手机号作为登录账号'); return; }
   if(ACCOUNTS.some(a=>a.acct === acct)){ toast('该账号（手机号）已存在'); return; }
   if(!nick){ toast('请填写昵称'); return; }
+  if(pwd.length < 5 || pwd.length > 30){ toast('密码需为 5~30 位'); return; }
   const cls = (role !== '教导主任' && one) ? [one] : [];
   ACCOUNTS.push({nick, acct, role, cls, off:false});
+  if(role === '老师' && one){
+    const c = CLASSES.find(x=>x.nm===one);
+    if(c) c.teacher = acct;
+  }
   newModal.classList.remove('show');
   renderAll();
   toast('演示：已创建' + role + '「' + nick + '」，初始密码 ' + pwd);
@@ -928,7 +1062,6 @@ newModal.addEventListener('click', e=>{ if(e.target===newModal) newModal.classLi
 const classModal = document.getElementById('classModal');
 document.getElementById('addCls').addEventListener('click', ()=>{
   document.getElementById('clsName').value = '';
-  document.getElementById('clsMemo').value = '';
   classModal.classList.add('show');
   setTimeout(()=>document.getElementById('clsName').focus(), 60);
 });
@@ -936,80 +1069,20 @@ document.getElementById('classOk').addEventListener('click', ()=>{
   const nm = document.getElementById('clsName').value.trim();
   if(!nm){ toast('请填写班级名称'); return; }
   if(CLASSES.some(c=>c.nm === nm)){ toast('该班级已存在'); return; }
-  CLASSES.push({nm, off:false});
+  CLASSES.push({nm, off:false, teacher:''});
   classModal.classList.remove('show');
   curCls = nm;
   renderAll();
-  toast('演示：已创建班级「' + nm + '」，可在「老师」中设置带班、在学员列表中添加学员');
+  toast('演示：已创建班级「' + nm + '」，可在「老师」中设置负责班级、在学员列表中新建学员');
 });
 document.getElementById('classCancel').addEventListener('click', ()=>classModal.classList.remove('show'));
 classModal.addEventListener('click', e=>{ if(e.target===classModal) classModal.classList.remove('show'); });
 
-/* ================= 添加学员（可选目标班级 / 先不分班） ================= */
-const addStuModal = document.getElementById('addStuModal');
-const addStuClsSel = document.getElementById('addStuCls');
-function renderAddStuCands(){
-  const tgt = addStuClsSel.value;               /* '' = 先不分班 */
-  const tgtName = tgt || UNASSIGNED;
-  const cands = ACCOUNTS.map((a,i)=>({a,i}))
-    .filter(x=>x.a.role==='学员' && !inCls(x.a, tgtName));
-  document.getElementById('addStuWho').innerHTML = tgt
-    ? '把学员加入班级「<b class="hl">' + esc(tgt) + '</b>」：'
-    : '把学员加入「<b class="hl">未分班学员</b>」（先不分班）：';
-  document.getElementById('addStuList').innerHTML = cands.length ? cands.map(({a,i})=>
-      '<label><input type="checkbox" value="' + i + '"><span class="cbx">✓</span>' + esc(a.nick) +
-      '<span class="mini-cls">' + esc(clsOf(a)) + '</span></label>'
-    ).join('') : '<div class="list-empty" style="padding:14px 0;grid-column:1/-1">没有可添加的学员</div>';
-}
-document.getElementById('addStu').addEventListener('click', ()=>{
-  addStuClsSel.innerHTML = '<option value="">先不分班（进入「未分班学员」）</option>' +
-    CLASSES.filter(c=>!c.off).map(c=>'<option value="' + esc(c.nm) + '">' + esc(c.nm) + '</option>').join('');
-  const cur = CLASSES.find(x=>x.nm===curCls);
-  addStuClsSel.value = (cur && !cur.off) ? curCls : '';   /* 默认当前选中班级，否则先不分班 */
-  renderAddStuCands();
-  addStuModal.classList.add('show');
-});
-addStuClsSel.addEventListener('change', renderAddStuCands);
-document.getElementById('addStuOk').addEventListener('click', ()=>{
-  const tgt = addStuClsSel.value;
-  const picked = [...document.querySelectorAll('#addStuList input:checked')].map(x=>parseInt(x.value,10));
-  if(!picked.length){ toast('请先勾选要添加的学员'); return; }
-  picked.forEach(i=>{ ACCOUNTS[i].cls = tgt ? [tgt] : []; });
-  addStuModal.classList.remove('show');
-  curCls = tgt || UNASSIGNED;   /* 视角跟到目标班级，便于确认结果 */
-  stuKw.value = '';
-  renderAll();
-  toast('演示：已把 ' + picked.length + ' 名学员加入「' + (tgt || UNASSIGNED) + '」');
-});
-document.getElementById('addStuCancel').addEventListener('click', ()=>addStuModal.classList.remove('show'));
-addStuModal.addEventListener('click', e=>{ if(e.target===addStuModal) addStuModal.classList.remove('show'); });
-
-/* ================= 重置密码（只能重置 · 不能修改） ================= */
-const pwdModal = document.getElementById('pwdModal');
-let pwdTarget = null;
-function openPwd(a){
-  if(!a) return;
-  pwdTarget = a;
-  document.getElementById('pwdWho').innerHTML = '为「<b class="hl">' + esc(a.nick) + '</b>」（' + a.role + ' · ' + a.acct + '）重置登录密码：';
-  document.getElementById('rPwd').value = makePwd();
-  pwdModal.classList.add('show');
-}
-document.getElementById('rGen').addEventListener('click', ()=>{ document.getElementById('rPwd').value = makePwd(); });
-document.getElementById('rCopy').addEventListener('click', ()=>{
-  const v = document.getElementById('rPwd').value;
-  if(navigator.clipboard) navigator.clipboard.writeText(v).then(()=>toast('演示：新密码已复制'));
-  else toast('新密码：' + v);
-});
-document.getElementById('pwdOk').addEventListener('click', ()=>{
-  const pwd = document.getElementById('rPwd').value;
-  pwdModal.classList.remove('show');
-  toast('演示：已重置「' + pwdTarget.nick + '」的密码为 ' + pwd);
-});
-document.getElementById('pwdCancel').addEventListener('click', ()=>pwdModal.classList.remove('show'));
-pwdModal.addEventListener('click', e=>{ if(e.target===pwdModal) pwdModal.classList.remove('show'); });
+/* ================= 新建学员（统一使用新建账号表单） ================= */
+document.getElementById('addStu').addEventListener('click', ()=>openNew('学员'));
 
 document.addEventListener('keydown', e=>{
-  if(e.key === 'Escape') [newModal, clsModal, cfmModal, classModal, pwdModal, addStuModal].forEach(m=>m.classList.remove('show'));
+  if(e.key === 'Escape') [newModal, editModal, cfmModal, classModal, ceditModal].forEach(m=>m.classList.remove('show'));
 });
 
 /* ================= 初始化 ================= */

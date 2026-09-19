@@ -9,7 +9,7 @@ function Cover({ cover, title, collection }) {
 }
 
 export default function ContentCard({ href, title, cover = '', meta = '', countLabel = '', collection = false, actions = null, className = '' }) {
-  const body = (
+  const content = (
     <>
       <Cover cover={cover} title={title} collection={collection} />
       <div className="name">{title}</div>
@@ -17,13 +17,13 @@ export default function ContentCard({ href, title, cover = '', meta = '', countL
         {countLabel ? <span className="cnt-chip">{countLabel}</span> : null}
         <span>{meta}</span>
       </div>
-      {actions ? <div className="ops">{actions}</div> : null}
     </>
   );
 
-  if (href) {
-    return <Link className={`card ${className}`.trim()} href={href}>{body}</Link>;
-  }
-
-  return <article className={`card ${className}`.trim()}>{body}</article>;
+  return (
+    <article className={`card ${className}`.trim()}>
+      {href ? <Link className="card-link" href={href}>{content}</Link> : content}
+      {actions ? <div className="ops">{actions}</div> : null}
+    </article>
+  );
 }

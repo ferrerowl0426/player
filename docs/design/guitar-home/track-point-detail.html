@@ -66,6 +66,7 @@ button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offs
 }
 /* 盒子内滚动条 */
 .scroll{overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent}
+.box>.scroll{flex:1;min-height:0}
 .scroll::-webkit-scrollbar{width:4px}
 .scroll::-webkit-scrollbar-thumb{background:var(--hair-2)}
 .scroll::-webkit-scrollbar-track{background:transparent}
@@ -103,7 +104,7 @@ button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offs
 /* 头像：咖啡描边圆 + 右上绿色活动点（绿色点睛） */
 .avatar{
   position:relative;width:34px;height:34px;border-radius:50%;
-  border:1.5px solid var(--coffee);background:var(--white);
+  border:1px solid rgba(93,67,38,.45);background:var(--white);
   display:grid;place-items:center;font-size:12.5px;color:var(--coffee);font-weight:600;transition:all .25s;
 }
 .avatar::after{
@@ -120,16 +121,16 @@ button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offs
   flex:1;min-height:0;
   max-width:1440px;width:100%;margin:0 auto;padding:16px 36px 20px;
   display:grid;
-  grid-template-columns:min(calc((100vh - var(--vres))*16/9),1fr) 260px;
+  grid-template-columns:minmax(0,calc((100vh - var(--vres))*16/9)) 260px;
   gap:36px;align-items:stretch;justify-content:center;
 }
 
 /* ---------- 右列：播放列表 + 附件下载 + 关联图书馆（纸面卡片 · 小圆角） ---------- */
-.side{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:18px;min-height:0}
+.side{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:18px;min-height:0;overflow-y:auto}
 .box{
-  border:1.5px solid var(--coffee);border-radius:6px;
+  border:1px solid rgba(93,67,38,.45);border-radius:6px;
   background:var(--glass);
-  box-shadow:5px 7px 0 rgba(93,67,38,.30), 0 18px 38px rgba(64,45,20,.28);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.06);
   display:flex;flex-direction:column;min-height:0;overflow:hidden;
 }
 .box-head{
@@ -149,16 +150,21 @@ button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offs
 .box-head .more{font-size:11px;color:var(--ink-3);letter-spacing:1px;text-decoration:none;transition:color .25s}
 .box-head .more:hover{color:var(--ink)}
 /* 播放列表占更高一些 */
-.pl-box{flex:1.45}
+.pl-box{flex:288 1 288px}
 .pl-item{
   display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;
-  padding:10px 18px;border-bottom:1px solid rgba(201,183,149,.4);cursor:pointer;
+  height:40px;padding:0 18px;border-bottom:1px solid rgba(201,183,149,.4);cursor:pointer;
   transition:background .3s var(--ease);
 }
 .pl-item:hover{background:rgba(255,252,242,.65)}
 .pl-item .idx{font-size:11.5px;color:var(--ink-3);letter-spacing:.5px}
-.pl-item .t{font-size:12.5px;letter-spacing:.3px;line-height:1.5}
+.pl-item .t{font-size:12.5px;letter-spacing:.3px;line-height:1.5;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pl-item .len{font-size:11px;color:var(--ink-3);letter-spacing:.5px}
+/* 过长标题悬停滚动：.marquee 由脚本在检测到溢出时挂载，--sd 为滚动距离 */
+.t .tt,.fname .tt,.bname .tt{display:inline-block;max-width:100%}
+.t.marquee,.fname.marquee,.bname.marquee{text-overflow:clip}
+.t.marquee .tt,.fname.marquee .tt,.bname.marquee .tt{animation:tscroll var(--sdur,3s) ease-in-out infinite}
+@keyframes tscroll{0%,10%{transform:translateX(0)}45%,55%{transform:translateX(var(--sd,0px))}90%,100%{transform:translateX(0)}}
 .pl-item .eq{display:inline-flex;align-items:flex-end;gap:2px;height:11px;margin-right:5px}
 .pl-item .eq i{width:2.5px;background:var(--green);animation:eq 1.1s ease-in-out infinite}
 .pl-item .eq i:nth-child(1){height:5px}
@@ -172,21 +178,22 @@ button:focus-visible,a:focus-visible{outline:1.5px solid var(--ink);outline-offs
 .pl-foot{flex:none;padding:9px 18px;border-top:1px solid rgba(201,183,149,.4);font-size:10.5px;color:var(--ink-3);letter-spacing:1px;display:flex;justify-content:space-between}
 
 /* 附件盒子 */
-.file-box{flex:1}
+.file-box{flex:168 1 168px}
 .frow{
-  display:grid;grid-template-columns:34px 1fr auto;gap:14px;align-items:center;
-  padding:11px 18px;border-bottom:1px solid rgba(201,183,149,.4);
+  display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:center;
+  height:40px;padding:0 18px;border-bottom:1px solid rgba(201,183,149,.4);
   transition:background .3s var(--ease);
 }
 a.frow{text-decoration:none;color:inherit;cursor:pointer}
 a.frow:hover{background:rgba(255,252,242,.65)}
 .frow .fico{
-  width:30px;height:38px;border:1px solid var(--hair-2);background:var(--white);
-  display:grid;place-items:center;font-size:8.5px;letter-spacing:1px;color:var(--coffee);font-weight:600;
+  width:22px;height:28px;border:1px solid var(--hair-2);background:var(--white);
+  display:grid;place-items:center;font-size:8px;letter-spacing:1px;color:var(--coffee);font-weight:600;flex:none;
 }
 .frow .fico.pdf{color:var(--orange);border-color:rgba(255,127,0,.55)}
-.frow .fname{font-size:12.5px;letter-spacing:.3px;line-height:1.45}
-.frow .fmeta{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:1px}
+.frow .fname{font-size:12.5px;letter-spacing:.3px;line-height:1.45;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow .fmeta{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:0;flex:none;white-space:nowrap}
+.frow>*:nth-child(2),.brow>*:nth-child(2){display:flex;align-items:baseline;gap:8px;min-width:0}
 /* 行内操作：预览 + 下载（附件 / 电子书共用） */
 .frow .fops,.brow .bops{display:flex;gap:6px;flex:none}
 .fbtn{
@@ -199,24 +206,24 @@ a.frow:hover .fbtn{border-color:var(--orange);color:var(--orange)}
 a.frow:hover .fbtn.solid{background:var(--orange);border-color:var(--orange);color:var(--white)}
 
 /* 关联图书馆盒子（紧凑 · 展示课件与电子书的关联状态） */
-.lib-box{flex:none}
+.lib-box{flex:128 1 128px}
 .brow{
-  display:grid;grid-template-columns:32px 1fr auto;gap:12px;align-items:center;
-  padding:11px 16px;border-bottom:1px solid rgba(201,183,149,.4);
+  display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:center;
+  height:40px;padding:0 16px;border-bottom:1px solid rgba(201,183,149,.4);
   text-decoration:none;color:inherit;transition:background .3s var(--ease);
 }
 .brow:last-child{border-bottom:none}
 .brow:hover{background:rgba(255,252,242,.65)}
 /* 书脊式封面：橘色书脊 + 竖排书名 */
 .brow .bcover{
-  width:30px;height:42px;background:var(--white);border:1px solid var(--hair-2);
-  border-left:4px solid var(--orange);
+  width:22px;height:28px;background:var(--white);border:1px solid var(--hair-2);
+  border-left:3px solid var(--orange);
   display:flex;align-items:center;justify-content:center;
   writing-mode:vertical-rl;letter-spacing:2px;
-  font-size:8.5px;color:var(--coffee);font-weight:600;flex:none;
+  font-size:8px;color:var(--coffee);font-weight:600;flex:none;
 }
-.brow .bname{font-size:12px;letter-spacing:.3px;line-height:1.45}
-.brow .bmeta{font-size:10px;color:var(--ink-3);letter-spacing:.4px;margin-top:2px;display:flex;align-items:center;gap:5px}
+.brow .bname{font-size:12px;letter-spacing:.3px;line-height:1.45;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .bmeta{font-size:10px;color:var(--ink-3);letter-spacing:.4px;margin-top:0;display:flex;align-items:center;gap:5px;flex:none;white-space:nowrap}
 .brow .bmeta .link-dot{width:5px;height:5px;background:var(--green);flex:none}   /* 绿色点睛：已关联 */
 .brow:hover .fbtn{border-color:var(--orange);color:var(--orange)}
 .brow:hover .fbtn.solid{background:var(--orange);border-color:var(--orange);color:var(--white)}
@@ -228,7 +235,7 @@ a.frow:hover .fbtn.solid{background:var(--orange);border-color:var(--orange);col
   position:relative;aspect-ratio:16/9;
   height:min(100%,calc(100vh - var(--vres,334px)));
   max-width:100%;
-  overflow:hidden;border:1.5px solid var(--coffee);border-radius:4px;
+  overflow:hidden;border:1px solid rgba(93,67,38,.45);border-radius:4px;
   background:var(--white);   /* 播放器保持不透明纯白 */
   box-shadow:none;
   display:grid;place-items:center;
@@ -362,9 +369,9 @@ a.frow:hover .fbtn.solid{background:var(--orange);border-color:var(--orange);col
 /* ---------- 左列整体：标题+前置+播放+简介 合装一个大框 ---------- */
 .main{
   grid-column:1;grid-row:1;min-width:0;display:flex;flex-direction:column;min-height:0;
-  border:1.5px solid var(--coffee);border-radius:6px;
+  border:1px solid rgba(93,67,38,.45);border-radius:6px;
   background:var(--glass);
-  box-shadow:5px 7px 0 rgba(93,67,38,.30), 0 18px 38px rgba(64,45,20,.28);
+  box-shadow:0 1px 3px rgba(93,67,38,.08), 0 4px 12px rgba(93,67,38,.06);
   padding:14px 20px 16px;
 }
 
@@ -377,14 +384,14 @@ a.frow:hover .fbtn.solid{background:var(--orange);border-color:var(--orange);col
 }
 
 /* 面包屑（标题上方，紧凑单行） */
-.crumbs{flex:none;display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--ink-3);letter-spacing:.5px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px dashed var(--hair-2)}
+.crumbs{flex:none;display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--ink-3);letter-spacing:.5px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px dashed rgba(201,183,149,.55)}
 .crumbs a{color:var(--ink-3);text-decoration:none;transition:color .25s}
 .crumbs a:hover{color:var(--orange)}
 .crumbs i{font-style:normal;color:var(--hair-2)}
 
 /* 视频简介（大框内末段 · 素面无纹理 · 盒内滚动） */
 .desc-box{
-  flex:none;border-top:1px dashed var(--hair-2);
+  flex:none;border-top:1px dashed rgba(201,183,149,.55);
   max-height:96px;overflow-y:auto;padding:10px 4px 0;
   scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
 }
@@ -395,7 +402,7 @@ a.frow:hover .fbtn.solid{background:var(--orange);border-color:var(--orange);col
 /* ---------- 前置知识点（大框内 · 单行 · 老师可设置） ---------- */
 .prereq{
   flex:none;display:flex;align-items:center;gap:16px;
-  padding:10px 4px;border-top:1px dashed var(--hair-2);
+  padding:10px 4px;border-top:1px dashed rgba(201,183,149,.55);
 }
 .prereq .lbl{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--coffee);flex:none}
 .prereq .items{display:flex;align-items:center;gap:18px;flex:1;min-width:0;overflow:hidden}

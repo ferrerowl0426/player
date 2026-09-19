@@ -7,6 +7,7 @@ import {
   completeMultipartUpload,
   createMultipartPartUrl,
   createMultipartUpload,
+  createUploadUrl,
   deleteFromBucket,
   ensureObjectExists,
   getPublicUrl,
@@ -137,13 +138,65 @@ async function getTrackParts(trackId) {
 
 async function getContentAttachments(objectType, objectId) {
   const result = await pool.query(
-    `SELECT id, file_name, file_url, file_key, file_type, file_size, created_at
+    `SELECT id, file_name, file_url, file_key, file_type, file_size, sort_order, created_at
      FROM content_attachments
      WHERE object_type = $1 AND object_id = $2
-     ORDER BY created_at DESC, id DESC`,
+     ORDER BY sort_order ASC, created_at ASC, id ASC`,
     [objectType, objectId]
   );
   return result.rows.map((row) => ({ ...row, file_url: normalizePublicUrl(row.file_url) }));
+}
+
+function normalizeFileSize(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.round(number) : 0;
+}
+
+function isAttachmentKey(key) {
+  return typeof key === 'string' && key.startsWith('attachments/') && !key.includes('..');
+}
+
+function normalizeAttachments(values) {
+  return (Array.isArray(values) ? values : [])
+    .map((item, index) => ({
+      id: normalizeId(item?.id),
+      fileName: normalizeText(item?.fileName || item?.file_name),
+      fileUrl: normalizeText(item?.fileUrl || item?.file_url),
+      fileKey: normalizeText(item?.fileKey || item?.file_key),
+      fileType: normalizeText(item?.fileType || item?.file_type),
+      fileSize: normalizeFileSize(item?.fileSize || item?.file_size),
+      sortOrder: Number.isInteger(Number(item?.sortOrder ?? item?.sort_order)) ? Number(item?.sortOrder ?? item?.sort_order) : index
+    }))
+    .filter((item) => item.fileName && item.fileUrl && isAttachmentKey(item.fileKey));
+}
+
+async function replaceContentAttachments({ objectType, objectId, attachments }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const old = await client.query(
+      `SELECT file_key FROM content_attachments WHERE object_type = $1 AND object_id = $2`,
+      [objectType, objectId]
+    );
+    await client.query('DELETE FROM content_attachments WHERE object_type = $1 AND object_id = $2', [objectType, objectId]);
+    for (const [index, attachment] of attachments.entries()) {
+      await ensureObjectExists(attachment.fileKey);
+      await client.query(
+        `INSERT INTO content_attachments (object_type, object_id, file_name, file_url, file_key, file_type, file_size, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [objectType, objectId, attachment.fileName, attachment.fileUrl, attachment.fileKey, attachment.fileType, attachment.fileSize, index]
+      );
+    }
+    await client.query('COMMIT');
+
+    const kept = new Set(attachments.map((item) => item.fileKey));
+    await Promise.all(old.rows.map((row) => row.file_key).filter((key) => key && !kept.has(key)).map((key) => deleteFromBucket(key).catch(() => {})));
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function getTrackCollections(trackId) {
@@ -156,6 +209,75 @@ async function getTrackCollections(trackId) {
     [trackId]
   );
   return result.rows.map(mapTrack);
+}
+
+function mapLibraryResource(row) {
+  return {
+    ...row,
+    cover: normalizePublicUrl(row.cover),
+    file_url: normalizePublicUrl(row.file_url)
+  };
+}
+
+async function getLinkedLibraryResources(objectType, objectId) {
+  const result = await pool.query(
+    `SELECT lr.id, lr.title, lr.cover, lr.file_name, lr.file_url, lr.file_size, lr.updated_at,
+            'direct' AS link_source,
+            NULL::int AS source_collection_id,
+            NULL::text AS source_collection_name
+     FROM library_resource_links l
+     JOIN library_resources lr ON lr.id = l.library_resource_id
+     WHERE l.object_type = $1 AND l.object_id = $2
+     ORDER BY lr.updated_at DESC, lr.id DESC`,
+    [objectType, objectId]
+  );
+
+  return result.rows.map(mapLibraryResource);
+}
+
+async function getTrackLibraryResources(trackId) {
+  const result = await pool.query(
+    `WITH direct_links AS (
+       SELECT lr.id, lr.title, lr.cover, lr.file_name, lr.file_url, lr.file_size, lr.updated_at,
+              TRUE AS direct_link,
+              ARRAY[]::int[] AS inherited_collection_ids,
+              ARRAY[]::text[] AS inherited_collection_names
+       FROM library_resource_links l
+       JOIN library_resources lr ON lr.id = l.library_resource_id
+       WHERE l.object_type = 'track_point' AND l.object_id = $1
+     ), inherited_links AS (
+       SELECT lr.id, lr.title, lr.cover, lr.file_name, lr.file_url, lr.file_size, lr.updated_at,
+              FALSE AS direct_link,
+              ARRAY_AGG(DISTINCT tc.id ORDER BY tc.id) AS inherited_collection_ids,
+              ARRAY_AGG(DISTINCT tc.name ORDER BY tc.name) AS inherited_collection_names
+       FROM track_collection_items tci
+       JOIN track_collections tc ON tc.id = tci.collection_id
+       JOIN library_resource_links l ON l.object_type = 'track_collection' AND l.object_id = tc.id
+       JOIN library_resources lr ON lr.id = l.library_resource_id
+       WHERE tci.track_id = $1
+       GROUP BY lr.id
+     ), merged AS (
+       SELECT * FROM direct_links
+       UNION ALL
+       SELECT * FROM inherited_links
+     )
+     SELECT id, MAX(title) AS title, MAX(cover) AS cover, MAX(file_name) AS file_name,
+            MAX(file_url) AS file_url, MAX(file_size) AS file_size, MAX(updated_at) AS updated_at,
+            BOOL_OR(direct_link) AS is_direct,
+            ARRAY_REMOVE(ARRAY_AGG(DISTINCT inherited_collection_id), NULL) AS inherited_collection_ids,
+            ARRAY_REMOVE(ARRAY_AGG(DISTINCT inherited_collection_name), NULL) AS inherited_collection_names
+     FROM merged
+     LEFT JOIN LATERAL UNNEST(inherited_collection_ids) AS inherited_collection_id ON TRUE
+     LEFT JOIN LATERAL UNNEST(inherited_collection_names) AS inherited_collection_name ON TRUE
+     GROUP BY id
+     ORDER BY MAX(updated_at) DESC, id DESC`,
+    [trackId]
+  );
+
+  return result.rows.map((row) => mapLibraryResource({
+    ...row,
+    link_source: row.is_direct && row.inherited_collection_ids?.length ? 'direct_and_inherited' : (row.is_direct ? 'direct' : 'inherited')
+  }));
 }
 
 export const tracksRouter = Router();
@@ -236,10 +358,11 @@ tracksRouter.get('/:id', async (req, res, next) => {
       return;
     }
 
-    const [parts, attachments, track_collections] = await Promise.all([
+    const [parts, attachments, track_collections, library_resources] = await Promise.all([
       getTrackParts(trackId),
       getContentAttachments('track_point', trackId),
-      getTrackCollections(trackId)
+      getTrackCollections(trackId),
+      getTrackLibraryResources(trackId)
     ]);
 
     res.json({
@@ -247,7 +370,8 @@ tracksRouter.get('/:id', async (req, res, next) => {
         ...mapTrack(track),
         parts,
         attachments,
-        track_collections
+        track_collections,
+        library_resources
       }
     });
   } catch (error) {
@@ -273,23 +397,27 @@ tracksRouter.get('/collections/:id', async (req, res, next) => {
       return;
     }
 
-    const tracksResult = await pool.query(
-      `SELECT t.id, t.name, t.cover, t.description, t.updated_at,
-              COUNT(tp.id)::int AS part_count
-       FROM track_collection_items ct
-       JOIN track_points t ON t.id = ct.track_id
-       LEFT JOIN track_parts tp ON tp.track_id = t.id
-       WHERE ct.collection_id = $1
-       GROUP BY t.id
-       ORDER BY t.name ASC, t.id ASC`,
-      [collectionId]
-    );
+    const [tracksResult, libraryResources] = await Promise.all([
+      pool.query(
+        `SELECT t.id, t.name, t.cover, t.description, t.updated_at,
+                COUNT(tp.id)::int AS part_count
+         FROM track_collection_items ct
+         JOIN track_points t ON t.id = ct.track_id
+         LEFT JOIN track_parts tp ON tp.track_id = t.id
+         WHERE ct.collection_id = $1
+         GROUP BY t.id
+         ORDER BY t.name ASC, t.id ASC`,
+        [collectionId]
+      ),
+      getLinkedLibraryResources('track_collection', collectionId)
+    ]);
 
     res.json({
       data: {
         ...mapTrack(collection),
         track_points: tracksResult.rows.map(mapTrack),
-        attachments: await getContentAttachments('track_collection', collectionId)
+        attachments: await getContentAttachments('track_collection', collectionId),
+        library_resources: libraryResources
       }
     });
   } catch (error) {
@@ -403,6 +531,54 @@ tracksRouter.delete('/:id', requireSuperAdmin, async (req, res, next) => {
     }
 
     res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/tracks/:id/attachments/upload-url
+tracksRouter.post('/:id/attachments/upload-url', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const trackId = normalizeId(req.params.id);
+    const fileName = normalizeText(req.body.fileName || req.body.name);
+    const fileType = normalizeText(req.body.fileType || req.body.type) || 'application/octet-stream';
+    const fileSize = normalizeFileSize(req.body.fileSize || req.body.size);
+    const fileExt = getExtension(fileName);
+
+    if (!trackId || !fileName || !fileExt) {
+      res.status(400).json({ message: '附件上传参数无效' });
+      return;
+    }
+
+    if (!(await findTrack(trackId))) {
+      res.status(404).json({ message: '曲目不存在' });
+      return;
+    }
+
+    const key = `attachments/track_point/${trackId}/${uuid()}${fileExt}`;
+    const uploadUrl = await createUploadUrl({ key, contentType: fileType });
+    res.json({ data: { key, uploadUrl, publicUrl: getPublicUrl(key), fileName, fileType, fileSize } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/tracks/:id/attachments
+tracksRouter.put('/:id/attachments', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const trackId = normalizeId(req.params.id);
+    if (!trackId) {
+      res.status(400).json({ message: '曲目 ID 无效' });
+      return;
+    }
+
+    if (!(await findTrack(trackId))) {
+      res.status(404).json({ message: '曲目不存在' });
+      return;
+    }
+
+    await replaceContentAttachments({ objectType: 'track_point', objectId: trackId, attachments: normalizeAttachments(req.body.attachments) });
+    res.json({ data: await getContentAttachments('track_point', trackId) });
   } catch (error) {
     next(error);
   }

@@ -1,0 +1,604 @@
+.page {
+  --guitar-paper: #f2ead9;
+  --guitar-cream: #ffffff;
+  --guitar-brown: #83654b;
+  --guitar-white: #ffffff;
+  --guitar-ink: #261d10;
+  --guitar-ink-2: #4f4230;
+  --guitar-ink-3: #7a6a52;
+  --guitar-hair: #ddd0b4;
+  --guitar-hair-2: #c9b795;
+  --guitar-coffee: #5d4326;
+  --guitar-orange: #cf6f24;
+  --guitar-glass-line: rgba(93, 67, 38, 0.32);
+  --guitar-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 56px 24px 40px;
+  overflow: auto;
+  color: var(--guitar-ink);
+  background: var(--guitar-brown);
+}
+
+.page::before,
+.page::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(242, 234, 217, 0.22) 1.4px, transparent 1.5px);
+  background-size: 13px 13px;
+}
+
+.page::before {
+  top: 26px;
+  right: 30px;
+  width: 300px;
+  height: 190px;
+  -webkit-mask: radial-gradient(ellipse at top right, #000 30%, transparent 72%);
+  mask: radial-gradient(ellipse at top right, #000 30%, transparent 72%);
+}
+
+.page::after {
+  bottom: 24px;
+  left: 28px;
+  width: 280px;
+  height: 180px;
+  -webkit-mask: radial-gradient(ellipse at bottom left, #000 30%, transparent 72%);
+  mask: radial-gradient(ellipse at bottom left, #000 30%, transparent 72%);
+}
+
+.loginShell {
+  width: min(1240px, 100%);
+  display: grid;
+  grid-template-columns: 250px minmax(0, 960px);
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 460px 1fr;
+  margin: 0;
+  background: radial-gradient(430px 300px at 86% 6%, rgba(207, 111, 36, 0.07), transparent 70%), radial-gradient(400px 320px at 6% 94%, rgba(125, 139, 94, 0.08), transparent 70%), radial-gradient(320px 260px at 68% 92%, rgba(185, 142, 62, 0.07), transparent 72%), var(--guitar-cream);
+  border: 1.5px solid var(--guitar-coffee);
+  border-radius: 8px;
+  box-shadow: 8px 10px 0 rgba(38, 29, 16, 0.32), 0 26px 60px rgba(38, 29, 16, 0.35);
+}
+
+.frame {
+  position: absolute;
+  inset: 9px;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px dashed rgba(201, 183, 141, 0.75);
+  border-radius: 5px;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .34 0 0 0 0 .2 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.tabRow {
+  position: absolute;
+  top: -27px;
+  left: 44px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.logoTab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px 12px 16px;
+  background: var(--guitar-white);
+  border: 1.5px solid var(--guitar-coffee);
+  border-radius: 5px;
+  box-shadow: 3px 4px 0 rgba(38, 29, 16, 0.3);
+}
+
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  color: var(--guitar-ink);
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-decoration: none;
+}
+
+.logo small {
+  color: var(--guitar-ink-3);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 2px;
+}
+
+.mark {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  align-self: center;
+  background: var(--guitar-orange);
+}
+
+.image {
+  position: relative;
+  overflow: hidden;
+  background: #ffffff url("/guitar-home/wc-metronome-tall.jpg") center/cover no-repeat;
+  border-right: 1px solid var(--guitar-glass-line);
+}
+
+.formSide {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  padding: 64px 52px 44px;
+}
+
+.formHead {
+  margin-bottom: 26px;
+  text-align: center;
+}
+
+.formHead h1 {
+  margin: 0;
+  color: var(--guitar-ink);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  line-height: 1.5;
+}
+
+.formHead h1 mark {
+  padding: 0 2px;
+  color: inherit;
+  background: linear-gradient(180deg, transparent 55%, rgba(233, 178, 80, 0.55) 55%);
+}
+
+.formHead p {
+  margin: 8px 0 0;
+  color: var(--guitar-ink-3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.form {
+  display: block;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--guitar-ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+}
+
+.field input {
+  width: 100%;
+  height: 40px;
+  padding: 0 13px;
+  color: var(--guitar-ink);
+  font: inherit;
+  font-size: 13.5px;
+  letter-spacing: 0.3px;
+  background: var(--guitar-white);
+  border: 1px solid var(--guitar-hair-2);
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.25s var(--guitar-ease), box-shadow 0.25s var(--guitar-ease);
+}
+
+.field input::placeholder {
+  color: #b3a58c;
+}
+
+.field input:hover,
+.field input:focus {
+  border-color: var(--guitar-coffee);
+}
+
+.field input:focus {
+  box-shadow: 2px 3px 0 rgba(93, 67, 38, 0.14);
+}
+
+.passwordBox {
+  position: relative;
+}
+
+.passwordBox input {
+  padding-right: 48px;
+}
+
+.eyeButton {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--guitar-ink-3);
+  line-height: 1;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  transform: translateY(-50%);
+  transition: color 0.2s var(--guitar-ease), background 0.2s var(--guitar-ease);
+}
+
+.eyeButton svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.eyeButton svg circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.eyeSlash {
+  stroke-width: 2.2;
+}
+
+.eyeButton:hover,
+.eyeButton:focus-visible {
+  color: var(--guitar-orange);
+  background: rgba(207, 111, 36, 0.08);
+  outline: none;
+}
+
+.aux {
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+
+.linkButton,
+.guest {
+  padding: 0;
+  color: var(--guitar-coffee);
+  font: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--guitar-hair-2);
+}
+
+.linkButton:hover,
+.guest:hover {
+  color: var(--guitar-orange);
+  border-color: var(--guitar-orange);
+}
+
+.passwordTip {
+  display: none;
+  padding: 6px 11px;
+  color: var(--guitar-coffee);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  background: rgba(233, 178, 80, 0.16);
+  border: 1px dashed var(--guitar-hair-2);
+  border-radius: 4px;
+}
+
+.passwordTip.show {
+  display: block;
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  margin: 2px 0 18px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.remember input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.cbx {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: transparent;
+  font-size: 10px;
+  line-height: 1;
+  background: var(--guitar-white);
+  border: 1px solid var(--guitar-hair-2);
+  border-radius: 3px;
+  transition: all 0.25s var(--guitar-ease);
+}
+
+.remember input:checked + .cbx {
+  color: var(--guitar-white);
+  background: var(--guitar-coffee);
+  border-color: var(--guitar-coffee);
+}
+
+.txt {
+  color: var(--guitar-ink-2);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.mainButton {
+  width: 100%;
+  height: 44px;
+  color: var(--guitar-white);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 6px;
+  text-indent: 6px;
+  cursor: pointer;
+  background: var(--guitar-orange);
+  border: 1.5px solid var(--guitar-orange);
+  border-radius: 4px;
+  box-shadow: 3px 4px 0 rgba(93, 67, 38, 0.3);
+  transition: background 0.3s var(--guitar-ease), border-color 0.3s var(--guitar-ease), transform 0.15s var(--guitar-ease), opacity 0.2s;
+}
+
+.mainButton:hover:not(:disabled) {
+  background: var(--guitar-coffee);
+  border-color: var(--guitar-coffee);
+}
+
+.mainButton:active:not(:disabled) {
+  transform: translate(2px, 3px);
+  box-shadow: 1px 1px 0 rgba(93, 67, 38, 0.3);
+}
+
+.mainButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.statusText {
+  margin: 0;
+  color: var(--guitar-orange);
+  font-size: 12px;
+  text-align: center;
+}
+
+.guest {
+  display: block;
+  width: fit-content;
+  margin: 16px auto 0;
+  padding-bottom: 1px;
+  color: var(--guitar-ink-3);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.testAccounts {
+  max-height: min(520px, calc(100dvh - 120px));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1.5px solid var(--guitar-coffee);
+  border-radius: 8px;
+  box-shadow: 5px 7px 0 rgba(38, 29, 16, 0.25), 0 18px 42px rgba(38, 29, 16, 0.24);
+}
+
+.testHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.testHead strong {
+  color: var(--guitar-coffee);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.testHead span,
+.testAccounts p {
+  margin: 0;
+  color: var(--guitar-ink-3);
+  font-size: 10px;
+  letter-spacing: 0.4px;
+}
+
+.testList {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(93, 67, 38, 0.36) transparent;
+}
+
+.testList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.testList::-webkit-scrollbar-thumb {
+  background: rgba(93, 67, 38, 0.3);
+  border-radius: 999px;
+}
+
+.testRow {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 3px 8px;
+  padding: 7px 8px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(201, 183, 149, 0.62);
+  border-radius: 4px;
+}
+
+.testRole {
+  grid-row: span 2;
+  align-self: center;
+  color: var(--guitar-orange);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.testName {
+  color: var(--guitar-ink-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.testCredential {
+  color: var(--guitar-ink-3);
+  font-size: 10.5px;
+  letter-spacing: 0.3px;
+}
+
+.testAccounts p {
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.rise {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: guitarRise 0.7s var(--guitar-ease) forwards;
+}
+
+.delay1 {
+  animation-delay: 0.08s;
+}
+
+.delay2 {
+  animation-delay: 0.16s;
+}
+
+.delay3 {
+  animation-delay: 0.24s;
+}
+
+@keyframes guitarRise {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: 40px 16px 28px;
+    place-items: center;
+  }
+
+  .loginShell {
+    width: min(734px, 100%);
+    grid-template-columns: minmax(210px, 250px) minmax(0, 460px);
+    gap: 18px;
+  }
+
+  .card {
+    grid-template-columns: 1fr;
+    width: min(460px, 100%);
+  }
+
+  .image {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .loginShell {
+    grid-template-columns: 1fr;
+  }
+
+  .testAccounts {
+    order: 2;
+    max-height: 220px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 36px 12px 24px;
+    align-items: start;
+  }
+
+  .card {
+    width: 100%;
+    border-radius: 6px;
+    box-shadow: 4px 5px 0 rgba(38, 29, 16, 0.28), 0 14px 34px rgba(38, 29, 16, 0.28);
+  }
+
+  .formSide {
+    padding: 48px 22px 28px;
+  }
+
+  .tabRow {
+    left: 18px;
+    top: -22px;
+  }
+
+  .logoTab {
+    padding: 9px 14px 9px 12px;
+  }
+
+  .logo {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+    letter-spacing: 2px;
+  }
+
+  .formHead h1 {
+    font-size: 19px;
+  }
+}

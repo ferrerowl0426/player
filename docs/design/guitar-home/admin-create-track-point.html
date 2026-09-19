@@ -246,6 +246,7 @@ input,textarea{font-family:inherit}
 .ptag.t-kp{color:var(--coffee);background:rgba(255,127,0,.12);border:1px dashed var(--hair-2)}
 .ptag.t-track{color:#4f7d3a;background:rgba(79,125,58,.12)}
 .ptag.t-score{color:#96702a;background:rgba(185,142,62,.16)}
+.ptag.t-book{color:#8a5a1f;background:rgba(255,127,0,.07);border:1px dashed rgba(185,142,62,.6)}
 .pre-item .pnm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pre-item .pmeta{flex:none;font-size:10px;color:var(--ink-3);letter-spacing:.3px}
 .pre-hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:8px}
@@ -260,6 +261,8 @@ input,textarea{font-family:inherit}
   scrollbar-width:thin;scrollbar-color:var(--hair-2) transparent;
 }
 .picked-list:empty{display:none}
+/* 关联图书馆的已选区：自适应收拢（内容少时不留空白），上限仍为 5 排、超出滚动 */
+#libChips{height:auto;max-height:152px}
 .picked-chip{
   display:inline-flex;align-items:center;gap:8px;max-width:100%;
   font-size:11px;letter-spacing:.4px;color:#4a6b3f;
@@ -526,6 +529,23 @@ input,textarea{font-family:inherit}
             </div>
           </div>
         </div>
+
+        <div class="fsec full" data-page-node-id="LibLinkSec000000000000001">
+          <div class="fsec-title" data-page-node-id="LibLinkTitle0000000000001">关联图书馆 <span class="note" data-page-node-id="LibLinkNote000000000001">可选 · 可关联多本 · 学员在详情页「关联图书馆」处查看与下载</span></div>
+          <p class="pick-count" data-page-node-id="LibLinkCntRow000000001">已关联 <b class="num" id="libCnt" data-page-node-id="LibLinkCnt00000000000001">0</b> <span data-page-node-id="LibLinkCntUnit000000001">本图书</span>
+          </p>
+          <div class="picked-list" id="libChips" aria-label="已关联图书馆图书" data-page-node-id="LibLinkChips0000000001"></div>
+          <div class="pre-picker" id="libPicker" data-page-node-id="LibLinkPicker00000000001">
+            <label class="pick-search big" id="libSearch" data-page-node-id="LibLinkSearch0000000001">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" data-page-node-id="LibLinkSearchIco0000001"><circle cx="11" cy="11" r="7" data-page-node-id="LibLinkSearchC10000000001"/><path d="M20 20l-3.5-3.5" data-page-node-id="LibLinkSearchC20000000001"/></svg>
+              <input type="text" id="libSearchInput" placeholder="搜索图书馆图书名称…" aria-label="搜索可关联的图书馆图书" data-page-node-id="LibLinkSearchInp0000001">
+              <button type="button" class="clr" id="libSearchClr" data-page-node-id="LibLinkSearchClr0000001">清除</button>
+            </label>
+            <div class="pre-drop" id="libDrop" data-page-node-id="LibLinkDrop000000000001"><!-- JS 渲染 --></div>
+          </div>
+          <p class="pre-hint" data-page-node-id="LibLinkHint000000000001">从图书馆搜索并关联图书，如【图书】民谣吉他入门一本通；点击结果加入，已关联项置灰；学员在单课详情页右下「关联图书馆」处可查看并下载</p>
+          <div class="pick-empty" id="libEmpty" data-page-node-id="LibLinkEmpty0000000001">未找到匹配的图书，换个关键词试试</div>
+        </div>
       </div>
     </form>
 
@@ -666,6 +686,61 @@ const PRE_ITEMS = [
     renderChips(); renderDrop();
   });
   document.getElementById('preChips').addEventListener('click', e=>{
+    const rm = e.target.closest('[data-rm]'); if(!rm) return;
+    sel.delete(rm.dataset.rm);
+    renderChips(); renderDrop();
+  });
+  document.addEventListener('click', e=>{ if(!picker.contains(e.target)) drop.classList.remove('open'); });
+})();
+
+/* 关联图书馆：搜索选择 + 已选 chips 快捷移除（复用前置选择器的设计语言） */
+const LIB_ITEMS = [
+  {t:'图书', c:'t-book', nm:'民谣吉他入门一本通',           m:'96 页 · 8.2 MB'},
+  {t:'图书', c:'t-book', nm:'乐理基础知识手册',             m:'64 页 · 4.6 MB'},
+  {t:'图书', c:'t-book', nm:'指弹曲集 2024 精选',           m:'120 页 · 12.4 MB'},
+  {t:'图书', c:'t-book', nm:'和弦词典速查手册',             m:'42 页 · 2.9 MB'},
+  {t:'图书', c:'t-book', nm:'五线谱与六线谱对照读本',       m:'58 页 · 5.3 MB'},
+  {t:'图书', c:'t-book', nm:'节奏训练练习册',               m:'36 页 · 3.1 MB'}
+];
+(function setupLib(){
+  const input = document.getElementById('libSearchInput');
+  const box   = document.getElementById('libSearch');
+  const drop  = document.getElementById('libDrop');
+  const picker= document.getElementById('libPicker');
+  const sel = new Map();
+  function renderChips(){
+    document.getElementById('libCnt').textContent = sel.size;
+    document.getElementById('libChips').innerHTML = [...sel.values()].map(it=>
+      '<span class="picked-chip"><span class="nm"><span class="ptag ' + it.c + '">' + it.t + '</span>' + it.nm + '</span>' +
+      '<button type="button" class="rm" data-rm="' + it.nm + '" aria-label="移除 ' + it.nm + '">✕</button></span>'
+    ).join('');
+  }
+  function renderDrop(){
+    const kw = input.value.trim().toLowerCase();
+    const list = LIB_ITEMS.filter(it=> !kw || (it.t + it.nm).toLowerCase().includes(kw));
+    document.getElementById('libEmpty').style.display = list.length ? 'none' : 'block';
+    drop.innerHTML = list.map(it=>{
+      const off = sel.has(it.nm);
+      return '<button type="button" class="pre-item' + (off ? ' off' : '') + '" data-nm="' + it.nm + '"' + (off ? ' disabled' : '') + '>' +
+        '<span class="ptag ' + it.c + '">' + it.t + '</span>' +
+        '<span class="pnm">' + it.nm + '</span>' +
+        '<span class="pmeta num">' + it.m + '</span></button>';
+    }).join('');
+    drop.classList.add('open');
+  }
+  input.addEventListener('focus', renderDrop);
+  input.addEventListener('input', ()=>{ box.classList.toggle('has', !!input.value.trim()); renderDrop(); });
+  document.getElementById('libSearchClr').addEventListener('click', ()=>{
+    input.value=''; box.classList.remove('has'); renderDrop(); input.focus();
+  });
+  input.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ drop.classList.remove('open'); } });
+  drop.addEventListener('click', e=>{
+    const b = e.target.closest('.pre-item'); if(!b || b.classList.contains('off')) return;
+    const it = LIB_ITEMS.find(x=>x.nm === b.dataset.nm);
+    sel.set(it.nm, it);
+    renderChips(); renderDrop();
+  });
+  document.getElementById('libChips').addEventListener('click', e=>{
     const rm = e.target.closest('[data-rm]'); if(!rm) return;
     sel.delete(rm.dataset.rm);
     renderChips(); renderDrop();

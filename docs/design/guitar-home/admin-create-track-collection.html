@@ -228,9 +228,19 @@ input,textarea{font-family:inherit}
 .ptag.t-kp{color:var(--coffee);background:rgba(255,127,0,.12);border:1px dashed var(--hair-2)}
 .ptag.t-track{color:#4f7d3a;background:rgba(79,125,58,.12)}
 .ptag.t-score{color:#96702a;background:rgba(185,142,62,.16)}
+.ptag.t-book{color:#8a5a1f;background:rgba(255,127,0,.07);border:1px dashed rgba(185,142,62,.6)}
 .pre-item .pnm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pre-item .pmeta{flex:none;font-size:10px;color:var(--ink-3);letter-spacing:.3px}
 .pre-hint{font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;margin-top:8px}
+
+/* 关联图书馆：复用新建单课的搜索选择器，但在合集页保持紧凑纵向节奏 */
+.lib-link-sec{padding-top:10px}
+.lib-link-sec .fsec-title{margin-bottom:7px}
+.lib-link-sec .pick-count{margin-bottom:7px}
+#libChips{height:auto;max-height:64px;margin:8px 0 10px;overflow-y:auto}
+.lib-link-sec .picked-chip{padding:4px 6px 4px 10px}
+.lib-link-sec .pre-picker{max-width:720px}
+.lib-link-sec .pre-hint{margin-top:7px}
 .picked-chip .ptag{margin-right:2px;transform:translateY(-.5px)}
 
 /* 从已有单课 / 知识点多选：卡片与知识点区首页同款（一行 8 张 · 每页最多两排 16 个） */
@@ -504,6 +514,22 @@ input,textarea{font-family:inherit}
             </button>
           </nav>
           <div class="pick-empty" id="pickEmpty">未找到匹配的内容，换个关键词试试</div>
+        </div>
+
+        <div class="fsec full lib-link-sec" data-page-node-id="LibLinkCollectionSec000001">
+          <div class="fsec-title" data-page-node-id="LibLinkCollectionTitle0001">关联图书馆 <span class="note" data-page-node-id="LibLinkCollectionNote0001">可选 · 可关联多本 · 学员在合集详情页查看与下载</span></div>
+          <p class="pick-count" data-page-node-id="LibLinkCollectionCntRow001">已关联 <b class="num" id="libCnt">0</b> <span>本图书</span><span style="font-size:10px;color:var(--ink-3)"> · 上方已选条目可点 ✕ 快捷移除</span></p>
+          <div class="picked-list" id="libChips" aria-label="已关联图书馆图书"></div>
+          <div class="pre-picker" id="libPicker">
+            <label class="pick-search big" id="libSearch">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+              <input type="text" id="libSearchInput" placeholder="搜索图书馆图书名称…" aria-label="搜索可关联的图书馆图书">
+              <button type="button" class="clr" id="libSearchClr">清除</button>
+            </label>
+            <div class="pre-drop" id="libDrop"><!-- JS 渲染 --></div>
+          </div>
+          <p class="pre-hint">从图书馆搜索并关联图书，如【图书】民谣吉他入门一本通；点击结果加入，已关联项置灰；学员在合集详情页「关联图书馆」处可查看并下载</p>
+          <div class="pick-empty" id="libEmpty">未找到匹配的图书，换个关键词试试</div>
         </div>
 
               </div>
@@ -782,6 +808,53 @@ const PRE_ITEMS = [
   {t:'单曲谱',   c:'t-score', nm:'童话 · 弹唱谱',               m:'G 调 · 4 页'},
   {t:'单曲谱',   c:'t-score', nm:'夜空中最亮的星 · 独奏谱',     m:'独奏 · 5 页'}
 ];
+
+/* ================= 关联图书馆：搜索选择 + 已选 chips 快捷移除 ================= */
+const LIB_ITEMS = [
+  {t:'图书', c:'t-book', nm:'民谣吉他入门一本通',       m:'96 页 · 8.2 MB'},
+  {t:'图书', c:'t-book', nm:'指弹吉他和弦与节奏图鉴',   m:'128 页 · 12.6 MB'},
+  {t:'图书', c:'t-book', nm:'零基础乐理小课',           m:'72 页 · 6.4 MB'},
+  {t:'图书', c:'t-book', nm:'舞台演出准备手册',         m:'54 页 · 4.8 MB'},
+  {t:'图书', c:'t-book', nm:'经典歌曲弹唱谱精选',       m:'180 页 · 15.1 MB'}
+];
+(function setupLib(){
+  const input = document.getElementById('libSearchInput');
+  const box = document.getElementById('libSearch');
+  const drop = document.getElementById('libDrop');
+  const picker = document.getElementById('libPicker');
+  const sel = new Map();
+  function renderChips(){
+    document.getElementById('libCnt').textContent = sel.size;
+    document.getElementById('libChips').innerHTML = [...sel.values()].map(it=>
+      '<span class="picked-chip"><span class="nm"><span class="ptag ' + it.c + '">' + it.t + '</span>' + it.nm + '</span>' +
+      '<button type="button" class="rm" data-rm="' + it.nm + '" aria-label="移除 ' + it.nm + '">✕</button></span>'
+    ).join('');
+  }
+  function renderDrop(){
+    const kw = input.value.trim().toLowerCase();
+    const list = LIB_ITEMS.filter(it=>!kw || (it.t + it.nm).toLowerCase().includes(kw));
+    document.getElementById('libEmpty').style.display = list.length ? 'none' : 'block';
+    drop.innerHTML = list.map(it=>{
+      const off = sel.has(it.nm);
+      return '<button type="button" class="pre-item' + (off ? ' off' : '') + '" data-nm="' + it.nm + '"' + (off ? ' disabled' : '') + '>' +
+        '<span class="ptag ' + it.c + '">' + it.t + '</span><span class="pnm">' + it.nm + '</span><span class="pmeta num">' + it.m + '</span></button>';
+    }).join('');
+    drop.classList.add('open');
+  }
+  input.addEventListener('focus', renderDrop);
+  input.addEventListener('input', ()=>{ box.classList.toggle('has', !!input.value.trim()); renderDrop(); });
+  document.getElementById('libSearchClr').addEventListener('click', ()=>{ input.value=''; box.classList.remove('has'); renderDrop(); input.focus(); });
+  input.addEventListener('keydown', e=>{ if(e.key === 'Escape') drop.classList.remove('open'); });
+  drop.addEventListener('click', e=>{
+    const b = e.target.closest('.pre-item'); if(!b || b.classList.contains('off')) return;
+    const it = LIB_ITEMS.find(x=>x.nm === b.dataset.nm); sel.set(it.nm, it); renderChips(); renderDrop();
+  });
+  document.getElementById('libChips').addEventListener('click', e=>{
+    const rm = e.target.closest('[data-rm]'); if(!rm) return; sel.delete(rm.dataset.rm); renderChips(); renderDrop();
+  });
+  document.addEventListener('click', e=>{ if(!picker.contains(e.target)) drop.classList.remove('open'); });
+  renderChips();
+})();
 (function setupPre(){
   const input = document.getElementById('preSearchInput');
   const box   = document.getElementById('preSearch');

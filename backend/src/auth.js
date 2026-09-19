@@ -15,6 +15,11 @@ function getCookieOptions() {
   };
 }
 
+function getClearCookieOptions() {
+  const { maxAge, ...options } = getCookieOptions();
+  return options;
+}
+
 function signToken(payload) {
   return jwt.sign(payload, config.auth.jwtSecret, {
     expiresIn: config.auth.tokenExpiresInSeconds
@@ -28,7 +33,7 @@ function readToken(req, cookieName) {
 }
 
 function clearAuthCookie(res, cookieName) {
-  res.clearCookie(cookieName, getCookieOptions());
+  res.clearCookie(cookieName, getClearCookieOptions());
 }
 
 export function signAdminToken(admin) {
@@ -102,6 +107,35 @@ export function requireRole(...allowedRoles) {
   };
 }
 
+export function requireAdminSession(req, res, next) {
+  const token = readToken(req, config.auth.adminCookieName);
+
+  if (!token) {
+    res.status(401).json({ message: '请先登录老师账号' });
+    return;
+  }
+
+  try {
+    const payload = jwt.verify(token, config.auth.jwtSecret);
+
+    if (payload.type !== 'admin') {
+      res.status(401).json({ message: '老师登录状态无效' });
+      return;
+    }
+
+    if (payload.role !== 'teacher' && payload.role !== 'super_admin') {
+      res.status(403).json({ message: '没有执行此操作的权限' });
+      return;
+    }
+
+    req.admin = payload;
+    next();
+  } catch (error) {
+    clearAdminCookie(res);
+    res.status(401).json({ message: '登录已过期，请重新登录' });
+  }
+}
+
 export function requireAdmin(req, res, next) {
   return requireRole('teacher', 'super_admin')(req, res, next);
 }
@@ -123,11 +157,6 @@ export function requireUser(req, res, next) {
 
     if (payload.type !== 'user') {
       res.status(401).json({ message: '学员登录状态无效' });
-      return;
-    }
-
-    if (payload.status === 'disabled') {
-      res.status(403).json({ message: '这个学员已被停用，请联系老师' });
       return;
     }
 
@@ -154,19 +183,11 @@ export function requireUserOrAdmin(req, res, next) {
       const payload = jwt.verify(token, config.auth.jwtSecret);
 
       if (payload.type === 'user') {
-        if (payload.status === 'disabled') {
-          continue;
-        }
-
         req.user = payload;
         return next();
       }
 
       if (payload.type === 'admin') {
-        if (payload.status === 'disabled') {
-          continue;
-        }
-
         req.admin = payload;
         return next();
       }

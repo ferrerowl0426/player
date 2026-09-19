@@ -6,6 +6,7 @@ import {
   abortMultipartUpload,
   completeMultipartUpload,
   createMultipartUpload,
+  createUploadUrl,
   createMultipartPartUrl,
   deleteFromBucket,
   ensureObjectExists,
@@ -37,6 +38,54 @@ function mapContent(row) {
   return { ...row, cover: normalizePublicUrl(row.cover) };
 }
 
+function size(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.round(number) : 0;
+}
+
+function isAttachmentKey(value) {
+  return typeof value === 'string' && value.startsWith('attachments/') && !value.includes('..');
+}
+
+function normalizeAttachments(values) {
+  return (Array.isArray(values) ? values : [])
+    .map((item, index) => ({
+      fileName: text(item?.fileName || item?.file_name),
+      fileUrl: text(item?.fileUrl || item?.file_url),
+      fileKey: text(item?.fileKey || item?.file_key),
+      fileType: text(item?.fileType || item?.file_type),
+      fileSize: size(item?.fileSize || item?.file_size),
+      sortOrder: Number.isInteger(Number(item?.sortOrder ?? item?.sort_order)) ? Number(item?.sortOrder ?? item?.sort_order) : index
+    }))
+    .filter((item) => item.fileName && item.fileUrl && isAttachmentKey(item.fileKey));
+}
+
+async function replaceAttachments({ objectType, objectId, values }) {
+  const next = normalizeAttachments(values);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const old = await client.query('SELECT file_key FROM content_attachments WHERE object_type = $1 AND object_id = $2', [objectType, objectId]);
+    await client.query('DELETE FROM content_attachments WHERE object_type = $1 AND object_id = $2', [objectType, objectId]);
+    for (const [index, attachment] of next.entries()) {
+      await ensureObjectExists(attachment.fileKey);
+      await client.query(
+        `INSERT INTO content_attachments (object_type, object_id, file_name, file_url, file_key, file_type, file_size, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [objectType, objectId, attachment.fileName, attachment.fileUrl, attachment.fileKey, attachment.fileType, attachment.fileSize, index]
+      );
+    }
+    await client.query('COMMIT');
+    const kept = new Set(next.map((item) => item.fileKey));
+    await Promise.all(old.rows.map((row) => row.file_key).filter((key) => key && !kept.has(key)).map((key) => deleteFromBucket(key).catch(() => {})));
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 function mapPart(row) {
   return {
     ...row,
@@ -60,9 +109,9 @@ async function findKnowledgePoint(pointId) {
 
 async function attachments(objectType, objectId) {
   const result = await pool.query(
-    `SELECT id, file_name, file_url, file_key, file_type, file_size, created_at
+    `SELECT id, file_name, file_url, file_key, file_type, file_size, sort_order, created_at
      FROM content_attachments WHERE object_type = $1 AND object_id = $2
-     ORDER BY created_at DESC, id DESC`,
+     ORDER BY sort_order ASC, created_at ASC, id ASC`,
     [objectType, objectId]
   );
   return result.rows.map((row) => ({ ...row, file_url: normalizePublicUrl(row.file_url) }));
@@ -76,7 +125,31 @@ async function pointParts(pointId) {
      WHERE kp.knowledge_point_id = $1 ORDER BY kp.part_no ASC, kp.id ASC`,
     [pointId]
   );
-  return result.rows.map(mapPart);
+
+  const rows = result.rows;
+  const videoIds = rows.map((row) => row.video_id).filter(Boolean);
+  const renditionsByVideoId = new Map();
+
+  if (videoIds.length > 0) {
+    const renditions = await pool.query(
+      `SELECT video_id, quality, video_url, file_size, status, updated_at
+       FROM video_renditions
+       WHERE video_id = ANY($1::int[])
+       ORDER BY CASE quality WHEN '1080p' THEN 1 WHEN '720p' THEN 2 WHEN 'source' THEN 3 ELSE 4 END`,
+      [videoIds]
+    );
+
+    for (const rendition of renditions.rows) {
+      const list = renditionsByVideoId.get(rendition.video_id) || [];
+      list.push({ ...rendition, video_url: normalizePublicUrl(rendition.video_url) });
+      renditionsByVideoId.set(rendition.video_id, list);
+    }
+  }
+
+  return rows.map((row) => ({
+    ...mapPart(row),
+    renditions: renditionsByVideoId.get(row.video_id) || []
+  }));
 }
 
 async function pointCollections(pointId) {
@@ -87,6 +160,75 @@ async function pointCollections(pointId) {
     [pointId]
   );
   return result.rows.map(mapContent);
+}
+
+function mapLibraryResource(row) {
+  return {
+    ...row,
+    cover: normalizePublicUrl(row.cover),
+    file_url: normalizePublicUrl(row.file_url)
+  };
+}
+
+async function linkedLibraryResources(objectType, objectId) {
+  const result = await pool.query(
+    `SELECT lr.id, lr.title, lr.cover, lr.file_name, lr.file_url, lr.file_size, lr.updated_at,
+            'direct' AS link_source,
+            NULL::int AS source_collection_id,
+            NULL::text AS source_collection_name
+     FROM library_resource_links l
+     JOIN library_resources lr ON lr.id = l.library_resource_id
+     WHERE l.object_type = $1 AND l.object_id = $2
+     ORDER BY lr.updated_at DESC, lr.id DESC`,
+    [objectType, objectId]
+  );
+
+  return result.rows.map(mapLibraryResource);
+}
+
+async function pointLibraryResources(pointId) {
+  const result = await pool.query(
+    `WITH direct_links AS (
+       SELECT lr.id, lr.title, lr.cover, lr.file_name, lr.file_url, lr.file_size, lr.updated_at,
+              TRUE AS direct_link,
+              ARRAY[]::int[] AS inherited_collection_ids,
+              ARRAY[]::text[] AS inherited_collection_names
+       FROM library_resource_links l
+       JOIN library_resources lr ON lr.id = l.library_resource_id
+       WHERE l.object_type = 'knowledge_point' AND l.object_id = $1
+     ), inherited_links AS (
+       SELECT lr.id, lr.title, lr.cover, lr.file_name, lr.file_url, lr.file_size, lr.updated_at,
+              FALSE AS direct_link,
+              ARRAY_AGG(DISTINCT kc.id ORDER BY kc.id) AS inherited_collection_ids,
+              ARRAY_AGG(DISTINCT kc.name ORDER BY kc.name) AS inherited_collection_names
+       FROM knowledge_collection_items kci
+       JOIN knowledge_collections kc ON kc.id = kci.collection_id
+       JOIN library_resource_links l ON l.object_type = 'knowledge_collection' AND l.object_id = kc.id
+       JOIN library_resources lr ON lr.id = l.library_resource_id
+       WHERE kci.knowledge_point_id = $1
+       GROUP BY lr.id
+     ), merged AS (
+       SELECT * FROM direct_links
+       UNION ALL
+       SELECT * FROM inherited_links
+     )
+     SELECT id, MAX(title) AS title, MAX(cover) AS cover, MAX(file_name) AS file_name,
+            MAX(file_url) AS file_url, MAX(file_size) AS file_size, MAX(updated_at) AS updated_at,
+            BOOL_OR(direct_link) AS is_direct,
+            ARRAY_REMOVE(ARRAY_AGG(DISTINCT inherited_collection_id), NULL) AS inherited_collection_ids,
+            ARRAY_REMOVE(ARRAY_AGG(DISTINCT inherited_collection_name), NULL) AS inherited_collection_names
+     FROM merged
+     LEFT JOIN LATERAL UNNEST(inherited_collection_ids) AS inherited_collection_id ON TRUE
+     LEFT JOIN LATERAL UNNEST(inherited_collection_names) AS inherited_collection_name ON TRUE
+     GROUP BY id
+     ORDER BY MAX(updated_at) DESC, id DESC`,
+    [pointId]
+  );
+
+  return result.rows.map((row) => mapLibraryResource({
+    ...row,
+    link_source: row.is_direct && row.inherited_collection_ids?.length ? 'direct_and_inherited' : (row.is_direct ? 'direct' : 'inherited')
+  }));
 }
 
 async function findCollection(collectionId) {
@@ -116,7 +258,16 @@ knowledgeRouter.get('/', async (req, res, next) => {
         [keyword, query]
       )
     ]);
-    res.json({ data: { points: points.rows.map(mapContent), knowledge_collections: knowledgeCollections.rows.map(mapContent) } });
+    // 口径统一：与 /api/tracks 的 track_points / track_collections 对齐。
+    // points 仅为旧字段兼容别名，新代码一律读 knowledge_points。
+    const mappedPoints = points.rows.map(mapContent);
+    res.json({
+      data: {
+        knowledge_points: mappedPoints,
+        points: mappedPoints,
+        knowledge_collections: knowledgeCollections.rows.map(mapContent)
+      }
+    });
   } catch (error) {
     next(error);
   }
@@ -130,14 +281,17 @@ knowledgeRouter.get('/collections/:id', async (req, res, next) => {
       res.status(collectionId ? 404 : 400).json({ message: collectionId ? '知识点集不存在' : '知识点集 ID 无效' });
       return;
     }
-    const points = await pool.query(
-      `SELECT kp.id, kp.name, kp.cover, kp.description, kp.updated_at, COUNT(kpp.id)::int AS part_count
-       FROM knowledge_collection_items ci JOIN knowledge_points kp ON kp.id = ci.knowledge_point_id
-       LEFT JOIN knowledge_parts kpp ON kpp.knowledge_point_id = kp.id
-       WHERE ci.collection_id = $1 GROUP BY kp.id ORDER BY kp.name ASC, kp.id ASC`,
-      [collectionId]
-    );
-    res.json({ data: { ...mapContent(collection), points: points.rows.map(mapContent), attachments: await attachments('knowledge_collection', collectionId) } });
+    const [points, libraryResources] = await Promise.all([
+      pool.query(
+        `SELECT kp.id, kp.name, kp.cover, kp.description, kp.updated_at, COUNT(kpp.id)::int AS part_count
+         FROM knowledge_collection_items ci JOIN knowledge_points kp ON kp.id = ci.knowledge_point_id
+         LEFT JOIN knowledge_parts kpp ON kpp.knowledge_point_id = kp.id
+         WHERE ci.collection_id = $1 GROUP BY kp.id ORDER BY kp.name ASC, kp.id ASC`,
+        [collectionId]
+      ),
+      linkedLibraryResources('knowledge_collection', collectionId)
+    ]);
+    res.json({ data: { ...mapContent(collection), points: points.rows.map(mapContent), attachments: await attachments('knowledge_collection', collectionId), library_resources: libraryResources } });
   } catch (error) {
     next(error);
   }
@@ -151,7 +305,7 @@ knowledgeRouter.get('/:id', async (req, res, next) => {
       res.status(pointId ? 404 : 400).json({ message: pointId ? '知识点不存在' : '知识点 ID 无效' });
       return;
     }
-    res.json({ data: { ...mapContent(point), parts: await pointParts(pointId), attachments: await attachments('knowledge_point', pointId), knowledge_collections: await pointCollections(pointId) } });
+    res.json({ data: { ...mapContent(point), parts: await pointParts(pointId), attachments: await attachments('knowledge_point', pointId), knowledge_collections: await pointCollections(pointId), library_resources: await pointLibraryResources(pointId) } });
   } catch (error) {
     next(error);
   }
@@ -335,6 +489,46 @@ knowledgeRouter.patch('/collections/:id/points', requireSuperAdmin, async (req, 
     next(error);
   } finally {
     client.release();
+  }
+});
+
+knowledgeRouter.post('/:id/attachments/upload-url', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const pointId = id(req.params.id);
+    const fileName = text(req.body.fileName || req.body.name);
+    const fileType = text(req.body.fileType || req.body.type) || 'application/octet-stream';
+    const fileSize = size(req.body.fileSize || req.body.size);
+    const fileExt = extension(fileName);
+    if (!pointId || !fileName || !fileExt) {
+      res.status(400).json({ message: '附件上传参数无效' });
+      return;
+    }
+    if (!(await findKnowledgePoint(pointId))) {
+      res.status(404).json({ message: '知识点不存在' });
+      return;
+    }
+    const key = `attachments/knowledge_point/${pointId}/${uuid()}${fileExt}`;
+    res.json({ data: { key, uploadUrl: await createUploadUrl({ key, contentType: fileType }), publicUrl: getPublicUrl(key), fileName, fileType, fileSize } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+knowledgeRouter.put('/:id/attachments', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const pointId = id(req.params.id);
+    if (!pointId) {
+      res.status(400).json({ message: '知识点 ID 无效' });
+      return;
+    }
+    if (!(await findKnowledgePoint(pointId))) {
+      res.status(404).json({ message: '知识点不存在' });
+      return;
+    }
+    await replaceAttachments({ objectType: 'knowledge_point', objectId: pointId, values: req.body.attachments });
+    res.json({ data: await attachments('knowledge_point', pointId) });
+  } catch (error) {
+    next(error);
   }
 });
 

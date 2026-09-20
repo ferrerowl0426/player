@@ -134,7 +134,6 @@ export default function KnowledgePointPage() {
 
           <div className="title-card">
             <div>
-              <p className="eyebrow">KNOWLEDGE POINT</p>
               <h1>{point.name}</h1>
               <p className="detail-time">更新 {formatDate(point.updated_at)} · {parts.length} 个分段</p>
             </div>

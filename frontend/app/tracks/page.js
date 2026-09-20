@@ -7,7 +7,7 @@ import ContentCard from '../../components/ui/ContentCard.js';
 import { fetchCurrentViewer, fetchTrackLibrary, deleteTrack, deleteTrackCollection } from '../../lib/api.js';
 
 const COLLECTION_ROWS = 1;
-const TRACK_ROWS = 2;
+const TRACK_ROWS = 4;
 
 function getGridColumns() {
   if (typeof window === 'undefined') {

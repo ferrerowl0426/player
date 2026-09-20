@@ -134,7 +134,6 @@ export default function TrackDetailPage() {
 
           <div className="title-card">
             <div>
-              <p className="eyebrow">TRACK DETAIL</p>
               <h1>{track.name}</h1>
               <p className="detail-time">更新 {formatDate(track.updated_at)} · {parts.length} 个分段</p>
             </div>

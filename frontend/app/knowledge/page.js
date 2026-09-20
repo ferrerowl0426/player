@@ -12,7 +12,7 @@ import {
 } from '../../lib/api.js';
 
 const COLLECTION_ROWS = 1;
-const POINT_ROWS = 2;
+const POINT_ROWS = 4;
 
 function getGridColumns() {
   if (typeof window === 'undefined') {

@@ -20,7 +20,10 @@
 
 html { min-height: 100%; scroll-behavior: smooth; background: var(--white); }
 body { min-height: 100vh; font-family: var(--font-body); color: var(--ink); background: transparent; font-size: 14.5px; line-height: 1.65; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
-body.student-manage-page { overflow: hidden; min-height: 0; }
+body.student-manage-page,
+body.class-manage-page { overflow: hidden; min-height: 0; }
+html:has(body.class-manage-page) { height: 100%; }
+body.class-manage-page { height: 100%; }
 body::after { display: none; }
 body::before {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -1;
@@ -36,6 +39,7 @@ body::before {
 button, input, select, textarea { font-family: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 1.5px solid var(--ink); outline-offset: 3px; }
 .home { flex: 1 0 auto; max-width: 1440px; width: 100%; margin: 0 auto; padding: 14px 36px 26px; display: flex; flex-direction: column; gap: 14px; }
+body.class-manage-page .home.class-manage { flex: 0 0 auto; min-height: 0; height: calc(100dvh - 56px); box-sizing: border-box; overflow: hidden; }
 .num { font-variant-numeric: tabular-nums; }
 .eyebrow { font-size: 10px; letter-spacing: 2.5px; color: var(--ink-3); text-transform: uppercase; font-weight: 500; }
 .scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--hair-2) transparent; }

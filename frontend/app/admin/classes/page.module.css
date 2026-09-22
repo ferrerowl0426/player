@@ -1,6 +1,8 @@
 ﻿﻿.page:global(.class-manage) {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
   max-width: 1440px;
   width: 100%;
   margin: 0 auto;
@@ -792,6 +794,9 @@
 
 @media (max-width: 1024px) {
   .page:global(.class-manage) {
+    height: auto;
+    min-height: calc(100vh - 56px);
+    overflow: visible;
     padding: 14px 20px 40px;
   }
 
@@ -802,6 +807,12 @@
 
   .page:global(.class-manage) :global(.zone) {
     min-height: 320px;
+  }
+
+  body:global(.class-manage-page) .page:global(.class-manage) {
+    height: auto;
+    min-height: calc(100vh - 56px);
+    overflow: visible;
   }
 
   .page:global(.class-manage) :global(.split) {

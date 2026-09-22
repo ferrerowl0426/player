@@ -124,6 +124,11 @@ export default function ClassesPage() {
   }
 
   useEffect(() => {
+    document.body.classList.add('class-manage-page');
+    return () => document.body.classList.remove('class-manage-page');
+  }, []);
+
+  useEffect(() => {
     async function init() {
       try {
         const me = await fetchAdminMe();

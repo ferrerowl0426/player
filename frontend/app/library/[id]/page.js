@@ -43,7 +43,7 @@ export default function LibraryBookPage() {
       <AppNav role={admin?.role || 'guest'} accountName={accountName} />
       <main className={styles.wrap}>
         <div className="crumb rise"><Link href="/library">← 返回图书馆</Link></div>
-        <section className="detail rise d1">
+        <section className={`${styles.bookDetail} rise d1`}>
           <div className="bcover" style={book.cover ? { backgroundImage: `url(${book.cover})` } : undefined}>
             <span className="pdf-badge">PDF</span>
           </div>

@@ -23,7 +23,7 @@
   color: var(--orange);
 }
 
-.wrap :global(.detail) {
+.bookDetail {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 36px;
@@ -220,7 +220,7 @@
     padding: 14px 20px 40px;
   }
 
-  .wrap :global(.detail) {
+  .bookDetail {
     grid-template-columns: 1fr;
     gap: 24px;
   }

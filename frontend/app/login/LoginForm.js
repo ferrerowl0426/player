@@ -91,7 +91,13 @@ export default function LoginForm() {
             </div>
           </div>
 
-          <div className={`${styles.image} ${styles.rise}`}></div>
+          <div className={`${styles.image} ${styles.rise}`}>
+            <div className={styles.auditNote}>
+              <strong>备案审核说明</strong>
+              <p>本站仅供吉他爱好者整理学习笔记与课程资料，无广告，不开放公共注册，无支付功能。</p>
+              <p>审核测试账号：13382800426<br />审核测试密码：demo123</p>
+            </div>
+          </div>
 
           <div className={styles.formSide}>
           <div className={`${styles.formHead} ${styles.rise} ${styles.delay1}`}>

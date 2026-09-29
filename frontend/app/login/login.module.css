@@ -141,6 +141,45 @@
   border-right: 1px solid var(--guitar-glass-line);
 }
 
+.auditNote {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  left: 24px;
+  z-index: 2;
+  padding: 16px 18px;
+  color: var(--guitar-ink);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(93, 67, 38, 0.32);
+  border-radius: 6px;
+  box-shadow: 0 10px 26px rgba(38, 29, 16, 0.18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.auditNote strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--guitar-coffee);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.auditNote p {
+  margin: 0;
+  color: var(--guitar-ink-2);
+  font-size: 12px;
+  line-height: 1.75;
+  letter-spacing: 0.4px;
+}
+
+.auditNote p + p {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(93, 67, 38, 0.24);
+}
+
 .formSide {
   position: relative;
   z-index: 3;

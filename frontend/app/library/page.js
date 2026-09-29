@@ -54,7 +54,6 @@ export default function LibraryPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [status, setStatus] = useState('正在加载图书馆...');
-  const [jump, setJump] = useState('');
   const [pending, setPending] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState('');
@@ -130,13 +129,7 @@ export default function LibraryPage() {
     }
   }
 
-  function jumpToPage() {
-    const target = Number(jump);
-    if (!Number.isInteger(target)) return;
-    setPage(Math.min(total, Math.max(1, target)));
-    setJump('');
-  }
-
+  const pagerItems = Array.from({ length: Math.min(total, 5) }, (_, index) => index + 1);
   const emptyText = keyword.trim() ? '未找到相关资料，换个关键词试试' : '暂无资料。';
 
   return (
@@ -188,10 +181,14 @@ export default function LibraryPage() {
           </div>
 
           <div className="pager">
-            <button className="pgbtn" type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>上一页</button>
-            <span className="pginfo num">第 <b>{safePage}</b> 页 · 共 {total} 页</span>
-            <button className="pgbtn" type="button" disabled={safePage >= total} onClick={() => setPage(safePage + 1)}>下一页</button>
-            <label className="pgjump">跳转到 <input value={jump} onChange={(event) => setJump(event.target.value.replace(/\D/g, '').slice(0, 3))} onKeyDown={(event) => { if (event.key === 'Enter') jumpToPage(); }} /> 页 <button type="button" onClick={jumpToPage}>跳转</button></label>
+            <button className="pgbtn" type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} aria-label="上一页">‹</button>
+            <div className="pgnums">
+              {pagerItems.map((item) => (
+                <button type="button" className={item === safePage ? 'pgnum on' : 'pgnum'} onClick={() => setPage(item)} key={item}>{item}</button>
+              ))}
+              {total > 5 ? <span className="pgdots">…</span> : null}
+            </div>
+            <button className="pgbtn" type="button" disabled={safePage >= total} onClick={() => setPage(safePage + 1)} aria-label="下一页">›</button>
           </div>
         </section>
       </main>

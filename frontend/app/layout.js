@@ -2,8 +2,8 @@ import './design-system.css';
 import './globals.css';
 
 export const metadata = {
-  title: '学习播放器',
-  description: 'Next.js 前端 + Express 后端的视频播放器学习项目'
+  title: '能学慧吉他课堂笔记整理工具',
+  description: '能学慧吉他课堂笔记整理工具，仅供吉他爱好者整理学习笔记与课程资料'
 };
 
 export default function RootLayout({ children }) {

@@ -1047,9 +1047,22 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       }
     }
 
+    // 替换源视频时，旧的 720p / 1080p 转码产物会一起失效，必须并入待清理列表，
+    // 否则 transcoded/ 下会持续堆积孤儿文件。
+    const oldRenditionResult = videoKey
+      ? await pool.query(
+          `SELECT video_url FROM video_renditions WHERE video_id = $1 AND quality <> 'source'`,
+          [videoId]
+        )
+      : { rows: [] };
+    const oldRenditionKeys = oldRenditionResult.rows
+      .map((row) => getKeyFromPublicUrl(row.video_url))
+      .filter(Boolean);
+
     const oldKeysToDelete = [
       videoKey ? getKeyFromPublicUrl(oldVideo.video_url) : '',
       coverKey ? getKeyFromPublicUrl(oldVideo.cover_url) : '',
+      ...oldRenditionKeys,
       ...currentAttachmentsResult.rows
         .filter((attachment) => changedOldAttachmentIds.includes(attachment.id))
         .map((attachment) => attachment.file_key)
@@ -1068,6 +1081,25 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
          RETURNING id, title, description, video_url, cover_url, created_at`,
         [title, description, videoKey ? getPublicUrl(videoKey) : null, coverKey ? getPublicUrl(coverKey) : null, videoId]
       );
+
+      // 替换了源视频：旧的转码地址已失效，重置 720p / 1080p 档位并重建 source 档。
+      // 注意 createInitialRenditions 对 720p / 1080p 是 ON CONFLICT DO NOTHING，
+      // 所以必须先显式重置，否则旧记录会残留、播放器切到 720P/1080P 会死链。
+      // 重置为 processing 期间前端会回落到原画 source，不会白屏。
+      if (videoKey) {
+        await client.query(
+          `UPDATE video_renditions
+              SET video_url = '', file_size = 0, status = 'processing', updated_at = CURRENT_TIMESTAMP
+            WHERE video_id = $1 AND quality = ANY($2::text[])`,
+          [videoId, ['720p', '1080p']]
+        );
+
+        await createInitialRenditions(client, {
+          videoId,
+          sourceUrl: getPublicUrl(videoKey),
+          sourceSize: Number(videoHead?.ContentLength || 0)
+        });
+      }
 
       if (shouldUpdatePrerequisites) {
         await client.query('DELETE FROM video_prerequisites WHERE video_id = $1', [videoId]);

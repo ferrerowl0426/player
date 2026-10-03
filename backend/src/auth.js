@@ -1,5 +1,23 @@
 import jwt from 'jsonwebtoken';
 import { config } from './config.js';
+import { pool } from './db.js';
+
+// 管理端鉴权必须回查数据库当前状态，不能只信 token 里的快照。
+// 原因：JWT 有效期 7 天，老师被停用（或角色被升降）后，旧 token 里的
+// role / status 仍是登录那一刻的值，只信 token 会导致停用老师 7 天内仍能管理学员。
+async function loadCurrentAdmin(adminId) {
+  const numericId = Number(adminId);
+  if (!Number.isInteger(numericId) || numericId <= 0) {
+    return null;
+  }
+
+  const result = await pool.query(
+    'SELECT id, username, account, nickname, role, status FROM admins WHERE id = $1',
+    [numericId]
+  );
+
+  return result.rows[0] || null;
+}
 
 function getTokenMaxAgeMs() {
   return config.auth.tokenExpiresInSeconds * 1000;
@@ -71,48 +89,12 @@ export function clearUserCookie(res) {
   clearAuthCookie(res, config.auth.userCookieName);
 }
 
-export function requireRole(...allowedRoles) {
-  return (req, res, next) => {
-    const token = readToken(req, config.auth.adminCookieName);
-
-    if (!token) {
-      res.status(401).json({ message: '请先登录老师账号' });
-      return;
-    }
-
-    try {
-      const payload = jwt.verify(token, config.auth.jwtSecret);
-
-      if (payload.type !== 'admin') {
-        res.status(401).json({ message: '老师登录状态无效' });
-        return;
-      }
-
-      if (!allowedRoles.includes(payload.role)) {
-        res.status(403).json({ message: '没有执行此操作的权限' });
-        return;
-      }
-
-      if (payload.status === 'disabled') {
-        res.status(403).json({ message: '此账号已停用，不能执行管理操作' });
-        return;
-      }
-
-      req.admin = payload;
-      next();
-    } catch (error) {
-      clearAdminCookie(res);
-      res.status(401).json({ message: '登录已过期，请重新登录' });
-    }
-  };
-}
-
-export function requireAdminSession(req, res, next) {
+function readAdminPayload(req, res) {
   const token = readToken(req, config.auth.adminCookieName);
 
   if (!token) {
     res.status(401).json({ message: '请先登录老师账号' });
-    return;
+    return null;
   }
 
   try {
@@ -120,20 +102,88 @@ export function requireAdminSession(req, res, next) {
 
     if (payload.type !== 'admin') {
       res.status(401).json({ message: '老师登录状态无效' });
+      return null;
+    }
+
+    return payload;
+  } catch (error) {
+    clearAdminCookie(res);
+    res.status(401).json({ message: '登录已过期，请重新登录' });
+    return null;
+  }
+}
+
+// 解析 token 并回查数据库，返回“以数据库为准”的管理员会话信息。
+// 返回 null 表示已经写过响应，调用方直接 return 即可。
+async function resolveAdminSession(req, res, next, { allowDisabled = false } = {}) {
+  const payload = readAdminPayload(req, res);
+  if (!payload) {
+    return null;
+  }
+
+  let current;
+  try {
+    current = await loadCurrentAdmin(payload.adminId);
+  } catch (error) {
+    next(error);
+    return null;
+  }
+
+  if (!current) {
+    // 账号已被删除：token 立即失效。
+    clearAdminCookie(res);
+    res.status(401).json({ message: '登录已过期，请重新登录' });
+    return null;
+  }
+
+  if (current.status !== 'active' && !allowDisabled) {
+    res.status(403).json({ message: '此账号已停用，不能执行管理操作' });
+    return null;
+  }
+
+  // 角色、状态一律以数据库为准：降权 / 停用 / 复权都能立刻生效。
+  return {
+    ...payload,
+    adminId: current.id,
+    username: current.username,
+    account: current.account,
+    nickname: current.nickname,
+    role: current.role,
+    status: current.status
+  };
+}
+
+export function requireRole(...allowedRoles) {
+  return async (req, res, next) => {
+    const admin = await resolveAdminSession(req, res, next);
+    if (!admin) {
       return;
     }
 
-    if (payload.role !== 'teacher' && payload.role !== 'super_admin') {
+    if (!allowedRoles.includes(admin.role)) {
       res.status(403).json({ message: '没有执行此操作的权限' });
       return;
     }
 
-    req.admin = payload;
+    req.admin = admin;
     next();
-  } catch (error) {
-    clearAdminCookie(res);
-    res.status(401).json({ message: '登录已过期，请重新登录' });
+  };
+}
+
+export async function requireAdminSession(req, res, next) {
+  // 停用状态也放行：老师仍可登录并看到停用提示，只是不能执行管理操作。
+  const admin = await resolveAdminSession(req, res, next, { allowDisabled: true });
+  if (!admin) {
+    return;
   }
+
+  if (admin.role !== 'teacher' && admin.role !== 'super_admin') {
+    res.status(403).json({ message: '没有执行此操作的权限' });
+    return;
+  }
+
+  req.admin = admin;
+  next();
 }
 
 export function requireAdmin(req, res, next) {

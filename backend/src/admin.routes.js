@@ -1298,18 +1298,33 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
     const newObjects = validated;
     if (newObjects.length > MAX_ACTIVE_VIDEO_ASSIGNMENTS) return sendValidationError(res, `本次最多选择 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个作业对象`);
 
-    const operationResult = await pool.query(`SELECT nextval('user_assignments_operation_id_seq') AS operation_id`);
-    const operationId = operationResult.rows[0].operation_id;
-    const insertedRows = [];
-    for (const item of newObjects) {
-      const result = await pool.query(`INSERT INTO user_assignments (operation_id, user_id, video_id, object_type, object_id, part_id, message, practice_requirement, submit_requirement, assigned_by_admin_id, assigned_video_title, assigned_object_title) VALUES ($1, $2, $3, $4, $5, $6, '', $7, $8, $9, $10, $10) RETURNING id, operation_id, user_id, video_id, object_type, object_id, part_id, message, practice_requirement, submit_requirement, is_deleted, delete_reason, deleted_at, created_at`, [operationId, userId, item.video_id || null, item.objectType, item.objectId, item.partId || null, practiceRequirement || legacyMessage, submitRequirement, req.admin.adminId, item.title]);
-      insertedRows.push(result.rows[0]);
+    // PRD：一次推送必须原子生效。取 operation_id 与全部 INSERT 放进同一个事务，
+    // 中途任何一步失败就整体回滚，避免留下“半批作业”。
+    // 校验逻辑（上面）保持在事务外，事务内只做数据库操作，不混入 COS 等外部 IO。
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const operationResult = await client.query(`SELECT nextval('user_assignments_operation_id_seq') AS operation_id`);
+      const operationId = operationResult.rows[0].operation_id;
+      const insertedRows = [];
+      for (const item of newObjects) {
+        const result = await client.query(`INSERT INTO user_assignments (operation_id, user_id, video_id, object_type, object_id, part_id, message, practice_requirement, submit_requirement, assigned_by_admin_id, assigned_video_title, assigned_object_title) VALUES ($1, $2, $3, $4, $5, $6, '', $7, $8, $9, $10, $10) RETURNING id, operation_id, user_id, video_id, object_type, object_id, part_id, message, practice_requirement, submit_requirement, is_deleted, delete_reason, deleted_at, created_at`, [operationId, userId, item.video_id || null, item.objectType, item.objectId, item.partId || null, practiceRequirement || legacyMessage, submitRequirement, req.admin.adminId, item.title]);
+        insertedRows.push(result.rows[0]);
+      }
+      if (newObjects.length === 0 || (legacyMessage && !practiceRequirement && !submitRequirement)) {
+        const result = await client.query(`INSERT INTO user_assignments (operation_id, user_id, video_id, object_type, object_id, message, practice_requirement, submit_requirement, assigned_by_admin_id) VALUES ($1, $2, NULL, 'message', NULL, $3, $4, $5, $6) RETURNING id, operation_id, user_id, video_id, object_type, object_id, message, practice_requirement, submit_requirement, is_deleted, delete_reason, deleted_at, created_at`, [operationId, userId, legacyMessage, practiceRequirement || legacyMessage, submitRequirement, req.admin.adminId]);
+        insertedRows.push(result.rows[0]);
+      }
+
+      await client.query('COMMIT');
+      res.status(201).json({ data: { operationId, rows: insertedRows } });
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
     }
-    if (newObjects.length === 0 || (legacyMessage && !practiceRequirement && !submitRequirement)) {
-      const result = await pool.query(`INSERT INTO user_assignments (operation_id, user_id, video_id, object_type, object_id, message, practice_requirement, submit_requirement, assigned_by_admin_id) VALUES ($1, $2, NULL, 'message', NULL, $3, $4, $5, $6) RETURNING id, operation_id, user_id, video_id, object_type, object_id, message, practice_requirement, submit_requirement, is_deleted, delete_reason, deleted_at, created_at`, [operationId, userId, legacyMessage, practiceRequirement || legacyMessage, submitRequirement, req.admin.adminId]);
-      insertedRows.push(result.rows[0]);
-    }
-    res.status(201).json({ data: { operationId, rows: insertedRows } });
   } catch (error) { next(error); }
 });
 
@@ -1332,6 +1347,13 @@ adminRouter.post('/users/:userId/message', requireAdmin, async (req, res, next) 
       return;
     }
 
+    // PRD：作业三栏（视频作业 / 练习要求 / 提交要求）全空时不得生成记录。
+    // 这个旧接口固定写 message = ''，所以判断依据只能是两个要求字段是否至少填一项。
+    if (!practiceRequirement && !submitRequirement) {
+      sendValidationError(res, '请至少填写一项作业内容（练习要求或提交要求）');
+      return;
+    }
+
     if (!(await ensureAdminCanManageUser(req, userId))) {
       res.status(403).json({ message: '无权管理该学员' });
       return;
@@ -1341,6 +1363,12 @@ adminRouter.post('/users/:userId/message', requireAdmin, async (req, res, next) 
 
     if (!user) {
       res.status(404).json({ message: '学员不存在' });
+      return;
+    }
+
+    // PRD：停用学员不可布置作业。
+    if (!user.is_active) {
+      res.status(400).json({ message: '停用学员不可布置新作业' });
       return;
     }
 

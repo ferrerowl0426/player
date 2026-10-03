@@ -194,7 +194,6 @@ libraryRouter.post('/', requireSuperAdmin, async (req, res, next) => {
     const cover = text(req.body.cover);
     const fileName = text(req.body.fileName);
     const fileType = text(req.body.fileType) || 'application/pdf';
-    const fileSize = size(req.body.fileSize);
     const fileKey = text(req.body.fileKey);
     const links = normalizeLinks(req.body.links);
 
@@ -214,19 +213,24 @@ libraryRouter.post('/', requireSuperAdmin, async (req, res, next) => {
       return;
     }
 
-    if (fileSize > PDF_MAX_SIZE) {
+    // 前端上报的 fileSize 不可信，以存储端 HeadObject 的真实大小为准复核 500MB 上限。
+    const fileHead = await ensureObjectExists(fileKey);
+    const realFileSize = Number(fileHead.ContentLength || 0);
+
+    if (realFileSize > PDF_MAX_SIZE) {
+      // 超限文件顺手从桶里清掉，避免长期占用空间。
+      await deleteFromBucket(fileKey).catch(() => {});
       res.status(400).json({ message: 'PDF 文件不能超过 500MB' });
       return;
     }
 
-    await ensureObjectExists(fileKey);
     const uploader = await findUploader(req.admin);
     await client.query('BEGIN');
     const result = await client.query(
       `INSERT INTO library_resources (title, description, cover, file_name, file_url, file_key, file_type, file_size, uploader_id, uploader_name)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id, title, description, cover, file_name, file_url, file_key, file_type, file_size, uploader_id, uploader_name, created_at, updated_at`,
-      [title, description, cover, fileName, getPublicUrl(fileKey), fileKey, fileType, fileSize, uploader.id, uploader.name]
+      [title, description, cover, fileName, getPublicUrl(fileKey), fileKey, fileType, realFileSize, uploader.id, uploader.name]
     );
     await setLinks(client, result.rows[0].id, links);
     await client.query('COMMIT');

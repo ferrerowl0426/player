@@ -1,5 +1,7 @@
 # 能学慧吉他教室 · 项目交接 README
 
+> **小程序端开发者请注意**：本 README 主要面向**网页端**。如果你接手的是微信小程序学生端，请直接阅读 [README-miniprogram.md](README-miniprogram.md) 和 [docs/PRD-小程序端学生功能.md](docs/PRD-小程序端学生功能.md)，本 README 只需按其中 §2「开工前必读」挑选部分章节阅读。
+
 这是给下一位程序员 / AI 编码助手的交接文档。详细需求不要以 README 为准，必须优先阅读：
 
 1. [PRD.md](file:///c:/Users/user/Desktop/播放器/docs/PRD.md)
@@ -131,6 +133,54 @@ http://backend:3000/api
 PORT=3000
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
 ```
+
+### 3.1 生产环境（线上）口径
+
+线上服务器：`/root/player`，公网 IP `150.158.122.193`，Docker Compose + 腾讯云 COS。
+
+| 入口 | 地址 | 说明 |
+|---|---|---|
+| 主站（唯一业务入口） | `https://nxhguitar.com` | 前端容器 `3001`，Nginx 反代 |
+| API | `https://api.nxhguitar.com/api` | 后端容器 `3000`，Nginx 反代 |
+| `http://nxhguitar.com` | 301 → `https://nxhguitar.com` | 只做跳转 |
+| `http://` / `https://www.nxhguitar.com` | 301 → `https://nxhguitar.com` | 只做跳转 |
+
+约定：
+
+- 只保留 `https://nxhguitar.com` 一个业务 Origin；`www`、HTTP 一律 301 跳主站，避免登录态 / CORS / localStorage 分裂。
+- 证书由 Certbot（Let's Encrypt）签发并自动续期，覆盖 `nxhguitar.com`、`www`、`api` 三个域名。
+- 生产环境变量（`/root/player/.env`，同时需要同步到 `/root/player/backend/.env`）：
+
+```env
+FRONTEND_URL=https://nxhguitar.com
+NEXT_PUBLIC_API_BASE_URL=https://api.nxhguitar.com/api
+CI_CALLBACK_SECRET=<数据万象回调密钥，见第 17 节>
+```
+
+- `NEXT_PUBLIC_API_BASE_URL` 是**前端构建时变量**，改完必须 `build frontend` 重建，否则浏览器仍用旧 API 地址。
+- 云端 COS 桶 `gy-nodejs-study-1423556188` 的 CORS 必须放行 `https://nxhguitar.com`（改域名 / 上 HTTPS 后都要同步）。
+- 站点元数据标题（`frontend/app/layout.js`）为：`能学慧吉他课堂笔记整理工具`。
+
+部署、HTTPS 申请、Nginx、CORS、故障排查的完整记录见：
+
+- [debug复盘/2026-09-20-服务器部署问题复盘.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-09-20-服务器部署问题复盘.md)
+
+### 3.2 服务器更新代码的标准流程
+
+```bash
+cd /root/player
+git pull gitee main
+
+# 只改前端
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml build frontend
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml up -d --force-recreate frontend
+
+# 只改后端
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml build backend
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml up -d --force-recreate backend
+```
+
+改了 `.env`、`NEXT_PUBLIC_API_BASE_URL`、后端配置或后端依赖时，对应的镜像必须重建，只 `restart` 不生效。
 
 ---
 
@@ -273,18 +323,21 @@ demo123
 
 | 身份 | 登录账号 | 内部测试标识 | 昵称 | 来源 | 密码 |
 |---|---|---|---|---|---|
-| 初始超级管理员 | `admin` | `admin` | admin | 系统初始化 `ensureAppSchema` 自动保留 | `demo123` |
+| 初始超级管理员 | `admin` | `admin` | admin | 系统初始化 `ensureAppSchema` 仅在无超管时创建 | `demo123` |
 | 普通教导主任 / 普通管理员 | `13900000002` | `dean_yuhan` | 教务雨涵老师 | `test-data/seed.mjs` 注入 | `demo123` |
 | 老师 | `13900000011` | `teacher_luxiang` | 鲁祥老师 | `test-data/seed.mjs` 注入 | `demo123` |
 | 老师 | `13900000012` | `teacher_yuanyuan` | 缘缘老师 | `test-data/seed.mjs` 注入 | `demo123` |
 | 老师 | `13900000013` | `teacher_zhangning` | 张宁老师 | `test-data/seed.mjs` 注入 | `demo123` |
+| 内部测试学员 | `13776186160` / `13013811119` / `18362776877` / `13382800426` | `internal_student_yuhan` / `internal_student_luxiang` / `internal_student_zhangning` / `internal_student_yuanyuan` | 学生雨涵 / 学生鲁详 / 学生张宁 / 学生缘缘 | `test-data/seed.mjs` 注入（能学慧内部测试班，账号表置顶） | `demo123` |
 | 学员 | `13800001001` ~ `13800001016` | `test_student_01` ~ `test_student_16` | 见账号表 | `test-data/seed.mjs` 注入 | `demo123` |
 
 口径说明：
 
 - 普通教导主任、老师、学员的产品登录账号优先使用手机号 / 纯数字账号。
-- 初始超级管理员账号是 `admin`，不由 `test-data` 注入；建表初始化只保留这个系统必需账号，不再写入 `teacher_a`、`student_a1` 这类测试账号。
+- 初始超级管理员账号是 `admin`，不由 `test-data` 注入。启动初始化只在**库中不存在任何 `super_admin`** 时创建它；如果已经存在超管（无论是否改过密码），启动过程不覆盖、不改密码。
+- `username = admin` 且 `role = super_admin` 的默认超管账号**禁止删除**，接口会返回「默认教导主任账号不可删除」。
 - `seed.mjs` 只负责注入普通教导主任、老师、学员和业务测试数据；`clean.mjs` 按 `manifest.json` 精确清理 seed 数据，不清理初始超级管理员。
+- 当前处于内部试用阶段：请重点验证老师布置作业、学生历史记录、学生学习首页、作业提交与查看；不要一次上传太多正式文件，正式上线前会清空测试数据重建。
 
 登录页：
 
@@ -339,6 +392,11 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 - 学员管理列表单击学生卡片即可选中，不需要双击。
 - 学员管理页仅保留“标记学生”和作业相关操作；重置密码、停用 / 恢复、删除等账号管理操作统一放在班级管理页。
 - 老师端和学生端历史作业均按推送时标题快照展示，历史记录不再作为跳转入口；搜索支持标题、练习要求、提交要求。老师端历史区有“回到顶部”。
+- 站点元数据标题已改为 `能学慧吉他课堂笔记整理工具`（`frontend/app/layout.js`），不是导航栏名称。
+- 公安备案审核期间的临时配置（未登录首屏游客曲目区、登录页审核提示）**已全部恢复**，现在未登录访问 `/` 会正常跳转 `/login`。相关记录见 [debug复盘/2026-09-29-公安备案审核临时配置说明.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-09-29-公安备案审核临时配置说明.md)。
+- 视频播放器控制栏已重构为：`上一P` / 播放暂停 / `下一P` / 进度条 / 时间 / 画质 / 倍速 / 全屏。上一P、下一P 由详情页传入，切换的是当前曲目 / 知识点的 P，不会跨对象跳转。
+- 图书馆详情页已修复被全局样式撑高的拉伸问题，图书馆列表翻页器也已统一为与知识点区一致的样式，见第 9 节。
+- 正在接腾讯云数据万象（CI）自动转码：曲目 / 知识点 P 上传后自动产出 720p、1080p 两档，播放器画质菜单可切换，详见第 17 节。
 
 ---
 
@@ -346,7 +404,7 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 完整测试数据位于 [test-data](file:///c:/Users/user/Desktop/播放器/test-data/)：
 
-- 账号：1 个普通教导主任、3 个老师、4 个班级 × 4 名学员；第 3、8、13、16 名学员为停用状态。
+- 账号：1 个普通教导主任、3 个老师、4 个常规测试班级 × 4 名学员 + 1 个「能学慧内部测试班」4 名内部测试学员；常规班级的第 3、8、13、16 名学员为停用状态。
 - 曲目区：20 个单曲目 + 5 个曲谱集；单曲按 1~4 个 P 分布，部分单曲加入多个合集。
 - 知识点区：20 个单知识点 + 5 个知识点集；单知识点按 1~4 个 P 分布，部分知识点加入多个合集。
 - 附件：覆盖 MP3、JPG、PDF；曲目、曲目合集、知识点、知识点集均有样例附件，部分对象有多个附件。
@@ -423,6 +481,37 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 - 选中学生使用单击；同步 URL 使用浏览器 history，不通过路由跳转打断选中状态。
 - 学员管理页不再承担重置密码、停用 / 恢复、删除账号操作；这些账号操作统一在班级管理页处理。
 - 学员历史作业支持按标题 / 练习要求 / 提交要求搜索，老师端历史区提供“回到顶部”。
+
+### 图书馆区（详情页 + 翻页器）
+
+文件：
+
+- [library/[id]/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/library/[id]/page.js)
+- [library/[id]/library-book.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/library/[id]/library-book.module.css)
+- [library/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/library/page.js)
+
+已修复：
+
+- 详情页曾被全局 `.detail` 类污染导致排版错乱：页面外层改为使用 CSS Module 私有类 `styles.bookDetail`，不再复用全局 `.detail`。
+- 详情页被 flex 拉伸：改为自然高度 —— `.bookDetail{align-items:start}`、`.binfo{min-height:0}`、`.bsec{flex:none}`，简介区固定 `max-height:140px` 内部滚动。
+- 图书馆列表翻页器替换为与知识点区一致的数字分页（`‹ 1 2 3 … ›`）。
+
+### 播放器控制栏
+
+文件：
+
+- [VideoPlayer.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoPlayer.js)
+- [design-system.css](file:///c:/Users/user/Desktop/播放器/frontend/app/design-system.css)
+- [tracks/[id]/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/tracks/[id]/page.js)
+- [knowledge/[id]/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/knowledge/[id]/page.js)
+
+当前状态：
+
+- 控制栏顺序固定为：`上一P` → 播放 / 暂停 → `下一P` → 进度条 → 时间 → 画质 → 倍速 → 全屏。
+- 已去掉此前无效的快进 / 快退按钮；上下 P 使用竖向分隔条 + 三角的内联 SVG，图标不再出现“奇怪”的观感。
+- `VideoPlayer` 新增 `onPrev` / `onNext` 两个 prop，为空时按钮置灰不可点；由详情页计算相邻 P 并传入。
+- 画质菜单来自 `renditions` prop（见第 17 节），无转码档位时只显示原画。
+- 进度条与按钮间距在 `design-system.css` 的 `.vctrl` / `.pbar` / `.ibtn` 中统一，不要再单独塞回 `.seek-btn` 之类的一次性类。
 
 ---
 
@@ -569,3 +658,129 @@ GET /api/library
 POST /api/auth/login
 POST /api/admin/login
 ```
+
+---
+
+## 16. 线上运维速查
+
+服务器：`/root/player`（Docker Compose，项目名 `video_player`）。
+
+容器与日志：
+
+```bash
+cd /root/player
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml ps
+docker logs --tail=150 video_player_backend
+docker logs --tail=150 video_player_frontend
+```
+
+健康检查与域名验证：
+
+```bash
+curl http://127.0.0.1:3000/api/health
+curl -I http://127.0.0.1:3001
+curl -I https://nxhguitar.com
+curl -I https://www.nxhguitar.com
+curl https://api.nxhguitar.com/api/health
+```
+
+Nginx：
+
+```bash
+sudo nginx -t
+sudo systemctl status nginx --no-pager
+sudo tail -n 100 /var/log/nginx/error.log
+```
+
+数据库：
+
+```bash
+docker exec -it video_player_postgres psql -U postgres -d video_player -c "\dt"
+docker exec -it video_player_postgres psql -U postgres -d video_player -c "SELECT COUNT(*) FROM track_points;"
+```
+
+端口占用：
+
+```bash
+sudo ss -tnlp | grep -E ':80|:3000|:3001'
+docker ps --filter publish=3000 --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
+```
+
+完整排障手册（DNS、Certbot、CORS、端口冲突、www 跳转）：
+
+- [debug复盘/2026-09-20-服务器部署问题复盘.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-09-20-服务器部署问题复盘.md)
+
+---
+
+## 17. 视频清晰度与自动转码（腾讯云数据万象 CI）
+
+### 17.1 目标与现状
+
+- 每个 P（曲目 P / 知识点 P）上传后自动产出 **720p / 1080p** 两档，播放器画质菜单可切换，默认优先 1080p。
+- 前端播放器是原生 `<video>` **直接播 MP4**，没有接 hls.js，因此**只使用 MP4 转码模板，不要选 HLS 系列**（选了也播不了，需要先改造前端）。
+- 数据模型沿用现有表，**不需要新建表**：
+  - `videos`：统一视频实体，曲目 P、知识点 P 都指向它（`track_parts.video_id` → `videos.id`）。
+  - `video_renditions`：`source` / `720p` / `1080p` 三档，上传时预置 `processing` 状态。
+
+### 17.2 数据流
+
+```txt
+前端分片上传
+  -> COS: tracks/<曲目id>/<uuid>.mp4 或 knowledge/<知识点id>/<uuid>.mp4
+  -> CI 工作流（输入路径 tracks/ 或 knowledge/）自动触发
+  -> 输出: transcoded/720p/${InputName}_720p.mp4、transcoded/1080p/${InputName}_1080p.mp4
+  -> CI 回调: POST https://api.nxhguitar.com/api/videos/transcode/callback?token=<CI_CALLBACK_SECRET>
+  -> 后端解析 TaskFinish 报文 -> 源文件 key 反查 videos.id -> 写 video_renditions 对应档位为 ready + 转码地址
+```
+
+### 17.3 控制台配置要点（两个工作流）
+
+| 项目 | tracks 工作流 | knowledge 工作流 |
+|---|---|---|
+| 输入路径 | `tracks/` | `knowledge/` |
+| 输出目录 | `transcoded/720p/`（720p 节点）、`transcoded/1080p/`（1080p 节点） | 同左 |
+| 输出文件名 | `${InputName}_720p.${ext}` / `${InputName}_1080p.${ext}` | 同左 |
+| 模板 | H264-MP4-高清（1280px）/ H264-MP4-全高清（1920px） | 同左 |
+| 回调 | 自定义回调配置 + HTTP 回调，格式 **JSON**，只勾「任务完成回调」 | 同左 |
+
+必须注意：
+
+- 输入路径**结尾必须带斜杠**（`tracks/`）；**留空表示整桶生效**，会把封面、附件和转码产物一起卷进来，形成循环转码刷费用。
+- 转码节点的目标路径**必须从默认的 `${InputPath}` 改掉**，否则结果写回 `tracks/` / `knowledge/`，自己触发自己。
+- `${RunId}` 是工作流实例 ID，同一工作流的两个转码节点共用同一个值，所以两个节点**不能**用同一个输出文件名，否则互相覆盖。
+- 两个节点都关闭「闲时转码」（闲时资源最长 72 小时才处理，教学场景等不起）；倍速转码、水印保持关闭。
+- 工作流默认关闭，保存后需**启用**，约 5 分钟生效；**启用状态下不能编辑**，要改先暂停。
+- 存量视频不会自动转码，需要在工作流里用「测试 / 创建执行实例」手动触发，可分批做。
+
+### 17.4 后端实现位置
+
+| 文件 | 职责 |
+|---|---|
+| [transcode.js](file:///c:/Users/user/Desktop/播放器/backend/src/transcode.js) | `parseCiCallbackPayload` 解析 TaskFinish 报文；`resolveTranscodeQuality` 按产物路径 / 画面长边判定档位（竖屏也能判对）；`findVideoIdBySourceKey` 用源 key 反查 `videos.id`；`verifyCiCallbackRequest` 校验回调身份 |
+| [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js) | `POST /api/videos/transcode/callback`：验签 → 解析 → 反查 → 写档位状态；失败写 `failed`，回调一律返回 200 避免 CI 反复重试 |
+| [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) | `publicKeyPrefixes` 已加入 `transcoded/`，转码产物才能生成公开地址 |
+
+回调安全策略（重要）：
+
+- 密钥来自环境变量 `CI_CALLBACK_SECRET`（服务器根目录 `/root/player/.env`；`docker-compose.yml` 的 backend 用这个文件；本地直接跑后端时读 `backend/.env`）。
+- **未配置密钥时回调接口一律拒绝**（返回 503），不会像旧实现那样「没配密钥就放行」——那个写法等于任何人构造一个 POST 就能伪造回调。
+- 回调 URL 用 `?token=<CI_CALLBACK_SECRET>` 传密钥（CI 控制台没有密钥配置项）；另保留 HMAC 签名头校验分支备用。
+- 额外两道防御：产物 key 必须以 `transcoded/` 开头；并用 HeadObject 确认产物确实存在（只有 404 才拒绝，网络抖动类异常放行不丢结果）。
+
+配好后验证：在工作流手动跑一个 `tracks/` 下的小视频，后端日志会出现 `[ci-callback] { state, inputKey, outputKey, quality }`，桶里应出现 `transcoded/720p/` 与 `transcoded/1080p/` 两个文件，播放页画质菜单能看到并切换 720P / 1080P。
+
+控制台逐步操作指南与交接说明：
+
+- [debug复盘/2026-10-01-腾讯云数据万象转码接入操作指南.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-10-01-腾讯云数据万象转码接入操作指南.md)
+
+---
+
+## 18. 近期变更记录
+
+| 日期 | 内容 |
+|---|---|
+| 2026-09-29 | 完成 HTTPS 域名部署（`https://nxhguitar.com` 唯一业务入口，www / HTTP 301 跳转），流程写入部署复盘 |
+| 2026-09-29 | 公安备案审核临时配置（未登录游客视图 + 登录页审核提示） |
+| 2026-10-01 | 公安备案通过，临时配置全部恢复，未登录正常跳转 `/login` |
+| 2026-10-01 | 新增腾讯云数据万象转码接入操作指南 |
+| 2026-10-03 | 播放器控制栏改为 上一P / 播放 / 下一P 布局；默认超管仅在无超管时创建且禁止删除；`prerequisites` 视频封面字段改用 `cover_url` 修复详情页 500；实现数据万象转码回调（真实报文解析 + 回调密钥校验 + `transcoded/` 公开地址） |

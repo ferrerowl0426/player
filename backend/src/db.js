@@ -12,15 +12,18 @@ async function addColumnIfMissing(tableName, columnSql) {
 }
 
 async function seedInitialAdmin() {
+  const superAdminResult = await pool.query(
+    `SELECT id FROM admins WHERE role = 'super_admin' LIMIT 1`
+  );
+
+  if (superAdminResult.rowCount > 0) {
+    return;
+  }
+
   await pool.query(
     `INSERT INTO admins (username, account, nickname, password_hash, role, status)
      VALUES ('admin', 'admin', 'admin', $1::text, 'super_admin', 'active')
-     ON CONFLICT (username) DO UPDATE SET
-       account = EXCLUDED.account,
-       nickname = EXCLUDED.nickname,
-       password_hash = EXCLUDED.password_hash,
-       role = EXCLUDED.role,
-       status = EXCLUDED.status`,
+     ON CONFLICT (username) DO NOTHING`,
     [DEFAULT_PASSWORD_HASH]
   );
 }

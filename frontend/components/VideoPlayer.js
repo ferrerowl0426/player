@@ -28,7 +28,7 @@ function formatTime(value) {
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
-export default function VideoPlayer({ src, poster, renditions = [], onNext }) {
+export default function VideoPlayer({ src, poster, renditions = [], onPrev, onNext }) {
   const videoRef = useRef(null);
   const progressRef = useRef(null);
   const restoreRef = useRef({ time: 0, playing: false });
@@ -203,6 +203,12 @@ export default function VideoPlayer({ src, poster, renditions = [], onNext }) {
         onContextMenu={(e) => e.preventDefault()}
       />
       <div className={`vctrl${playing ? ' playing' : ''}`}>
+        <button className="ibtn part-btn" type="button" aria-label="上一P" title="上一P" onClick={onPrev} disabled={!onPrev}>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6.5 6v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M17 7.2 9.2 12 17 16.8V7.2Z" fill="currentColor" />
+          </svg>
+        </button>
         <button className="ibtn" type="button" aria-label={playing ? '暂停' : '播放'} onClick={togglePlay}>
           {playing ? (
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 6h2.4v12H8V6Zm5.6 0H16v12h-2.4V6Z" /></svg>
@@ -210,19 +216,12 @@ export default function VideoPlayer({ src, poster, renditions = [], onNext }) {
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 6.2 16.5 12 9 17.8V6.2Z" /></svg>
           )}
         </button>
-        <button className="ibtn" type="button" aria-label="下一段" onClick={onNext} disabled={!onNext}>
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 6H17v12h-1.5V6ZM6 6.8 15 12l-9 5.2V6.8Z" /></svg>
+        <button className="ibtn part-btn" type="button" aria-label="下一P" title="下一P" onClick={onNext} disabled={!onNext}>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7 7.2 14.8 12 7 16.8V7.2Z" fill="currentColor" />
+            <path d="M17.5 6v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
         </button>
-        <div className={`pop-wrap${speedOpen ? ' menu-on' : ''}`}>
-          <button className="tbtn" type="button" aria-haspopup="menu" onClick={() => { setSpeedOpen((value) => !value); setQualityOpen(false); }}>{speed.toFixed(1)}x</button>
-          <div className="pmenu" role="menu">
-            {SPEEDS.map((item) => (
-              <button type="button" className={item === speed ? 'on' : ''} onClick={() => { setSpeed(item); setSpeedOpen(false); }} key={item}>
-                <span className="dot" />{item.toFixed(1)}x
-              </button>
-            ))}
-          </div>
-        </div>
         <button
           ref={progressRef}
           className="pbar"
@@ -235,6 +234,7 @@ export default function VideoPlayer({ src, poster, renditions = [], onNext }) {
         >
           <i /><span className="knob" /><span className="tt">{formatTime(hoverTime || currentTime)}</span>
         </button>
+        <span className="ctime">{formatTime(currentTime)} / {formatTime(duration)}</span>
         <div className={`pop-wrap${qualityOpen ? ' menu-on' : ''}`}>
           <button className="tbtn" type="button" aria-haspopup="menu" onClick={() => { setQualityOpen((value) => !value); setSpeedOpen(false); }}>{activeLabel}</button>
           <div className="pmenu" role="menu">
@@ -245,10 +245,19 @@ export default function VideoPlayer({ src, poster, renditions = [], onNext }) {
             ))}
           </div>
         </div>
+        <div className={`pop-wrap${speedOpen ? ' menu-on' : ''}`}>
+          <button className="tbtn" type="button" aria-haspopup="menu" onClick={() => { setSpeedOpen((value) => !value); setQualityOpen(false); }}>{speed.toFixed(1)}x</button>
+          <div className="pmenu" role="menu">
+            {SPEEDS.map((item) => (
+              <button type="button" className={item === speed ? 'on' : ''} onClick={() => { setSpeed(item); setSpeedOpen(false); }} key={item}>
+                <span className="dot" />{item.toFixed(1)}x
+              </button>
+            ))}
+          </div>
+        </div>
         <button className="ibtn" type="button" aria-label="全屏" onClick={toggleFullscreen}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
         </button>
-        <span className="ctime">{formatTime(currentTime)} / {formatTime(duration)}</span>
       </div>
     </div>
   );

@@ -16,7 +16,18 @@ import {
   getPublicUrl,
   normalizePublicUrl
 } from './storage.js';
-import { createInitialRenditions, deleteObjectKeys, getVideoObjectKeys, upsertRendition, verifyCiSignature } from './transcode.js';
+import {
+  CI_OUTPUT_PREFIX,
+  createInitialRenditions,
+  deleteObjectKeys,
+  findVideoIdBySourceKey,
+  getVideoObjectKeys,
+  isCiSuccessState,
+  parseCiCallbackPayload,
+  resolveTranscodeQuality,
+  upsertRendition,
+  verifyCiCallbackRequest
+} from './transcode.js';
 import { logStandaloneDeletion } from './deletion.js';
 
 const TITLE_MAX_LENGTH = 120;
@@ -679,30 +690,128 @@ videoRouter.post('/edit-upload/create', requireSuperAdmin, async (req, res, next
 });
 
 // POST /api/videos/transcode/callback
-// 数据万象 CI 工作流回调：登记 1080p/720p 转码状态。CI 未配置时不会影响原画播放。
+// 数据万象 CI 工作流「任务完成回调」：把 720p / 1080p 转码结果写回 video_renditions。
+// 曲目区和知识点区的 P 视频共用这一个入口，靠回调里的源文件 key（tracks/...、knowledge/...）区分归属。
+// 安全要求：回调地址必须带 ?token=CI_CALLBACK_SECRET，未配置密钥时直接拒绝，避免伪造回调写入转码地址。
 videoRouter.post('/transcode/callback', async (req, res, next) => {
   try {
     const rawBody = req.rawBody || JSON.stringify(req.body || {});
     const signature = req.get('x-ci-signature') || req.get('x-cos-signature') || '';
+    const token = req.query.token || req.get('x-ci-callback-token') || '';
+    const verdict = verifyCiCallbackRequest({
+      rawBody,
+      signature,
+      token,
+      secret: config.ci.callbackSecret
+    });
 
-    if (!verifyCiSignature({ rawBody, signature, secret: config.ci.callbackSecret })) {
-      res.status(401).json({ message: 'CI 回调签名无效' });
+    if (!verdict.ok) {
+      // unconfigured 用 503，方便运维一眼看出是“密钥没配”，而不是有人在伪造。
+      const unconfigured = verdict.reason === 'unconfigured';
+      console.warn(`[ci-callback] 拒绝回调：${verdict.reason}`);
+      res.status(unconfigured ? 503 : 401).json({
+        message: unconfigured ? 'CI 回调密钥未配置，已拒绝回调' : 'CI 回调校验失败'
+      });
       return;
     }
 
-    const payload = req.body || {};
-    const videoId = Number(payload.videoId || payload.video_id || payload.VideoId);
-    const quality = payload.quality || payload.Quality;
-    const status = payload.status || payload.Status;
-    const videoUrl = payload.videoUrl || payload.video_url || payload.Url || payload.url || '';
-    const fileSize = payload.fileSize || payload.file_size || payload.Size || 0;
+    // CI 偶尔会不带 application/json 的 Content-Type，导致 express.json 解析不到，
+    // 这时兜底手动解析 rawBody，保证报文不会因为请求头问题被丢掉。
+    let payload = req.body;
+    if ((!payload || Object.keys(payload).length === 0) && rawBody) {
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        payload = {};
+      }
+    }
 
-    const ok = await upsertRendition({ videoId, quality, status, videoUrl, fileSize });
+    const info = parseCiCallbackPayload(payload);
+    console.log('[ci-callback]', JSON.stringify({
+      state: info.state,
+      inputKey: info.inputKey,
+      outputKey: info.outputKey,
+      outputSize: info.outputSize,
+      width: info.width,
+      height: info.height,
+      templateId: info.templateId,
+      templateName: info.templateName,
+      nodeName: info.nodeName,
+      workflowId: info.workflowId,
+      runId: info.runId,
+      via: verdict.via
+    }));
+
+    if (!info.inputKey) {
+      // 报文结构没对上时把原文打出来，方便按真实格式调整解析。
+      console.warn('[ci-callback] 未识别出源文件信息，原始报文：', rawBody.slice(0, 2000));
+      res.json({ message: '已忽略：回调缺少源文件信息' });
+      return;
+    }
+
+    const videoId = await findVideoIdBySourceKey(info.inputKey);
+    if (!videoId) {
+      console.warn(`[ci-callback] 未找到源文件对应的视频记录：${info.inputKey}`);
+      res.json({ message: '已忽略：未找到对应视频记录' });
+      return;
+    }
+
+    const quality = resolveTranscodeQuality(info);
+
+    if (!isCiSuccessState(info.state)) {
+      if (quality) {
+        await upsertRendition({ videoId, quality, status: 'failed' });
+        console.warn(`[ci-callback] 转码失败：videoId=${videoId} quality=${quality} message=${info.message}`);
+      } else {
+        console.warn(
+          `[ci-callback] 转码失败且无法判断档位：videoId=${videoId} templateId=${info.templateId} ` +
+          `templateName=${info.templateName} nodeName=${info.nodeName} message=${info.message}`
+        );
+      }
+      res.json({ message: '已记录转码失败' });
+      return;
+    }
+
+    if (!quality) {
+      console.warn(`[ci-callback] 无法判断转码档位：videoId=${videoId} outputKey=${info.outputKey}`);
+      res.json({ message: '已忽略：未识别出转码档位' });
+      return;
+    }
+
+    if (!info.outputKey || !info.outputKey.startsWith(CI_OUTPUT_PREFIX)) {
+      console.warn(`[ci-callback] 产物路径异常，已拒绝：${info.outputKey}`);
+      res.status(400).json({ message: 'CI 回调产物路径异常' });
+      return;
+    }
+
+    // 防御性检查：产物必须真的存在于存储桶里。
+    // 只有 404 才拒绝；其它异常（网络抖动等）只记日志，避免因为一次探测失败丢掉转码结果。
+    try {
+      await ensureObjectExists(info.outputKey);
+    } catch (error) {
+      const notFound = error?.$metadata?.httpStatusCode === 404 || error?.name === 'NotFound';
+      if (notFound) {
+        console.warn(`[ci-callback] 产物在存储桶中不存在，已拒绝：${info.outputKey}`);
+        res.status(400).json({ message: 'CI 回调产物不存在' });
+        return;
+      }
+      console.warn(`[ci-callback] 产物存在性检查失败（继续处理）：${info.outputKey} ${error?.message || error}`);
+    }
+
+    const ok = await upsertRendition({
+      videoId,
+      quality,
+      status: 'ready',
+      videoUrl: getPublicUrl(info.outputKey),
+      fileSize: info.outputSize
+    });
+
     if (!ok) {
       res.status(400).json({ message: 'CI 回调参数无效' });
       return;
     }
 
+    console.log(`[ci-callback] 已登记转码结果：videoId=${videoId} quality=${quality} url=${getPublicUrl(info.outputKey)}`);
     res.json({ message: '已更新转码状态' });
   } catch (error) {
     next(error);

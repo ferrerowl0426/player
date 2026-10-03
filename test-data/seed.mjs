@@ -108,7 +108,8 @@ async function main() {
 
   const classDefs = [
     ['测试一班', teachers.teacher_luxiang], ['测试二班', teachers.teacher_luxiang],
-    ['测试三班', teachers.teacher_yuanyuan], ['测试四班', teachers.teacher_zhangning]
+    ['测试三班', teachers.teacher_yuanyuan], ['测试四班', teachers.teacher_zhangning],
+    ['能学慧内部测试班', teachers.teacher_luxiang]
   ];
   const classes = {};
   for (const [name, teacherId] of classDefs) {
@@ -122,13 +123,16 @@ async function main() {
     ['林知夏', '13800001001'], ['周予安', '13800001002'], ['沈嘉木', '13800001003'], ['顾星河', '13800001004'],
     ['许清禾', '13800001005'], ['江晚晴', '13800001006'], ['陆景行', '13800001007'], ['苏念安', '13800001008'],
     ['程一诺', '13800001009'], ['叶书言', '13800001010'], ['唐沐阳', '13800001011'], ['宋知遥', '13800001012'],
-    ['白若溪', '13800001013'], ['韩子墨', '13800001014'], ['顾南乔', '13800001015'], ['秦以安', '13800001016']
+    ['白若溪', '13800001013'], ['韩子墨', '13800001014'], ['顾南乔', '13800001015'], ['秦以安', '13800001016'],
+    ['学生雨涵', '13776186160'], ['学生鲁详', '13013811119'], ['学生张宁', '18362776877'], ['学生缘缘', '13382800426']
   ];
   const studentMap = {};
   for (let i = 0; i < studentNames.length; i += 1) {
     const className = classDefs[Math.floor(i / 4)][0];
     const [nickname, account] = studentNames[i];
-    const username = `test_student_${String(i + 1).padStart(2, '0')}`;
+    const username = i >= 16
+      ? ['internal_student_yuhan', 'internal_student_luxiang', 'internal_student_zhangning', 'internal_student_yuanyuan'][i - 16]
+      : `test_student_${String(i + 1).padStart(2, '0')}`;
     const disabled = [2, 7, 12, 15].includes(i);
     const row = (await q(`INSERT INTO users (username, account, nickname, password_hash, class_id, status, is_active, is_marked)
       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE) RETURNING id`,

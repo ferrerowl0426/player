@@ -850,12 +850,17 @@ adminRouter.delete('/admins/:id', requireSuperAdmin, async (req, res, next) => {
     }
 
     const adminResult = await pool.query(
-      `SELECT id, role FROM admins WHERE id = $1`,
+      `SELECT id, username, role FROM admins WHERE id = $1`,
       [adminId]
     );
 
     if (adminResult.rowCount === 0) {
       res.status(404).json({ message: '账号不存在' });
+      return;
+    }
+
+    if (adminResult.rows[0].role === 'super_admin' && adminResult.rows[0].username === 'admin') {
+      res.status(400).json({ message: '默认教导主任账号不可删除' });
       return;
     }
 

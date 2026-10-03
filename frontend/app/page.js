@@ -52,8 +52,7 @@ export default function HomePage() {
         setUser(result.data);
         await loadTodayAssignments();
       } catch {
-        // 公安备案审核期临时配置：未登录首次打开站点时直接展示游客可见的曲目区。
-        router.replace('/tracks');
+        router.replace('/login');
       }
     }
     init();

@@ -119,6 +119,7 @@ export default function TrackDetailPage() {
   const libraryResources = track.library_resources || [];
   const activePart = parts.find((part) => part.id === activePartId) || parts[0];
   const activePartIndex = parts.findIndex((part) => part.id === activePart?.id);
+  const prevPart = activePartIndex > 0 ? parts[activePartIndex - 1] : null;
   const nextPart = activePartIndex >= 0 ? parts[activePartIndex + 1] : null;
 
   return (
@@ -154,7 +155,7 @@ export default function TrackDetailPage() {
           <div className="video-wrap">
             <div className="video">
               {activePart?.video_url ? (
-                <VideoPlayer src={activePart.video_url} poster={track.cover || activePart.video_cover_url} renditions={activePart.renditions || []} onNext={nextPart ? () => setActivePartId(nextPart.id) : null} />
+                <VideoPlayer src={activePart.video_url} poster={track.cover || activePart.video_cover_url} renditions={activePart.renditions || []} onPrev={prevPart ? () => setActivePartId(prevPart.id) : null} onNext={nextPart ? () => setActivePartId(nextPart.id) : null} />
               ) : (
                 <div className="video-cover"><span className="vlabel"><i /></span></div>
               )}

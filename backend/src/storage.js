@@ -56,7 +56,8 @@ export function normalizePublicUrl(url) {
     return getPublicUrl(text.replace(/^undefined\//, ''));
   }
 
-  const publicKeyPrefixes = ['videos/', 'covers/', 'attachments/', 'tracks/', 'knowledge/', 'library/'];
+  // 这些前缀下的对象都是可以直接公开访问的（转码产物在 transcoded/ 下）。
+  const publicKeyPrefixes = ['videos/', 'covers/', 'attachments/', 'tracks/', 'knowledge/', 'library/', 'transcoded/'];
 
   if (publicKeyPrefixes.some((prefix) => text.startsWith(prefix))) {
     return getPublicUrl(text);

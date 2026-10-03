@@ -34,7 +34,7 @@ async function findObject(type, id) {
     return pool.query('SELECT id, title, knowledge_point_id AS parent_id FROM knowledge_parts WHERE id = $1', [id]);
   }
   if (type === 'video') {
-    return pool.query('SELECT id, title, thumbnail_url AS cover FROM videos WHERE id = $1', [id]);
+    return pool.query('SELECT id, title, cover_url AS cover FROM videos WHERE id = $1', [id]);
   }
   return { rows: [] };
 }

@@ -137,7 +137,7 @@
 .image {
   position: relative;
   overflow: hidden;
-  background: #ffffff url("/guitar-home/wc-metronome-tall.jpg") center/cover no-repeat;
+  background: #ffffff url("/guitar-home/wc-metronome-tall.jpg") center top / cover no-repeat;
   border-right: 1px solid var(--guitar-glass-line);
 }
 

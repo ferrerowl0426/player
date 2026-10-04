@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from './db.js';
-import { deleteFromBucket, getKeyFromPublicUrl } from './storage.js';
+import { deleteFromBucket, getKeyFromPublicUrl, getPublicUrl } from './storage.js';
 
 const READY_STATUS = 'ready';
 const PROCESSING_STATUS = 'processing';
@@ -96,41 +96,50 @@ function decodeObjectKey(value) {
   }
 }
 
-// 数据万象任务完成回调的报文在不同入口下结构略有差异：
-// 有的把内容包在 Response 下面，有的直接平铺；JobsDetail 可能是对象也可能是数组。
-// 所以这里做宽松解析，只挑我们需要的字段，解析不出来的一律留空。
-export function parseCiCallbackPayload(payload) {
+function normalizeArray(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+  return value ? [value] : [];
+}
+
+// 数据万象工作流完成回调：一次回调内包含同一个工作流实例下的多个 JobsDetail。
+// 当前只按“工作流完成回调”接入，不再兼容旧的任务完成回调口径，避免单个节点完成就被误判为整条转码完成。
+export function parseCiWorkflowCallbackPayload(payload) {
   const container = payload && typeof payload === 'object' ? (payload.Response || payload.response || payload) : {};
   const root = container && typeof container === 'object' ? container : {};
-  const jobs = root.JobsDetail ?? root.jobsDetail;
-  const job = Array.isArray(jobs) ? (jobs[0] || {}) : (jobs && typeof jobs === 'object' ? jobs : {});
-  const input = job.Input || job.input || {};
-  const operation = job.Operation || job.operation || {};
-  const outputRaw = operation.Output ?? operation.output ?? job.Output ?? job.output ?? {};
-  const output = Array.isArray(outputRaw)
-    ? (outputRaw[0] || {})
-    : (outputRaw && typeof outputRaw === 'object' ? outputRaw : {});
-  const workflow = job.Workflow || job.workflow || {};
-  const size = findObjectSize(output);
-  const { width, height } = findWidthHeight(job.MediaInfo || job.mediaInfo || {});
+  const jobs = normalizeArray(root.JobsDetail ?? root.jobsDetail);
+  const workflow = root.Workflow || root.workflow || {};
 
-  return {
-    eventName: toText(root.EventName ?? root.eventName),
-    tag: toText(job.Tag ?? job.tag),
-    state: toText(job.State ?? job.state),
-    message: toText(job.Message ?? job.message),
-    inputKey: decodeObjectKey(input.Object ?? input.object),
-    outputKey: decodeObjectKey(output.Object ?? output.object),
-    outputSize: size,
-    templateId: toText(operation.TemplateId ?? operation.templateId ?? job.TemplateId),
-    templateName: toText(operation.TemplateName ?? operation.templateName ?? job.TemplateName),
-    nodeName: toText(workflow.Name ?? workflow.name),
-    workflowId: toText(workflow.WorkflowId ?? workflow.workflowId),
-    workflowName: toText(workflow.WorkflowName ?? workflow.workflowName),
-    runId: toText(workflow.RunId ?? workflow.runId),
-    width,
-    height
-  };
+  return jobs.map((job) => {
+    const input = job.Input || job.input || {};
+    const operation = job.Operation || job.operation || {};
+    const outputRaw = operation.Output ?? operation.output ?? job.Output ?? job.output ?? {};
+    const output = Array.isArray(outputRaw)
+      ? (outputRaw[0] || {})
+      : (outputRaw && typeof outputRaw === 'object' ? outputRaw : {});
+    const jobWorkflow = job.Workflow || job.workflow || workflow || {};
+    const size = findObjectSize(output);
+    const { width, height } = findWidthHeight(job.MediaInfo || job.mediaInfo || {});
+
+    return {
+      eventName: toText(root.EventName ?? root.eventName),
+      tag: toText(job.Tag ?? job.tag),
+      state: toText(job.State ?? job.state),
+      message: toText(job.Message ?? job.message),
+      inputKey: decodeObjectKey(input.Object ?? input.object),
+      outputKey: decodeObjectKey(output.Object ?? output.object),
+      outputSize: size,
+      templateId: toText(operation.TemplateId ?? operation.templateId ?? job.TemplateId),
+      templateName: toText(operation.TemplateName ?? operation.templateName ?? job.TemplateName),
+      nodeName: toText(jobWorkflow.Name ?? jobWorkflow.name),
+      workflowId: toText(jobWorkflow.WorkflowId ?? jobWorkflow.workflowId ?? root.WorkflowId ?? root.workflowId),
+      workflowName: toText(jobWorkflow.WorkflowName ?? jobWorkflow.workflowName ?? root.WorkflowName ?? root.workflowName),
+      runId: toText(jobWorkflow.RunId ?? jobWorkflow.runId ?? root.RunId ?? root.runId),
+      width,
+      height
+    };
+  });
 }
 
 // 回调里没有统一的字段名，产物大小到处可能在，按优先级找第一个数字。

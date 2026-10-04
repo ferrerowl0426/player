@@ -106,14 +106,41 @@ function normalizeArray(value) {
   return value ? [value] : [];
 }
 
-// 数据万象工作流完成回调：一次回调内包含同一个工作流实例下的多个 JobsDetail。
-// 当前只按“工作流完成回调”接入，不再兼容旧的任务完成回调口径，避免单个节点完成就被误判为整条转码完成。
+// 数据万象工作流完成回调：一次回调内包含同一个工作流实例下的多个转码任务。
+// 线上真实格式为 WorkflowExecution.Tasks[].ResultInfo[]；保留 JobsDetail 分支用于兼容同类工作流报文差异。
 export function parseCiWorkflowCallbackPayload(payload) {
   const container = payload && typeof payload === 'object' ? (payload.Response || payload.response || payload) : {};
   const root = container && typeof container === 'object' ? container : {};
-  const jobs = normalizeArray(root.JobsDetail ?? root.jobsDetail);
-  const workflow = root.Workflow || root.workflow || {};
+  const workflowExecution = root.WorkflowExecution || root.workflowExecution || {};
+  const workflow = root.Workflow || root.workflow || workflowExecution || {};
+  const workflowInputKey = decodeObjectKey(workflowExecution.Object ?? workflowExecution.object ?? root.Object ?? root.object);
+  const workflowTasks = normalizeArray(workflowExecution.Tasks ?? workflowExecution.tasks);
 
+  if (workflowTasks.length > 0) {
+    return workflowTasks.flatMap((task) => {
+      const resultInfos = normalizeArray(task.ResultInfo ?? task.resultInfo);
+      const { width, height } = findWidthHeight(task.MediaInfo || task.mediaInfo || {});
+      return resultInfos.map((result) => ({
+        eventName: toText(root.EventName ?? root.eventName),
+        tag: toText(task.Type ?? task.type ?? task.Tag ?? task.tag),
+        state: toText(task.State ?? task.state),
+        message: toText(task.Message ?? task.message),
+        inputKey: workflowInputKey,
+        outputKey: decodeObjectKey(result.ObjectName ?? result.objectName ?? result.Object ?? result.object),
+        outputSize: findObjectSize(result),
+        templateId: toText(task.TemplateId ?? task.templateId),
+        templateName: toText(task.TemplateName ?? task.templateName),
+        nodeName: toText(task.Name ?? task.name),
+        workflowId: toText(workflowExecution.WorkflowId ?? workflowExecution.workflowId ?? root.WorkflowId ?? root.workflowId),
+        workflowName: toText(workflowExecution.WorkflowName ?? workflowExecution.workflowName ?? root.WorkflowName ?? root.workflowName),
+        runId: toText(workflowExecution.RunId ?? workflowExecution.runId ?? root.RunId ?? root.runId),
+        width,
+        height
+      }));
+    });
+  }
+
+  const jobs = normalizeArray(root.JobsDetail ?? root.jobsDetail);
   return jobs.map((job) => {
     const input = job.Input || job.input || {};
     const operation = job.Operation || job.operation || {};

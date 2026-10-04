@@ -17,11 +17,11 @@ import {
   normalizePublicUrl
 } from './storage.js';
 import {
-  CI_OUTPUT_PREFIX,
   createInitialRenditions,
   deleteObjectKeys,
   findVideoIdBySourceKey,
   getVideoObjectKeys,
+  isAllowedCiOutputKey,
   isCiSuccessState,
   parseCiWorkflowCallbackPayload,
   resolveTranscodeQuality,
@@ -786,10 +786,10 @@ videoRouter.post('/transcode/callback', async (req, res, next) => {
         continue;
       }
 
-      if (!info.outputKey || !info.outputKey.startsWith(CI_OUTPUT_PREFIX)) {
-        console.warn(`[ci-callback] 产物路径异常，已拒绝：${info.outputKey}`);
+      if (!isAllowedCiOutputKey(info.outputKey, info.inputKey)) {
+        console.warn(`[ci-callback] 产物路径异常，已拒绝：input=${info.inputKey} output=${info.outputKey}`);
         invalidOutput = true;
-        results.push({ status: 'rejected', reason: 'invalid-output-key', videoId, quality, outputKey: info.outputKey });
+        results.push({ status: 'rejected', reason: 'invalid-output-key', videoId, quality, inputKey: info.inputKey, outputKey: info.outputKey });
         continue;
       }
 

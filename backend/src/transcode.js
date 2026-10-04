@@ -8,9 +8,12 @@ const FAILED_STATUS = 'failed';
 const TRANSCODE_QUALITIES = ['1080p', '720p'];
 const ALLOWED_STATUSES = new Set([READY_STATUS, PROCESSING_STATUS, FAILED_STATUS]);
 
-// 数据万象工作流把转码结果写到这个前缀下（控制台里节点的“目标路径”）。
-// 回调里的产物 key 必须落在这个前缀内，避免伪造回调把地址指向任意位置。
-export const CI_OUTPUT_PREFIX = 'transcoded/';
+// 数据万象工作流允许的转码产物路径：
+// 1. 推荐配置：直接输出回源视频所在目录 tracks/... 或 knowledge/...，文件名以 -720p/-1080p 结尾；
+// 2. 兼容旧配置：输出到 transcoded/...。
+// 回调里的产物 key 必须满足这些规则，避免伪造回调把地址指向任意位置。
+export const CI_LEGACY_OUTPUT_PREFIX = 'transcoded/';
+export const CI_SOURCE_OUTPUT_PREFIXES = ['tracks/', 'knowledge/'];
 const CI_SUCCESS_STATE = 'success';
 
 function normalizeQuality(value) {
@@ -186,7 +189,7 @@ function findWidthHeight(node, depth = 0) {
 }
 
 // 判断这次回调属于 720p 还是 1080p：
-// 优先看产物路径（我们配置的是 transcoded/720p/、transcoded/1080p/），
+// 优先看产物路径（新配置为源目录下的 xxx-720p.mp4 / xxx-1080p.mp4，旧配置为 transcoded/720p/、transcoded/1080p/），
 // 其次看转码后画面的长边（做成竖屏视频也能判断），都拿不到就放弃。
 export function resolveTranscodeQuality({ outputKey = '', width = 0, height = 0 } = {}) {
   const key = toText(outputKey);
@@ -204,6 +207,39 @@ export function resolveTranscodeQuality({ outputKey = '', width = 0, height = 0 
   }
 
   return '';
+}
+
+export function isAllowedCiOutputKey(outputKey, inputKey = '') {
+  const key = toText(outputKey);
+  const sourceKey = toText(inputKey);
+  if (!key || key.includes('..')) {
+    return false;
+  }
+
+  if (key.startsWith(CI_LEGACY_OUTPUT_PREFIX)) {
+    return Boolean(resolveTranscodeQuality({ outputKey: key }));
+  }
+
+  const sourcePrefix = CI_SOURCE_OUTPUT_PREFIXES.find((prefix) => sourceKey.startsWith(prefix));
+  if (!sourcePrefix || !key.startsWith(sourcePrefix)) {
+    return false;
+  }
+
+  const sourceDir = sourceKey.includes('/') ? sourceKey.slice(0, sourceKey.lastIndexOf('/') + 1) : '';
+  if (!sourceDir || !key.startsWith(sourceDir)) {
+    return false;
+  }
+
+  const quality = resolveTranscodeQuality({ outputKey: key });
+  if (!quality) {
+    return false;
+  }
+
+  const sourceExtIndex = sourceKey.lastIndexOf('.');
+  const sourceBase = sourceExtIndex > -1 ? sourceKey.slice(0, sourceExtIndex) : sourceKey;
+  const outputExtIndex = key.lastIndexOf('.');
+  const outputBase = outputExtIndex > -1 ? key.slice(0, outputExtIndex) : key;
+  return outputBase === `${sourceBase}-${quality}`;
 }
 
 // 用回调里的源文件 key 反查 videos.id。

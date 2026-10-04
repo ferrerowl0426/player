@@ -106,8 +106,17 @@ function normalizeArray(value) {
   return value ? [value] : [];
 }
 
+function getWorkflowTaskOutputs(task) {
+  const resultInfo = task.ResultInfo ?? task.resultInfo;
+  const resultInfos = normalizeArray(resultInfo);
+  return resultInfos.flatMap((result) => {
+    const objectInfos = normalizeArray(result.ObjectInfo ?? result.objectInfo);
+    return objectInfos.length > 0 ? objectInfos : [result];
+  });
+}
+
 // 数据万象工作流完成回调：一次回调内包含同一个工作流实例下的多个转码任务。
-// 线上真实格式为 WorkflowExecution.Tasks[].ResultInfo[]；保留 JobsDetail 分支用于兼容同类工作流报文差异。
+// 线上真实格式为 WorkflowExecution.Tasks[].ResultInfo.ObjectInfo[]；保留 JobsDetail 分支用于兼容同类工作流报文差异。
 export function parseCiWorkflowCallbackPayload(payload) {
   const container = payload && typeof payload === 'object' ? (payload.Response || payload.response || payload) : {};
   const root = container && typeof container === 'object' ? container : {};
@@ -118,16 +127,16 @@ export function parseCiWorkflowCallbackPayload(payload) {
 
   if (workflowTasks.length > 0) {
     return workflowTasks.flatMap((task) => {
-      const resultInfos = normalizeArray(task.ResultInfo ?? task.resultInfo);
+      const outputs = getWorkflowTaskOutputs(task);
       const { width, height } = findWidthHeight(task.MediaInfo || task.mediaInfo || {});
-      return resultInfos.map((result) => ({
+      return outputs.map((output) => ({
         eventName: toText(root.EventName ?? root.eventName),
         tag: toText(task.Type ?? task.type ?? task.Tag ?? task.tag),
         state: toText(task.State ?? task.state),
         message: toText(task.Message ?? task.message),
         inputKey: workflowInputKey,
-        outputKey: decodeObjectKey(result.ObjectName ?? result.objectName ?? result.Object ?? result.object),
-        outputSize: findObjectSize(result),
+        outputKey: decodeObjectKey(output.ObjectName ?? output.objectName ?? output.Object ?? output.object),
+        outputSize: findObjectSize(output),
         templateId: toText(task.TemplateId ?? task.templateId),
         templateName: toText(task.TemplateName ?? task.templateName),
         nodeName: toText(task.Name ?? task.name),

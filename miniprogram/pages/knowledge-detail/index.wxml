@@ -1,12 +1,14 @@
 <view class="page lesson-page">
   <view class="player {{isFullscreen ? 'fullscreen' : ''}}">
-    <video wx:if="{{detail.currentPart.videoUrl}}" id="lessonVideo" class="video-player" src="{{detail.currentPart.videoUrl}}" poster="{{detail.currentPart.coverUrl || detail.coverUrl}}" autoplay controls="{{false}}" enable-progress-gesture show-fullscreen-btn="{{false}}" show-play-btn="{{false}}" show-center-play-btn="{{false}}" show-casting-button="{{false}}" object-fit="contain" direction="{{videoDirection}}" bindloadedmetadata="handleVideoLoadedMeta" bindplay="handleVideoPlay" bindpause="handleVideoPause" bindtimeupdate="handleVideoTimeUpdate" bindended="handleVideoEnded" bindfullscreenchange="handleFullscreenChange">
-      <cover-view class="video-controls {{isFullscreen ? 'full' : 'compact'}}">
-        <cover-view wx:if="{{isFullscreen}}" class="ctrl-btn part-ctrl prev-ctrl" data-step="-1" bindtap="switchPartByStep"><cover-view class="bar"></cover-view><cover-view class="tri left"></cover-view></cover-view>
-        <cover-view class="ctrl-btn icon-ctrl" bindtap="togglePlay">{{isPlaying ? 'Ⅱ' : '▶'}}</cover-view>
-        <cover-view wx:if="{{isFullscreen}}" class="ctrl-btn part-ctrl next-ctrl" data-step="1" bindtap="switchPartByStep"><cover-view class="tri right"></cover-view><cover-view class="bar"></cover-view></cover-view>
+    <video wx:if="{{detail.currentPart.videoUrl}}" id="lessonVideo" class="video-player" src="{{detail.currentPart.videoUrl}}" poster="{{detail.currentPart.coverUrl || detail.coverUrl}}" autoplay controls="{{false}}" enable-progress-gesture show-fullscreen-btn="{{false}}" show-play-btn="{{false}}" show-center-play-btn="{{false}}" show-casting-button="{{false}}" object-fit="contain" direction="{{videoDirection}}" bindloadedmetadata="handleVideoLoadedMeta" bindplay="handleVideoPlay" bindpause="handleVideoPause" bindtimeupdate="handleVideoTimeUpdate" bindended="handleVideoEnded" bindfullscreenchange="handleFullscreenChange" bindtap="showVideoControls" bindtouchstart="showVideoControls">
+      <cover-view class="video-controls {{controlsVisible ? 'show' : 'hide'}} {{isFullscreen ? 'full' : 'compact'}}">
+        <cover-view class="left-controls">
+          <cover-view wx:if="{{isFullscreen && !isPortraitVideo}}" class="ctrl-btn part-ctrl prev-ctrl" data-step="-1" bindtap="switchPartByStep"><cover-view class="bar"></cover-view><cover-view class="tri left"></cover-view></cover-view>
+          <cover-view class="ctrl-btn icon-ctrl" bindtap="togglePlay">{{isPlaying ? 'Ⅱ' : '▶'}}</cover-view>
+          <cover-view wx:if="{{isFullscreen && !isPortraitVideo}}" class="ctrl-btn part-ctrl next-ctrl" data-step="1" bindtap="switchPartByStep"><cover-view class="tri right"></cover-view><cover-view class="bar"></cover-view></cover-view>
+        </cover-view>
         <cover-view class="progress-zone">
-          <cover-view class="progress-track" bindtap="seekVideo" bindtouchstart="startSeekVideo" bindtouchmove="moveSeekVideo">
+          <cover-view class="progress-track" bindtap="seekVideo" bindtouchstart="startSeekVideo" bindtouchmove="moveSeekVideo" bindtouchend="endSeekVideo" bindtouchcancel="endSeekVideo">
             <cover-view class="progress-fill" style="width: {{progressPercent}}%;"></cover-view>
             <cover-view class="progress-dot" style="left: {{progressPercent}}%;"></cover-view>
           </cover-view>

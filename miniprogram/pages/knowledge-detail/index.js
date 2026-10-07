@@ -150,6 +150,9 @@ Page({
     videoDirection: 0,
     isPlaying: false,
     isFullscreen: false,
+    isPortraitVideo: false,
+    controlsVisible: true,
+    isSeeking: false,
     currentTime: 0,
     duration: 0,
     currentTimeText: '0:00',
@@ -202,6 +205,16 @@ Page({
     return wx.createVideoContext('lessonVideo', this);
   },
 
+  showVideoControls() {
+    if (this.controlsTimer) clearTimeout(this.controlsTimer);
+    this.setData({ controlsVisible: true });
+    if (this.data.isPlaying) {
+      this.controlsTimer = setTimeout(() => {
+        this.setData({ controlsVisible: false });
+      }, this.data.isFullscreen ? 2600 : 2000);
+    }
+  },
+
   playCurrentVideo() {
     if (!this.data.detail.currentPart.videoUrl) return;
     wx.nextTick(() => {
@@ -212,9 +225,10 @@ Page({
   },
 
   pauseCurrentVideo() {
+    if (this.controlsTimer) clearTimeout(this.controlsTimer);
     if (!this.data.detail.currentPart.videoUrl) return;
     this.getVideoContext().pause();
-    this.setData({ isPlaying: false });
+    this.setData({ isPlaying: false, controlsVisible: true });
   },
 
   selectPartById(part, shouldScroll = true) {
@@ -310,6 +324,7 @@ Page({
   },
 
   updateVideoProgress(currentTime, duration) {
+    if (this.data.isSeeking) return;
     const safeDuration = Number(duration || this.data.duration || 0);
     const safeCurrent = Number(currentTime || 0);
     this.setData({
@@ -322,15 +337,24 @@ Page({
   },
 
   handleVideoPlay() {
-    this.setData({ isPlaying: true });
+    this.setData({ isPlaying: true }, () => this.showVideoControls());
   },
 
   handleVideoPause() {
-    this.setData({ isPlaying: false });
+    if (this.controlsTimer) clearTimeout(this.controlsTimer);
+    this.setData({ isPlaying: false, controlsVisible: true });
   },
 
   handleVideoEnded() {
-    this.setData({ isPlaying: false, progressPercent: 100 });
+    if (this.controlsTimer) clearTimeout(this.controlsTimer);
+    const duration = Number(this.data.duration || 0);
+    this.setData({
+      isPlaying: false,
+      controlsVisible: true,
+      currentTime: duration,
+      currentTimeText: formatVideoTime(duration),
+      progressPercent: 100
+    });
   },
 
   handleVideoTimeUpdate(event) {
@@ -339,10 +363,10 @@ Page({
   },
 
   handleFullscreenChange(event) {
-    this.setData({ isFullscreen: Boolean(event.detail?.fullScreen) });
+    this.setData({ isFullscreen: Boolean(event.detail?.fullScreen) }, () => this.showVideoControls());
   },
 
-  seekVideoByTouch(touch) {
+  previewSeekByTouch(touch, shouldCommit = false) {
     if (!touch || !this.data.duration) return;
     const clientX = Number(touch.clientX ?? touch.x ?? 0);
     if (!clientX) return;
@@ -351,21 +375,41 @@ Page({
       if (!rect || !rect.width) return;
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       const nextTime = ratio * this.data.duration;
-      this.getVideoContext().seek(nextTime);
-      this.updateVideoProgress(nextTime, this.data.duration);
+      this.setData({
+        isSeeking: true,
+        controlsVisible: true,
+        currentTime: nextTime,
+        currentTimeText: formatVideoTime(nextTime),
+        progressPercent: clampPercent(ratio * 100)
+      });
+      if (shouldCommit) this.commitSeek(nextTime);
     }).exec();
   },
 
+  commitSeek(nextTime = this.data.currentTime) {
+    this.getVideoContext().seek(nextTime);
+    this.setData({ isSeeking: false }, () => this.showVideoControls());
+  },
+
   seekVideo(event) {
-    this.seekVideoByTouch(event.detail || event.changedTouches?.[0]);
+    this.previewSeekByTouch(event.detail || event.changedTouches?.[0], true);
   },
 
   startSeekVideo(event) {
-    this.seekVideoByTouch(event.touches?.[0]);
+    this.previewSeekByTouch(event.touches?.[0], false);
   },
 
   moveSeekVideo(event) {
-    this.seekVideoByTouch(event.touches?.[0]);
+    this.previewSeekByTouch(event.touches?.[0], false);
+  },
+
+  endSeekVideo(event) {
+    const touch = event.changedTouches?.[0];
+    if (touch) {
+      this.previewSeekByTouch(touch, true);
+      return;
+    }
+    this.commitSeek();
   },
 
   handleVideoLoadedMeta(event) {
@@ -374,9 +418,11 @@ Page({
     const duration = Number(event.detail?.duration || this.data.duration || 0);
     // 微信 video direction：0 正常竖屏方向；90 横屏方向。
     // 横屏视频全屏横屏，竖屏/正方形视频全屏竖屏并保留必要黑边。
+    const isPortraitVideo = height > width;
     const videoDirection = width > height ? 90 : 0;
     this.setData({
       videoDirection,
+      isPortraitVideo,
       duration,
       durationText: formatVideoTime(duration)
     }, () => this.getVideoContext().playbackRate(this.data.speed));

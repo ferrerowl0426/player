@@ -9,11 +9,21 @@ const SECTION_TITLES = {
   track: '曲目'
 };
 
+const SORT_OPTIONS = [
+  { value: 'updated_desc', label: '时间倒序' },
+  { value: 'updated_asc', label: '时间正序' },
+  { value: 'title', label: '按标题' }
+];
+
 Page({
   data: {
     section: 'knowledge-set',
     sectionTitle: '知识点集',
     keyword: '',
+    sort: 'updated_desc',
+    sortLabel: '时间倒序',
+    sortOptions: SORT_OPTIONS,
+    sortOpen: false,
     loading: false,
     items: []
   },
@@ -44,10 +54,25 @@ Page({
     this.backToTop();
   },
 
+  toggleSort() {
+    this.setData({ sortOpen: !this.data.sortOpen });
+  },
+
+  selectSort(event) {
+    const value = event.currentTarget.dataset.value;
+    const option = SORT_OPTIONS.find((item) => item.value === value);
+    if (!option || option.value === this.data.sort) {
+      this.setData({ sortOpen: false });
+      return;
+    }
+    this.setData({ sort: option.value, sortLabel: option.label, sortOpen: false });
+    this.loadCourses();
+  },
+
   async loadCourses() {
     this.setData({ loading: true });
     try {
-      const data = await getCourses({ section: this.data.section, keyword: this.data.keyword });
+      const data = await getCourses({ section: this.data.section, keyword: this.data.keyword, sort: this.data.sort });
       this.setData({ items: normalizeCourseItems(data, this.data.section, this.data.keyword) });
     } catch (error) {
       this.setData({ items: [] });

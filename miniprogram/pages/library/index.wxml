@@ -10,7 +10,8 @@
     <block wx:for="{{items}}" wx:key="id">
       <view class="pdf-card">
         <view class="pdf-cover">
-          <view class="pdf-page-icon"></view>
+          <image wx:if="{{item.coverUrl}}" class="pdf-cover-img" src="{{item.coverUrl}}" mode="aspectFill" />
+          <view wx:else class="pdf-page-icon"></view>
         </view>
         <view class="pdf-info">
           <view class="pdf-title">{{item.title}}</view>

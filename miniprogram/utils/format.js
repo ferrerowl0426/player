@@ -26,16 +26,20 @@ function formatWeekText(value) {
 }
 
 function normalizeAssignment(item = {}) {
-  const objectType = item.objectType || item.object_type || '';
-  const partId = item.partId || item.part_id || '';
+  const target = item.target || {};
+  const objectType = item.objectType || item.object_type || item.type || target.type || '';
+  const objectId = item.objectId || item.object_id || (target.id !== undefined ? target.id : '') || '';
+  const partId = item.partId || item.part_id || (target.partId !== undefined ? target.partId : '') || '';
+  const partNo = item.partNo || item.part_no || item.no || item.partIndex || item.part_index || '';
   const typeLabel = OBJECT_TYPE_LABELS[objectType] || '内容';
-  const partLabel = partId ? `P${partId}` : '';
+  const partLabel = partNo ? `P${String(partNo).padStart(2, '0')}` : '';
   return {
     ...item,
     id: item.id,
     objectType,
-    objectId: item.objectId || item.object_id,
+    objectId,
     partId,
+    partNo,
     title: item.title || item.assignedObjectTitle || item.assigned_object_title || '未命名内容',
     coverUrl: item.coverUrl || item.cover_url || '',
     typeLabel,
@@ -122,6 +126,7 @@ function normalizeLibraryItems(data) {
       ...item,
       title: item.title || item.name || '未命名资料',
       fileType,
+      coverUrl: item.coverUrl || item.cover_url || item.cover || '',
       sizeText: item.sizeText || item.size_text || item.size || 'PDF',
       updateDateText: item.updateDateText || item.update_date_text || item.updatedAtText || item.updated_at_text || formatDateText(item.updatedAt || item.updated_at || item.createdAt || item.created_at) || '更新日期待同步',
       localPath: item.localPath || item.local_path || ''

@@ -52,22 +52,47 @@
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  min-height: 72rpx;
-  padding: 12rpx 18rpx;
+  gap: 10rpx;
+  min-height: 58rpx;
+  padding: 8rpx 18rpx 12rpx;
   box-sizing: border-box;
-  background: rgba(0, 0, 0, 0.64);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.62));
+  opacity: 1;
+}
+
+.video-controls.hide {
+  opacity: 0;
+}
+
+.video-controls.show {
+  opacity: 1;
 }
 
 .video-controls.compact {
-  gap: 14rpx;
+  gap: 16rpx;
+  min-height: 68rpx;
+  padding: 12rpx 22rpx 12rpx;
 }
 
 .video-controls.full {
-  gap: 14rpx;
-  min-height: 84rpx;
-  padding: 14rpx 24rpx;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.78));
+  gap: 16rpx;
+  min-height: 70rpx;
+  padding: 10rpx 46rpx 18rpx 24rpx;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.5));
+}
+
+.left-controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+}
+
+.video-controls.compact .left-controls {
+  width: 46rpx;
+  height: 46rpx;
+  gap: 0;
 }
 
 .ctrl-btn {
@@ -82,21 +107,28 @@
 }
 
 .icon-ctrl {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 999rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 0;
+  font-size: 25rpx;
+}
+
+.video-controls.compact .icon-ctrl {
+  width: 46rpx;
+  height: 46rpx;
+  font-size: 24rpx;
 }
 
 .part-ctrl {
-  width: 58rpx;
-  height: 48rpx;
-  gap: 5rpx;
-  opacity: 0.58;
+  width: 32rpx;
+  height: 40rpx;
+  gap: 3rpx;
+  opacity: 0.38;
 }
 
 .part-ctrl .bar {
-  width: 6rpx;
-  height: 34rpx;
+  width: 3rpx;
+  height: 22rpx;
   border-radius: 999rpx;
   background: #ffffff;
 }
@@ -104,47 +136,72 @@
 .part-ctrl .tri {
   width: 0;
   height: 0;
-  border-top: 15rpx solid transparent;
-  border-bottom: 15rpx solid transparent;
+  border-top: 9rpx solid transparent;
+  border-bottom: 9rpx solid transparent;
 }
 
 .part-ctrl .tri.left {
-  border-right: 24rpx solid #ffffff;
+  border-right: 14rpx solid #ffffff;
 }
 
 .part-ctrl .tri.right {
-  border-left: 24rpx solid #ffffff;
+  border-left: 14rpx solid #ffffff;
 }
 
 .text-ctrl {
-  min-width: 64rpx;
-  height: 48rpx;
-  padding: 0 8rpx;
-  border-radius: 10rpx;
-  font-size: 21rpx;
+  min-width: 56rpx;
+  height: 38rpx;
+  padding: 0 6rpx;
+  border-radius: 0;
+  font-size: 19rpx;
 }
 
 .progress-zone {
   flex: 1;
-  min-width: 0;
+  min-width: 96rpx;
   height: 48rpx;
   display: flex;
   align-items: center;
+  margin: 0 8rpx;
+}
+
+.video-controls.compact .progress-zone {
+  flex: 1;
+  min-width: 0;
+  height: 46rpx;
+  margin: 0 14rpx;
+}
+
+.video-controls.full .progress-zone {
+  min-width: 260rpx;
+  margin: 0 14rpx;
 }
 
 .progress-track {
   position: relative;
   width: 100%;
-  height: 8rpx;
+  height: 18rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.34);
+  background: transparent;
+}
+
+.progress-track::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .progress-fill {
   position: absolute;
   left: 0;
-  top: 0;
-  height: 8rpx;
+  top: 6rpx;
+  z-index: 1;
+  height: 6rpx;
   border-radius: 999rpx;
   background: #ffffff;
 }
@@ -152,21 +209,45 @@
 .progress-dot {
   position: absolute;
   top: 50%;
-  width: 24rpx;
-  height: 24rpx;
-  margin-left: -12rpx;
-  margin-top: -12rpx;
+  z-index: 2;
+  width: 18rpx;
+  height: 18rpx;
+  margin-left: -9rpx;
+  margin-top: -9rpx;
   border-radius: 999rpx;
   background: #ffffff;
 }
 
+.video-controls.full .progress-track {
+  height: 16rpx;
+}
+
+.video-controls.full .progress-track::after,
+.video-controls.full .progress-fill {
+  top: 6rpx;
+  height: 4rpx;
+}
+
+.video-controls.full .progress-track {
+  background: transparent;
+}
+
+.video-controls.full .progress-dot {
+  width: 14rpx;
+  height: 14rpx;
+  margin-left: -7rpx;
+  margin-top: -7rpx;
+}
+
 .time-label {
   flex: none;
-  min-width: 132rpx;
+  min-width: 118rpx;
+  margin-left: 4rpx;
   color: #ffffff;
-  font-size: 21rpx;
+  font-size: 18rpx;
   font-weight: 800;
-  line-height: 48rpx;
+  line-height: 40rpx;
+  text-align: center;
 }
 
 .lesson-card {

@@ -18,9 +18,9 @@ function resolveCourseRequest(section) {
   return map[section] || map.track;
 }
 
-function getCourses({ section, keyword, page = 1, pageSize = 20 } = {}) {
+function getCourses({ section, keyword, sort = 'updated_desc', page = 1, pageSize = 20 } = {}) {
   const { path, type } = resolveCourseRequest(section);
-  return request({ url: `${path}${buildQuery({ type, keyword, page, pageSize })}` });
+  return request({ url: `${path}${buildQuery({ type, keyword, sort, page, pageSize })}` });
 }
 
 function getTrackDetail(id) {

@@ -7,9 +7,10 @@ function buildUrl(path, params = {}) {
 }
 
 function navigateByAssignment(assignment = {}) {
-  const objectType = assignment.objectType || assignment.object_type;
-  const objectId = assignment.objectId || assignment.object_id;
-  const partId = assignment.partId || assignment.part_id;
+  const target = assignment.target || {};
+  const objectType = assignment.objectType || assignment.object_type || assignment.type || target.type || '';
+  const objectId = assignment.objectId || assignment.object_id || assignment.id || target.id || '';
+  const partId = assignment.partId || assignment.part_id || target.partId || '';
 
   const routeMap = {
     track_collection: '/pages/track-collection/index',

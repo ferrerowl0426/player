@@ -17,7 +17,18 @@
 
     <view class="list-head">
       <view class="list-title">{{sectionTitle}}</view>
-      <view class="sort-select">更新时间倒序</view>
+      <view class="sort-wrap">
+        <view class="sort-trigger" bindtap="toggleSort">
+          <text>{{sortLabel}}</text>
+          <view class="sort-arrow {{sortOpen ? 'open' : ''}}"></view>
+        </view>
+        <view class="sort-menu" wx:if="{{sortOpen}}">
+          <view class="sort-option {{item.value === sort ? 'active' : ''}}" wx:for="{{sortOptions}}" wx:key="value" data-value="{{item.value}}" bindtap="selectSort">
+            <text>{{item.label}}</text>
+            <view wx:if="{{item.value === sort}}" class="sort-check">✓</view>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 

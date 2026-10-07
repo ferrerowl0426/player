@@ -213,10 +213,24 @@ export async function getHomeworkHistory(student, { page = 1, pageSize = 20 } = 
   return { items: [...map.values()], pagination: pagination(safePage, safePageSize, total) };
 }
 
-async function listContent({ table, collectionTable, kind, keyword = '', page = 1, pageSize = 20 }) {
+function resolveSort(sort = '') {
+  // 支持三种：updated_desc 时间倒序、updated_asc 时间正序、title 按标题
+  switch (String(sort || '')) {
+    case 'updated_asc':
+      return { column: 'updated_at', order: 'ASC' };
+    case 'title':
+      return { column: 'name', order: 'ASC' };
+    case 'updated_desc':
+    default:
+      return { column: 'updated_at', order: 'DESC' };
+  }
+}
+
+async function listContent({ table, collectionTable, kind, keyword = '', page = 1, pageSize = 20, sort = 'updated_desc' }) {
   const safePage = toInt(page, 1);
   const safePageSize = Math.min(toInt(pageSize, 20), 50);
   const offset = (safePage - 1) * safePageSize;
+  const order = resolveSort(sort);
   const params = [];
   let where = '';
   if (keyword) {
@@ -230,7 +244,7 @@ async function listContent({ table, collectionTable, kind, keyword = '', page = 
     `SELECT id, name, cover, description, created_at, updated_at
        FROM ${table}
        ${where}
-      ORDER BY updated_at DESC, id DESC
+      ORDER BY ${order.column} ${order.order}, id DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
@@ -444,7 +458,7 @@ export async function listLibrary({ keyword = '', page = 1, pageSize = 20 } = {}
   const totalResult = await pool.query(`SELECT COUNT(*)::int AS total FROM library_resources ${where}`, params);
   params.push(safePageSize, offset);
   const result = await pool.query(
-    `SELECT id, title, file_url, file_size, file_type, created_at, updated_at
+    `SELECT id, title, cover, file_url, file_size, file_type, created_at, updated_at
        FROM library_resources
        ${where}
       ORDER BY updated_at DESC, id DESC
@@ -465,6 +479,7 @@ function serializeLibraryResource(row) {
     id: String(row.id),
     title,
     type,
+    coverUrl: normalizePublicUrl(row.cover || ''),
     fileUrl: normalizePublicUrl(row.file_url || ''),
     objectKey: getKeyFromPublicUrl(row.file_url || ''),
     sizeText: sizeText(row.file_size),
@@ -580,7 +595,7 @@ async function getLibraryRelatedCourses(resourceId) {
 
 export async function getLibraryDetail(id) {
   const result = await pool.query(
-    'SELECT id, title, file_url, file_size, file_type, created_at, updated_at FROM library_resources WHERE id = $1',
+    'SELECT id, title, cover, file_url, file_size, file_type, created_at, updated_at FROM library_resources WHERE id = $1',
     [id]
   );
   const row = result.rows[0];

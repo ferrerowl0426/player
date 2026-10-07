@@ -16,8 +16,6 @@
           <view class="rec-teacher">{{item.teacherName}}</view>
         </view>
 
-        <view class="rec-title">{{item.title}}</view>
-
         <view class="work-list">
           <block wx:for="{{item.assignments}}" wx:key="id" wx:for-item="assignment" wx:for-index="idx">
             <view class="work-row">

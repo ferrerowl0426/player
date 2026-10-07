@@ -1,0 +1,362 @@
+.lesson-page {
+  padding: 0 28rpx 120rpx;
+  overflow-x: hidden;
+}
+
+.player {
+  border-radius: 16rpx;
+  background: #1f170f;
+  overflow: hidden;
+  box-shadow: 0 12rpx 36rpx rgba(38, 29, 16, 0.18);
+  border: 2rpx solid rgba(93, 67, 38, 0.45);
+  margin-bottom: 20rpx;
+}
+
+.video {
+  height: 388rpx;
+  background: #24190f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.video::before {
+  content: "";
+  position: absolute;
+  inset: 36rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 10rpx;
+}
+
+.play {
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  position: relative;
+}
+
+.play::after {
+  content: "";
+  position: absolute;
+  left: 36rpx;
+  top: 26rpx;
+  border-left: 28rpx solid #5d4326;
+  border-top: 20rpx solid transparent;
+  border-bottom: 20rpx solid transparent;
+}
+
+.vctrl {
+  height: 74rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 0 16rpx;
+  color: #fff;
+  background: #171009;
+}
+
+.pause-icon {
+  width: 28rpx;
+  height: 30rpx;
+  border-left: 8rpx solid #ffffff;
+  border-right: 8rpx solid #ffffff;
+  flex: none;
+}
+
+.pbar {
+  flex: 1;
+  height: 8rpx;
+  border-radius: 99rpx;
+  background: rgba(255, 255, 255, 0.22);
+  position: relative;
+}
+
+.pbar-fill {
+  width: 42%;
+  height: 100%;
+  border-radius: 99rpx;
+  background: #ff7f00;
+}
+
+.knob {
+  position: absolute;
+  left: 42%;
+  top: -8rpx;
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.ctime {
+  flex: none;
+  font-size: 20rpx;
+  color: rgba(255,255,255,0.78);
+}
+
+.vselect {
+  flex: none;
+  height: 42rpx;
+  padding: 0 12rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 20rpx;
+  line-height: 38rpx;
+}
+
+.fullscreen-icon {
+  flex: none;
+  width: 38rpx;
+  height: 38rpx;
+  position: relative;
+}
+
+.fs-corner {
+  position: absolute;
+  width: 12rpx;
+  height: 12rpx;
+  border-color: #ffffff;
+  border-style: solid;
+}
+
+.fs-corner.tl {
+  left: 0;
+  top: 0;
+  border-width: 4rpx 0 0 4rpx;
+}
+
+.fs-corner.tr {
+  right: 0;
+  top: 0;
+  border-width: 4rpx 4rpx 0 0;
+}
+
+.fs-corner.bl {
+  left: 0;
+  bottom: 0;
+  border-width: 0 0 4rpx 4rpx;
+}
+
+.fs-corner.br {
+  right: 0;
+  bottom: 0;
+  border-width: 0 4rpx 4rpx 0;
+}
+
+.lesson-card {
+  background: rgba(255, 255, 255, 0.97);
+  border: 2rpx solid #c9b795;
+  border-radius: 18rpx;
+  box-shadow: 0 4rpx 18rpx rgba(93, 67, 38, 0.08);
+  padding: 22rpx;
+  margin-bottom: 20rpx;
+  overflow: hidden;
+}
+
+.lesson-title-row,
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.lesson-title {
+  min-width: 0;
+  color: #261d10;
+  font-size: 34rpx;
+  line-height: 1.35;
+  font-weight: 950;
+  word-break: break-word;
+}
+
+.sec-note {
+  flex: none;
+  color: #7a6a52;
+  font-size: 21rpx;
+  font-weight: 800;
+}
+
+.lesson-summary {
+  margin-top: 14rpx;
+  color: #4f4230;
+  font-size: 24rpx;
+  line-height: 1.75;
+}
+
+.mini-title {
+  color: #5d4326;
+  font-size: 28rpx;
+  font-weight: 950;
+  letter-spacing: 1rpx;
+}
+
+.pre-scroll {
+  width: 100%;
+  white-space: nowrap;
+  margin-top: 18rpx;
+}
+
+.pre-node {
+  width: 240rpx;
+  min-height: 164rpx;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  vertical-align: top;
+  margin-right: 16rpx;
+  padding: 18rpx;
+  border: 2rpx solid #ddd0b4;
+  border-radius: 16rpx;
+  background: #fffdf8;
+}
+
+.kind,
+.type-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  height: 34rpx;
+  padding: 0 10rpx;
+  border-radius: 6rpx;
+  background: #f7f1e6;
+  color: #5d4326;
+  font-size: 19rpx;
+  font-weight: 900;
+}
+
+.type-inline {
+  width: 64rpx;
+  padding: 0;
+  justify-self: center;
+}
+
+.kind {
+  justify-self: flex-start;
+}
+
+.pre-title {
+  color: #261d10;
+  font-size: 24rpx;
+  line-height: 1.35;
+  font-weight: 900;
+  white-space: nowrap;
+  margin: 12rpx 0 8rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pre-duration,
+.file-meta,
+.part-meta {
+  color: #7a6a52;
+  font-size: 20rpx;
+  line-height: 1.4;
+}
+
+.info-block {
+  margin-top: 18rpx;
+  border-top: 2rpx solid rgba(221, 208, 180, 0.82);
+  border-bottom: 2rpx solid rgba(221, 208, 180, 0.82);
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.part,
+.file-row {
+  min-height: 90rpx;
+  display: grid;
+  align-items: center;
+  gap: 16rpx;
+  padding: 16rpx 18rpx;
+  border-bottom: 2rpx solid rgba(221, 208, 180, 0.62);
+}
+
+.part {
+  grid-template-columns: 52rpx minmax(0, 1fr) auto;
+}
+
+.file-row {
+  grid-template-columns: 52rpx minmax(0, 1fr) 72rpx auto;
+}
+
+.part:last-child,
+.file-row:last-child {
+  border-bottom: 0;
+}
+
+.part.active {
+  background: #f2f7ec;
+  border-left: 8rpx solid #4f7d3a;
+  padding-left: 10rpx;
+}
+
+.part-no,
+.file-no {
+  color: #5d4326;
+  font-size: 22rpx;
+  font-weight: 950;
+  text-align: center;
+}
+
+.part-main,
+.file-main {
+  min-width: 0;
+}
+
+.clip-title {
+  color: #261d10;
+  font-size: 24rpx;
+  line-height: 1.45;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-status {
+  height: 44rpx;
+  padding: 0 14rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid #c9b795;
+  color: #5d4326;
+  font-size: 20rpx;
+  font-weight: 900;
+  line-height: 40rpx;
+  background: #ffffff;
+}
+
+.part.active .part-status {
+  border-color: transparent;
+  color: #4f7d3a;
+  background: transparent;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.action-btn {
+  height: 46rpx;
+  padding: 0 14rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid #c9b795;
+  color: #5d4326;
+  background: #ffffff;
+  font-size: 20rpx;
+  font-weight: 900;
+  line-height: 42rpx;
+  white-space: nowrap;
+}
+
+.action-btn.solid {
+  border-color: #5d4326;
+  color: #ffffff;
+  background: #5d4326;
+}

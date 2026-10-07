@@ -1,0 +1,23 @@
+<view wx:if="{{preview === 'pdf'}}" class="pdf-native-page">
+  <view class="native-pdf-box">
+    <view class="preview-title">PDF</view>
+    <view class="muted">{{detail.title}}.pdf</view>
+    <view class="native-note">这里用于承载小程序原生 PDF 预览；真实文件接入后直接调用 wx.openDocument，不再绘制自定义 PDF 页面。</view>
+  </view>
+</view>
+
+<view wx:else class="page">
+  <view class="preview-box">
+    <view>
+      <view class="preview-title">{{detail.fileType || 'FILE'}}</view>
+      <view class="muted">{{detail.title || '资料文件'}}</view>
+    </view>
+  </view>
+
+  <button class="primary-btn" bindtap="openFile">打开资料</button>
+
+  <view class="card rule-card">
+    <view class="section-title"><text class="section-title__text">权限规则</text></view>
+    <view class="muted">文件地址不长期裸露，小程序通过后端获取短时有效的临时凭证后打开。</view>
+  </view>
+</view>

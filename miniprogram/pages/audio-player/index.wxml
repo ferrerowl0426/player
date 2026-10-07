@@ -1,0 +1,44 @@
+<view class="page audio-page">
+  <view class="audio-head">
+    <view class="back" bindtap="goBack">返回</view>
+    <view class="head-title">音频播放</view>
+  </view>
+
+  <view class="audio-card">
+    <view class="info-head">
+      <view class="audio-mark">
+        <view class="pick"></view>
+        <view class="wave-bars"><text></text><text></text><text></text><text></text><text></text></view>
+      </view>
+      <view class="audio-title-wrap">
+        <view class="audio-title">{{title || '音频文件'}}</view>
+        <view class="audio-meta">{{audioFormat}} · {{durationText}}</view>
+      </view>
+    </view>
+    <view class="source">来源：<text>{{source || '天空之城 · 主歌段落慢速跟练'}}</text></view>
+  </view>
+
+  <view class="player-card {{playing ? 'playing' : ''}}">
+    <view class="time-row"><text>{{currentTimeText}}</text><text>{{audioFormat}}</text><text>{{durationText}}</text></view>
+    <view class="progress-wrap">
+      <view wx:if="{{seeking}}" class="seek-bubble" style="left: {{progress}}%;">{{currentTimeText}}</view>
+      <slider value="{{progress}}" bindchanging="onSeeking" bindchange="onSeekEnd" activeColor="#ff7f00" backgroundColor="#e7dac2" block-color="#5d4326" block-size="14" />
+    </view>
+    <view class="transport">
+      <view class="transport-icon loop-icon {{loop ? 'active' : ''}}" bindtap="toggleLoop">
+        <svg class="loop-svg" viewBox="0 0 56 44">
+          <path class="loop-path" d="M38 8 C30 1 15 3 8 11 C1 19 4 31 14 35 C22 38 34 35 40 28" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+          <path class="loop-head" d="M37 4 L49 9 L39 16 Z" fill="currentColor"/>
+          <text class="loop-one" x="26" y="26" text-anchor="middle">1</text>
+        </svg>
+      </view>
+      <view class="transport-icon rewind-icon" bindtap="rewind"><view></view><text></text></view>
+      <view class="transport-icon play-button" bindtap="togglePlay">
+        <view wx:if="{{playing}}" class="pause-shape"><text></text><text></text></view>
+        <view wx:else class="play-shape"></view>
+      </view>
+      <view class="transport-icon forward-icon" bindtap="forward"><text></text><view></view></view>
+      <view class="transport-icon speed-toggle" bindtap="toggleSpeed">{{speedText}}</view>
+    </view>
+  </view>
+</view>

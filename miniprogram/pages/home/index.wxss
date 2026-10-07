@@ -1,0 +1,219 @@
+.home-page {
+  padding-top: 34rpx;
+  padding-bottom: 150rpx;
+  overflow-x: hidden;
+}
+
+.home-greeting {
+  color: #261d10;
+  font-size: 36rpx;
+  font-weight: 900;
+  line-height: 1.35;
+  letter-spacing: 1rpx;
+  margin: 0 8rpx 28rpx;
+  word-break: break-word;
+}
+
+.disabled-tip {
+  width: 100%;
+  margin: 0 0 28rpx;
+  padding: 18rpx 20rpx;
+  border: 3rpx dashed #d99a83;
+  border-radius: 14rpx;
+  color: #5d4326;
+  background: rgba(255,255,255,0.78);
+  font-size: 23rpx;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.disabled-strong {
+  color: #b4452e;
+  font-weight: 900;
+}
+
+.materials-hint {
+  flex: none;
+  color: #7a6a52;
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.assignment-box {
+  width: 100%;
+  background: rgba(255,255,255,0.97);
+  border: 2rpx solid #c9b795;
+  border-radius: 16rpx;
+  padding: 22rpx;
+  box-shadow: 0 10rpx 30rpx rgba(93, 67, 38, 0.06);
+  overflow: hidden;
+}
+
+.assignment-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin-bottom: 22rpx;
+}
+
+.assignment-date {
+  min-width: 0;
+  color: #261d10;
+  font-size: 28rpx;
+  line-height: 1.35;
+  font-weight: 900;
+  letter-spacing: 0;
+  word-break: break-word;
+}
+
+.assignment-teacher {
+  flex: none;
+  max-width: 280rpx;
+  color: #7a6a52;
+  font-size: 22rpx;
+  line-height: 1.4;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.requirement-box {
+  width: 100%;
+  border: 2rpx dashed #ddd0b4;
+  border-radius: 14rpx;
+  padding: 22rpx 22rpx 20rpx;
+  background: rgba(255,255,255,0.70);
+  overflow: hidden;
+}
+
+.submit-box {
+  margin-top: 18rpx;
+}
+
+.requirement-title {
+  color: #5d4326;
+  font-size: 25rpx;
+  line-height: 1.35;
+  font-weight: 900;
+  margin-bottom: 14rpx;
+}
+
+.requirement-text {
+  color: #4f4230;
+  font-size: 24rpx;
+  line-height: 1.78;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.materials-card {
+  width: 100%;
+  margin-top: 24rpx;
+  background: rgba(255,255,255,0.97);
+  border: 2rpx solid #c9b795;
+  border-radius: 16rpx;
+  padding: 22rpx;
+  box-shadow: 0 10rpx 30rpx rgba(93, 67, 38, 0.06);
+  overflow: hidden;
+}
+
+.materials-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 18rpx;
+}
+
+.materials-title {
+  min-width: 0;
+  color: #261d10;
+  font-size: 28rpx;
+  line-height: 1.35;
+  font-weight: 900;
+  letter-spacing: 0;
+  word-break: break-word;
+}
+
+.material-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-height: 136rpx;
+  padding: 14rpx;
+  margin-top: 16rpx;
+  border: 2rpx solid #ddd0b4;
+  border-radius: 14rpx;
+  background: rgba(255,255,255,0.82);
+  overflow: hidden;
+}
+
+.material-cover {
+  flex: none;
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 10rpx;
+  position: relative;
+  overflow: hidden;
+  background-color: #6a4826;
+  background-image:
+    linear-gradient(135deg, rgba(255,255,255,0.08) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.08) 75%, transparent 75%, transparent),
+    linear-gradient(135deg, #7b562f 0%, #4a321d 100%);
+  background-size: 34rpx 34rpx, 100% 100%;
+}
+
+.material-part {
+  position: absolute;
+  right: 10rpx;
+  bottom: 10rpx;
+  max-width: 72rpx;
+  height: 32rpx;
+  padding: 0 10rpx;
+  border-radius: 6rpx;
+  color: #ffffff;
+  background: rgba(93, 67, 38, 0.88);
+  font-size: 20rpx;
+  line-height: 32rpx;
+  font-weight: 900;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.material-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.material-name {
+  color: #261d10;
+  font-size: 27rpx;
+  line-height: 1.42;
+  font-weight: 900;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.material-meta {
+  color: #7a6a52;
+  font-size: 22rpx;
+  line-height: 1.45;
+  margin-top: 8rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.material-action {
+  color: #5d4326;
+  font-size: 22rpx;
+  line-height: 1.45;
+  font-weight: 900;
+  margin-top: 10rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

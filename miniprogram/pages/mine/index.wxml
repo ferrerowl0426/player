@@ -1,0 +1,23 @@
+<view class="page mine-page">
+  <view class="profile">
+    <view class="avatar">{{avatarText}}</view>
+    <view>
+      <view class="profile-name">{{student.nickname || '同学'}}</view>
+      <view class="profile-meta">{{student.className || '暂无班级'}} · 学生账号</view>
+    </view>
+  </view>
+
+  <status-banner wx:if="{{student.status === 'disabled'}}" type="danger" text="账号已停用：如需继续学习请联系老师。" />
+
+  <view class="info-list">
+    <view class="info-row"><text>账号状态</text><text>{{student.status === 'disabled' ? '已停用' : '正常'}}</text></view>
+    <view class="info-row"><text>所属班级</text><text>{{student.className || '暂无班级'}}</text></view>
+    <view class="info-row"><text>资料修改</text><text>请联系老师</text></view>
+    <view class="info-row" bindtap="confirmLogout"><text>切换账号</text><text>退出登录</text></view>
+  </view>
+
+  <view class="card help-card">
+    <view class="section-title"><text class="section-title__text">使用说明</text></view>
+    <view class="help-text">本小程序仅供已创建账号的固定学生使用，不提供公开注册、交易广告或老师后台入口。</view>
+  </view>
+</view>

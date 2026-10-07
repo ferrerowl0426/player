@@ -1,0 +1,103 @@
+<view class="page lesson-page">
+  <view class="player">
+    <view class="video">
+      <view class="play"></view>
+    </view>
+    <view class="vctrl">
+      <view class="pause-icon"></view>
+      <view class="pbar"><view class="pbar-fill"></view><view class="knob"></view></view>
+      <view class="ctime">{{detail.progressText}}</view>
+      <view class="vselect">{{detail.quality}}</view>
+      <view class="vselect">1.0x</view>
+      <view class="fullscreen-icon"><view class="fs-corner tl"></view><view class="fs-corner tr"></view><view class="fs-corner bl"></view><view class="fs-corner br"></view></view>
+    </view>
+  </view>
+
+  <view class="lesson-card intro-card">
+    <view class="lesson-title-row">
+      <view class="lesson-title">{{detail.title}}</view>
+    </view>
+    <view class="lesson-summary">{{detail.summary}}</view>
+  </view>
+
+  <view class="lesson-card">
+    <view class="sec-head">
+      <view class="mini-title">前置知识点</view>
+      <view class="sec-note">滑动查看</view>
+    </view>
+    <scroll-view scroll-x class="pre-scroll" show-scrollbar="false">
+      <block wx:for="{{detail.prerequisites}}" wx:key="id">
+        <view class="pre-node" data-url="{{item.url}}" bindtap="openPrerequisite">
+          <view class="kind">{{item.typeLabel}}</view>
+          <view class="pre-title">{{item.title}}</view>
+          <view class="pre-duration">{{item.duration}}</view>
+        </view>
+      </block>
+    </scroll-view>
+  </view>
+
+  <view class="lesson-card">
+    <view class="sec-head">
+      <view class="mini-title">播放列表</view>
+      <view class="sec-note">{{detail.currentPartLabel}}</view>
+    </view>
+    <view class="info-block">
+      <block wx:for="{{detail.parts}}" wx:key="id">
+        <view class="part {{item.active ? 'active' : ''}}" data-part="{{item.id}}" bindtap="selectPart">
+          <view class="part-no">{{item.no}}</view>
+          <view class="part-main">
+            <view class="clip-title">{{item.title}}</view>
+            <view class="part-meta">{{item.duration}}{{item.active ? ' · 当前播放' : ''}}</view>
+          </view>
+          <view class="part-status">{{item.statusText}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="lesson-card">
+    <view class="sec-head">
+      <view class="mini-title">附件资料</view>
+    </view>
+    <view class="info-block">
+      <block wx:for="{{detail.attachments}}" wx:key="id">
+        <view class="file-row">
+          <view class="file-no">{{item.no}}</view>
+          <view class="file-main">
+            <view class="clip-title">{{item.title}}</view>
+            <view class="file-meta">{{item.meta}}</view>
+          </view>
+          <view class="type-inline">{{item.fileType}}</view>
+          <view class="actions">
+            <view wx:if="{{item.fileType === 'PDF'}}" class="action-btn" data-file="{{item}}" data-action="preview" bindtap="handleFileAction">预览</view>
+            <view wx:if="{{item.canPlay}}" class="action-btn" data-file="{{item}}" data-action="play" bindtap="handleFileAction">播放</view>
+            <view class="action-btn solid" data-file="{{item}}" data-action="open" bindtap="handleFileAction">打开</view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="lesson-card">
+    <view class="sec-head">
+      <view class="mini-title">关联图书馆</view>
+    </view>
+    <view class="info-block">
+      <block wx:for="{{detail.libraryItems}}" wx:key="id">
+        <view class="file-row">
+          <view class="file-no">{{item.no}}</view>
+          <view class="file-main">
+            <view class="clip-title">{{item.title}}</view>
+            <view class="file-meta">{{item.meta}}</view>
+          </view>
+          <view class="type-inline">{{item.fileType}}</view>
+          <view class="actions">
+            <view wx:if="{{item.fileType === 'PDF'}}" class="action-btn" data-file="{{item}}" data-action="preview" bindtap="handleFileAction">预览</view>
+            <view wx:if="{{item.canPlay}}" class="action-btn" data-file="{{item}}" data-action="play" bindtap="handleFileAction">播放</view>
+            <view class="action-btn solid" data-file="{{item}}" data-action="open" bindtap="handleFileAction">打开</view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>

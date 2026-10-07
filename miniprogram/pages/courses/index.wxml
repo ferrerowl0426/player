@@ -1,0 +1,42 @@
+<view class="page course-page">
+  <view class="course-sticky">
+    <view class="type-switch">
+      <view class="type-option {{section === 'knowledge-set' ? 'active' : ''}}" data-section="knowledge-set" bindtap="changeSection">知识点集</view>
+      <view class="type-option {{section === 'track-set' ? 'active' : ''}}" data-section="track-set" bindtap="changeSection">曲目集</view>
+      <view class="type-option {{section === 'knowledge' ? 'active' : ''}}" data-section="knowledge" bindtap="changeSection">知识点</view>
+      <view class="type-option {{section === 'track' ? 'active' : ''}}" data-section="track" bindtap="changeSection">曲目</view>
+    </view>
+
+    <view class="toolbar">
+      <view class="searchbar">
+        <view class="search-icon"></view>
+        <input class="search-input" value="{{keyword}}" placeholder="在当前类型内搜索" bindinput="onKeywordInput" />
+        <view wx:if="{{keyword}}" class="clear-btn" bindtap="clearKeyword">清空</view>
+      </view>
+    </view>
+
+    <view class="list-head">
+      <view class="list-title">{{sectionTitle}}</view>
+      <view class="sort-select">更新时间倒序</view>
+    </view>
+  </view>
+
+  <empty-state wx:if="{{!loading && items.length === 0}}" title="没有找到相关课程" desc="请换个关键词试试。" />
+
+  <view class="course-list">
+    <block wx:for="{{items}}" wx:key="key">
+      <view class="course-card" data-item="{{item}}" bindtap="openCourse">
+        <view class="course-cover {{item.coverTheme}}">
+          <view class="disc"></view>
+          <text class="course-count">{{item.countLabel}}</text>
+        </view>
+        <view class="course-info">
+          <view class="course-name">{{item.title}}</view>
+          <view class="course-meta">{{item.meta}}</view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view class="backtop" bindtap="backToTop">↑</view>
+</view>

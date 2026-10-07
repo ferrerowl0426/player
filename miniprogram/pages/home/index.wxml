@@ -1,0 +1,48 @@
+<view class="page home-page">
+  <view class="home-greeting">{{student.nickname || student.username || '同学'}}，今天练琴了吗?</view>
+
+  <view wx:if="{{student.status === 'disabled'}}" class="disabled-tip">
+    <text class="disabled-strong">停用学生置顶提示：</text>
+    <text>上次老师带你学到了这里，联系老师恢复课程。</text>
+  </view>
+
+
+  <empty-state wx:if="{{!loading && homework.assignments.length === 0}}" title="还没有收到作业" desc="等老师布置后会显示在这里。" />
+
+  <view wx:else class="assignment-box">
+    <view class="assignment-head">
+      <view class="assignment-date">{{homework.assignmentDateText || '今日'}}作业</view>
+      <view class="assignment-teacher">{{homework.teacherName}}<text wx:if="{{homework.assignmentTimeText}}"> · {{homework.assignmentTimeText}}</text></view>
+    </view>
+
+    <view class="requirement-box">
+      <view class="requirement-title">练习要求</view>
+      <view class="requirement-text">{{homework.practiceRequirement || '暂无练习要求'}}</view>
+    </view>
+
+    <view class="requirement-box submit-box">
+      <view class="requirement-title">提交要求</view>
+      <view class="requirement-text">{{homework.submitRequirement || '暂无提交要求'}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{homework.assignments.length}}" class="materials-card">
+    <view class="materials-head">
+      <view class="materials-title">你今日需要用到的课件</view>
+      <view class="materials-hint">点击直达内容</view>
+    </view>
+
+    <block wx:for="{{homework.assignments}}" wx:key="id">
+      <view class="material-card" data-item="{{item}}" bindtap="openAssignment">
+        <view class="material-cover">
+          <text wx:if="{{item.partLabel}}" class="material-part">{{item.partLabel}}</text>
+        </view>
+        <view class="material-info">
+          <view class="material-name">{{item.title}}</view>
+          <view class="material-meta">{{item.materialMeta || item.actionText}}</view>
+          <view class="material-action">{{item.materialAction || '进入详情'}}</view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

@@ -1,0 +1,14 @@
+.banner {
+  border: 3rpx dashed rgba(180, 69, 46, 0.55);
+  background: rgba(255, 252, 242, 0.9);
+  border-radius: 16rpx;
+  padding: 22rpx 24rpx;
+  color: #4f4230;
+  font-size: 24rpx;
+  line-height: 1.7;
+  margin-bottom: 24rpx;
+}
+
+.banner.danger {
+  color: #b4452e;
+}

@@ -1,0 +1,30 @@
+<view class="login-page">
+  <view class="login-head">
+    <view class="login-brand">能学慧吉他教室</view>
+    <view class="login-page-title">学生登录</view>
+    <view class="login-page-desc">固定学生在微信内查看作业、课程、资料和历史记录。</view>
+  </view>
+
+  <view class="login-card">
+    <view class="login-title">进入学习记录</view>
+    <view class="login-desc">本小程序仅供已创建账号的固定学生使用。没有账号或忘记密码请联系老师。</view>
+
+    <view class="field">
+      <text class="field-label">手机号 / 学生账号</text>
+      <input class="input" value="{{account}}" placeholder="请输入学生账号" type="number" bindinput="onAccountInput" />
+    </view>
+
+    <view class="field">
+      <text class="field-label">密码</text>
+      <input class="input" value="{{password}}" placeholder="请输入密码" password bindinput="onPasswordInput" />
+    </view>
+
+    <view wx:if="{{error}}" class="error-text">{{error}}</view>
+
+    <button class="primary-btn login-btn" loading="{{loading}}" bindtap="onLogin">登录并进入</button>
+
+    <button wx:if="{{enableDevPreview}}" class="ghost-btn preview-btn" bindtap="enterPreview">开发预览：直接查看学生端页面</button>
+
+    <view class="login-note">不开放公众注册；账号由老师或教导主任在网页端创建。</view>
+  </view>
+</view>

@@ -1,0 +1,17 @@
+.empty {
+  padding: 68rpx 24rpx;
+  text-align: center;
+  color: #7a6a52;
+}
+
+.empty-title {
+  color: #261d10;
+  font-size: 28rpx;
+  font-weight: 800;
+  margin-bottom: 10rpx;
+}
+
+.empty-desc {
+  font-size: 24rpx;
+  line-height: 1.6;
+}

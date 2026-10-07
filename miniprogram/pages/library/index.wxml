@@ -1,0 +1,31 @@
+<view class="page library-page">
+  <view class="searchbar">
+    <view class="search-icon"></view>
+    <input class="search-input" value="{{keyword}}" placeholder="搜索 PDF 资料、曲谱、讲义" bindinput="onKeywordInput" />
+  </view>
+
+  <empty-state wx:if="{{!loading && items.length === 0}}" title="暂无 PDF 资料" desc="老师上传后会显示在这里。" />
+
+  <view class="library-list" wx:else>
+    <block wx:for="{{items}}" wx:key="id">
+      <view class="pdf-card">
+        <view class="pdf-cover">
+          <view class="pdf-page-icon"></view>
+        </view>
+        <view class="pdf-info">
+          <view class="pdf-title">{{item.title}}</view>
+          <view class="pdf-meta-line">
+            <text>{{item.sizeText}}</text>
+            <text>{{item.updateDateText}}</text>
+          </view>
+          <view class="pdf-actions">
+            <view class="btn-preview" data-id="{{item.id}}" bindtap="previewPdf">预览</view>
+            <view class="btn-download" data-id="{{item.id}}" bindtap="downloadPdf">下载</view>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view class="back-top" bindtap="backToTop">↑</view>
+</view>

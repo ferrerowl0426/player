@@ -1,0 +1,13 @@
+@import "../track-detail/index.wxss";
+
+.knowledge-video {
+  background: #2b2217;
+}
+
+.knowledge-fill {
+  width: 29%;
+}
+
+.knowledge-knob {
+  left: 29%;
+}

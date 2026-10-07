@@ -1,0 +1,42 @@
+<view class="page collection-page">
+  <view class="collection-content">
+    <view class="set-head">
+      <view class="set-cover knowledge-cover">
+        <view class="cover-line line-1"></view>
+        <view class="cover-line line-2"></view>
+        <view class="cover-line line-3"></view>
+      </view>
+      <view class="set-info">
+        <view class="type-tag">{{detail.typeLabel}}</view>
+        <view class="set-title">{{detail.title}}</view>
+        <view class="meta-row">
+          <text>{{detail.totalText}}</text>
+          <text>{{detail.updatedText}}</text>
+        </view>
+      </view>
+      <view class="set-desc">{{detail.desc}}</view>
+    </view>
+
+    <view class="section-head">
+      <view class="section-name">{{detail.sectionTitle}}</view>
+    </view>
+
+    <view class="lesson-list">
+      <view class="lesson-card" wx:for="{{detail.lessons}}" wx:key="id" data-id="{{item.id}}" bindtap="openLesson">
+        <view class="lesson-cover knowledge-lesson-cover">
+          <view class="lesson-lines"></view>
+        </view>
+        <view class="lesson-no">{{item.no}}</view>
+        <view class="lesson-main">
+          <view class="lesson-title">{{item.title}}</view>
+          <view class="lesson-meta">{{item.meta}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-demo">
+      <view class="empty-title">空态样例</view>
+      <view>{{detail.emptyText}}</view>
+    </view>
+  </view>
+</view>

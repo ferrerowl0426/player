@@ -1,0 +1,47 @@
+<view class="page history-page">
+  <view class="search-box">
+    <view class="search-icon"></view>
+    <input class="search-input" value="{{keyword}}" placeholder="搜索老师、曲目、练习要求或提交要求" bindinput="onKeywordInput" />
+  </view>
+
+  <empty-state wx:if="{{!loading && items.length === 0}}" title="暂无历史作业" desc="老师布置作业后会出现在这里和首页。" />
+
+  <view class="record-list" wx:else>
+    <block wx:for="{{items}}" wx:key="operationId">
+      <view class="record-card {{item.deleted ? 'deleted' : ''}}">
+        <view class="rec-top">
+          <view class="rec-date">
+            <view class="rec-date-main">{{item.dateText}} {{item.timeText}}</view>
+          </view>
+          <view class="rec-teacher">{{item.teacherName}}</view>
+        </view>
+
+        <view class="rec-title">{{item.title}}</view>
+
+        <view class="work-list">
+          <block wx:for="{{item.assignments}}" wx:key="id" wx:for-item="assignment" wx:for-index="idx">
+            <view class="work-row">
+              <view class="work-no">{{idx + 1 < 10 ? '0' + (idx + 1) : idx + 1}}</view>
+              <view class="work-title">{{assignment.title}}</view>
+              <view class="work-type">{{assignment.typeLabel}}</view>
+            </view>
+          </block>
+        </view>
+
+        <view class="msg-box">
+          <view class="msg" wx:if="{{item.practiceRequirement}}">
+            <view class="msg-title">练习要求</view>
+            <view class="msg-text">{{item.practiceRequirement}}</view>
+          </view>
+          <view class="msg" wx:if="{{item.submitRequirement}}">
+            <view class="msg-title">提交要求</view>
+            <view class="msg-text">{{item.submitRequirement}}</view>
+          </view>
+          <view class="delete-note" wx:if="{{item.deleted}}">已删除 · {{item.deleteReason}}</view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view class="back-top" bindtap="backToTop">↑</view>
+</view>

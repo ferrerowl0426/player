@@ -7,6 +7,7 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  GetObjectCommand,
   UploadPartCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -76,6 +77,15 @@ export async function createUploadUrl({ key, contentType }) {
   });
 
   return getSignedUrl(presignClient, command, { expiresIn: 10 * 60 });
+}
+
+export async function createDownloadUrl({ key, expiresIn = 10 * 60 }) {
+  const command = new GetObjectCommand({
+    Bucket: config.s3.bucket,
+    Key: key
+  });
+
+  return getSignedUrl(presignClient, command, { expiresIn });
 }
 
 // 创建腾讯云 COS Multipart Upload。

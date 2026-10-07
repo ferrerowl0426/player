@@ -1,0 +1,49 @@
+.preview-box {
+  height: 460rpx;
+  border: 3rpx dashed #c9b795;
+  border-radius: 18rpx;
+  background: #fffaf0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #7a6a52;
+  margin-bottom: 20rpx;
+}
+
+.preview-title {
+  color: #5d4326;
+  font-size: 36rpx;
+  font-weight: 900;
+  letter-spacing: 2rpx;
+  margin-bottom: 8rpx;
+}
+
+.rule-card {
+  margin-top: 24rpx;
+}
+
+.pdf-native-page {
+  min-height: 100vh;
+  padding: 0;
+  background: #ffffff;
+}
+
+.native-pdf-box {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  text-align: center;
+  background: #ffffff;
+}
+
+.native-note {
+  max-width: 560rpx;
+  margin-top: 18rpx;
+  color: #7a6a52;
+  font-size: 22rpx;
+  line-height: 1.7;
+}

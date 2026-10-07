@@ -1,0 +1,227 @@
+.collection-page {
+  padding: 0 0 140rpx;
+}
+
+.collection-content {
+  padding: 26rpx 28rpx 0;
+}
+
+.set-head {
+  background: rgba(255, 255, 255, 0.97);
+  border: 2rpx solid #c9b795;
+  border-radius: 20rpx;
+  box-shadow: 0 4rpx 18rpx rgba(93, 67, 38, 0.08);
+  padding: 24rpx;
+  display: grid;
+  grid-template-columns: 192rpx minmax(0, 1fr);
+  gap: 20rpx 24rpx;
+  align-items: center;
+}
+
+.set-cover {
+  width: 192rpx;
+  height: 192rpx;
+  border: 2rpx solid rgba(93, 67, 38, 0.28);
+  border-radius: 16rpx;
+  background: #fffaf2;
+  position: relative;
+  overflow: hidden;
+}
+
+.set-cover::before {
+  content: "";
+  position: absolute;
+  inset: 16rpx;
+  border: 2rpx solid rgba(93, 67, 38, 0.16);
+  background: #f7f1e6;
+}
+
+.knowledge-cover::before {
+  background: #f7f1e6;
+}
+
+.cover-line {
+  position: absolute;
+  left: 30rpx;
+  right: 30rpx;
+  height: 2rpx;
+  background: rgba(93, 67, 38, 0.22);
+  z-index: 2;
+}
+
+.line-1 { top: 104rpx; }
+.line-2 { top: 128rpx; }
+.line-3 { top: 152rpx; }
+
+.set-info {
+  min-width: 0;
+  min-height: 192rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.type-tag {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  width: auto;
+  height: 44rpx;
+  padding: 0 14rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid #c9b795;
+  background: #f7f1e6;
+  color: #5d4326;
+  font-size: 20rpx;
+  font-weight: 900;
+  margin-bottom: 14rpx;
+}
+
+.set-title {
+  color: #261d10;
+  font-size: 38rpx;
+  line-height: 1.28;
+  font-weight: 900;
+  letter-spacing: 1rpx;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 16rpx;
+}
+
+.meta-row text {
+  height: 44rpx;
+  display: inline-flex;
+  align-items: center;
+  border: 2rpx solid rgba(201, 183, 149, 0.72);
+  border-radius: 8rpx;
+  padding: 0 14rpx;
+  background: #ffffff;
+  color: #7a6a52;
+  font-size: 20rpx;
+}
+
+.set-desc {
+  grid-column: 1 / -1;
+  border-top: 2rpx solid rgba(221, 208, 180, 0.72);
+  padding-top: 20rpx;
+  color: #4f4230;
+  font-size: 24rpx;
+  line-height: 1.72;
+}
+
+.section-head {
+  margin: 30rpx 4rpx 18rpx;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.section-name {
+  color: #261d10;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.lesson-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.lesson-card {
+  min-height: 132rpx;
+  background: rgba(255, 255, 255, 0.97);
+  border: 2rpx solid #ddd0b4;
+  border-radius: 18rpx;
+  padding: 16rpx;
+  display: grid;
+  grid-template-columns: 96rpx 58rpx minmax(0, 1fr);
+  gap: 18rpx;
+  align-items: center;
+  box-shadow: 0 3rpx 14rpx rgba(93, 67, 38, 0.06);
+}
+
+.lesson-cover {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid rgba(93, 67, 38, 0.20);
+  background:
+    linear-gradient(135deg, rgba(255,127,0,0.12), transparent 42%),
+    linear-gradient(180deg, #fffdf7, #efe8d8);
+  position: relative;
+  overflow: hidden;
+}
+
+.lesson-lines,
+.lesson-lines::before,
+.lesson-lines::after {
+  position: absolute;
+  left: 18rpx;
+  right: 18rpx;
+  height: 2rpx;
+  background: rgba(93, 67, 38, 0.24);
+  content: "";
+}
+
+.lesson-lines { top: 38rpx; }
+.lesson-lines::before { top: 18rpx; left: 0; right: 0; }
+.lesson-lines::after { top: 36rpx; left: 0; right: 0; }
+
+.lesson-no {
+  color: #7a4a26;
+  font-size: 26rpx;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.lesson-main {
+  min-width: 0;
+}
+
+.lesson-title {
+  color: #261d10;
+  font-size: 28rpx;
+  line-height: 1.35;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lesson-meta {
+  margin-top: 8rpx;
+  color: #7a6a52;
+  font-size: 22rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-demo {
+  margin-top: 22rpx;
+  border: 2rpx dashed #c9b795;
+  border-radius: 16rpx;
+  background: rgba(255, 250, 242, 0.78);
+  padding: 22rpx;
+  color: #7a6a52;
+  font-size: 23rpx;
+  line-height: 1.65;
+}
+
+.empty-title {
+  color: #5d4326;
+  font-size: 25rpx;
+  font-weight: 900;
+  margin-bottom: 8rpx;
+}

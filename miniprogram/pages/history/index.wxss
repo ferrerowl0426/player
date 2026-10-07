@@ -1,0 +1,208 @@
+.history-page {
+  padding-bottom: 132rpx;
+}
+
+.search-box {
+  height: 84rpx;
+  border: 3rpx solid #5d4326;
+  border-radius: 16rpx;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 0 24rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 4rpx 18rpx rgba(93, 67, 38, 0.07);
+}
+
+.search-icon {
+  flex: none;
+  width: 30rpx;
+  height: 30rpx;
+  border: 4rpx solid #7a6a52;
+  border-radius: 50%;
+  position: relative;
+}
+
+.search-icon::after {
+  content: "";
+  position: absolute;
+  right: -10rpx;
+  bottom: -8rpx;
+  width: 16rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: #7a6a52;
+  transform: rotate(45deg);
+}
+
+.search-input {
+  min-width: 0;
+  flex: 1;
+  height: 78rpx;
+  color: #261d10;
+  font-size: 26rpx;
+}
+
+.record-list {
+  display: grid;
+  gap: 22rpx;
+}
+
+.record-card {
+  border: 2rpx solid #c9b795;
+  border-radius: 20rpx;
+  background: #ffffff;
+  padding: 24rpx;
+  box-shadow: 0 4rpx 18rpx rgba(93, 67, 38, 0.08);
+}
+
+.record-card.deleted {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.record-card.deleted .rec-top,
+.record-card.deleted .rec-title,
+.record-card.deleted .work-list,
+.record-card.deleted .msg-box {
+  opacity: 0.52;
+}
+
+.rec-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding-bottom: 18rpx;
+  margin-bottom: 18rpx;
+  border-bottom: 2rpx solid rgba(221, 208, 180, 0.75);
+}
+
+.rec-date {
+  min-width: 0;
+}
+
+.rec-date-main {
+  color: #261d10;
+  font-size: 30rpx;
+  line-height: 1.35;
+  font-weight: 950;
+  letter-spacing: 1rpx;
+}
+
+.rec-teacher {
+  flex: none;
+  color: #5d4326;
+  font-size: 22rpx;
+  line-height: 1.45;
+  font-weight: 850;
+}
+
+.rec-title {
+  color: #261d10;
+  font-size: 30rpx;
+  line-height: 1.42;
+  font-weight: 900;
+  margin-bottom: 14rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.work-list {
+  border: 2rpx solid rgba(221, 208, 180, 0.82);
+  border-radius: 16rpx;
+  background: #ffffff;
+  margin-bottom: 18rpx;
+  overflow: hidden;
+}
+
+.work-row {
+  min-height: 68rpx;
+  display: grid;
+  grid-template-columns: 48rpx minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16rpx;
+  padding: 12rpx 18rpx;
+  border-bottom: 2rpx solid rgba(221, 208, 180, 0.62);
+}
+
+.work-row:last-child {
+  border-bottom: 0;
+}
+
+.work-no {
+  color: #5d4326;
+  font-size: 20rpx;
+  font-weight: 950;
+}
+
+.work-title {
+  min-width: 0;
+  color: #261d10;
+  font-size: 24rpx;
+  line-height: 1.45;
+  font-weight: 850;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.work-type {
+  color: #5d4326;
+  font-size: 20rpx;
+  line-height: 1.45;
+  font-weight: 850;
+}
+
+.msg-box {
+  display: grid;
+  gap: 14rpx;
+}
+
+.msg {
+  border: 2rpx solid rgba(194, 181, 158, 0.42);
+  border-radius: 16rpx;
+  background: #f6f3ee;
+  padding: 16rpx 18rpx;
+}
+
+.msg-title {
+  color: #5d4326;
+  font-size: 22rpx;
+  font-weight: 950;
+  margin-bottom: 6rpx;
+}
+
+.msg-text {
+  color: #4f4230;
+  font-size: 23rpx;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.delete-note {
+  color: #b4452e;
+  font-size: 22rpx;
+  line-height: 1.5;
+  padding: 2rpx 0 0;
+}
+
+.back-top {
+  position: fixed;
+  right: 28rpx;
+  bottom: 148rpx;
+  z-index: 40;
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 50%;
+  border: 2rpx solid #c9b795;
+  background: rgba(255, 255, 255, 0.96);
+  color: #5d4326;
+  font-size: 34rpx;
+  line-height: 72rpx;
+  text-align: center;
+  font-weight: 950;
+  box-shadow: 0 8rpx 24rpx rgba(93, 67, 38, 0.14);
+}

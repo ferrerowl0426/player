@@ -11,6 +11,7 @@ import { knowledgeRouter } from './knowledge.routes.js';
 import { prerequisiteRouter } from './prerequisites.routes.js';
 import { libraryRouter } from './library.routes.js';
 import { videoRouter } from './videos.routes.js';
+import { miniprogramRouter } from './miniprogram.routes.js';
 
 const app = express();
 
@@ -84,6 +85,9 @@ app.use('/api/library', libraryRouter);
 // 视频相关接口统一挂载到 /api/videos。
 app.use('/api/videos', videoRouter);
 
+// 小程序学生端专用接口统一挂载到 /api/miniprogram。
+app.use('/api/miniprogram', miniprogramRouter);
+
 // 统一错误处理中间件。
 // Express 中只要 next(error)，最后都会进入这里。
 app.use((error, req, res, next) => {
@@ -98,6 +102,7 @@ ensureAppSchema()
   .then(() => {
     app.listen(config.port, () => {
       console.log(`后端服务已启动：http://localhost:${config.port}`);
+      console.log('小程序学生端接口已挂载：http://localhost:%s/api/miniprogram', config.port);
     });
   })
   .catch((error) => {

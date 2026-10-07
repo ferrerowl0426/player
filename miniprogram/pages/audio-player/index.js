@@ -36,6 +36,7 @@ Page({
     fileSource: 'library',
     title: '',
     source: '',
+    coverUrl: '',
     audioFormat: 'MP3',
     loading: false,
     playing: false,
@@ -58,6 +59,7 @@ Page({
       fileSource: options.fileSource || options.sourceType || 'library',
       title: options.title ? decodeURIComponent(options.title) : '',
       source: options.source ? decodeURIComponent(options.source) : '',
+      coverUrl: options.coverUrl ? decodeURIComponent(options.coverUrl) : '',
       audioFormat: getFormat(options)
     });
   },
@@ -67,6 +69,10 @@ Page({
     if (!this.audio && this.data.fileId) {
       this.prepareAudio();
     }
+  },
+
+  onHide() {
+    this.destroyAudio();
   },
 
   onUnload() {

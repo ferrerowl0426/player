@@ -728,9 +728,10 @@ docker ps --filter publish=3000 --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
 前端分片上传
   -> COS: tracks/<曲目id>/<uuid>.mp4 或 knowledge/<知识点id>/<uuid>.mp4
   -> CI 工作流（输入路径 tracks/ 或 knowledge/）自动触发
-  -> 输出: transcoded/720p/${InputName}_720p.mp4、transcoded/1080p/${InputName}_1080p.mp4
-  -> CI 回调: POST https://api.nxhguitar.com/api/videos/transcode/callback?token=<CI_CALLBACK_SECRET>
-  -> 后端解析 TaskFinish 报文 -> 源文件 key 反查 videos.id -> 写 video_renditions 对应档位为 ready + 转码地址
+  -> 输出: tracks/<曲目id>/<uuid>-720p.mp4、tracks/<曲目id>/<uuid>-1080p.mp4
+          或 knowledge/<知识点id>/<uuid>-720p.mp4、knowledge/<知识点id>/<uuid>-1080p.mp4
+  -> CI 工作流完成回调: POST https://api.nxhguitar.com/api/videos/transcode/callback?token=<CI_CALLBACK_SECRET>
+  -> 后端解析 WorkflowExecution.Tasks[].ResultInfo.ObjectInfo[] -> 源文件 key 反查 videos.id -> 写 video_renditions 对应档位为 ready + 转码地址
 ```
 
 ### 17.3 控制台配置要点（两个工作流）
@@ -738,16 +739,19 @@ docker ps --filter publish=3000 --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
 | 项目 | tracks 工作流 | knowledge 工作流 |
 |---|---|---|
 | 输入路径 | `tracks/` | `knowledge/` |
-| 输出目录 | `transcoded/720p/`（720p 节点）、`transcoded/1080p/`（1080p 节点） | 同左 |
-| 输出文件名 | `${InputName}_720p.${ext}` / `${InputName}_1080p.${ext}` | 同左 |
+| 上传触发执行 | 开启 | 开启 |
+| 720p 节点输出路径 | `${InputPath}` | `${InputPath}` |
+| 1080p 节点输出路径 | `${InputPath}` | `${InputPath}` |
+| 输出文件名 | `${InputName}-720p.${ext}` / `${InputName}-1080p.${ext}` | 同左 |
 | 模板 | H264-MP4-高清（1280px）/ H264-MP4-全高清（1920px） | 同左 |
-| 回调 | 自定义回调配置 + HTTP 回调，格式 **JSON**，只勾「任务完成回调」 | 同左 |
+| 回调 | 自定义回调配置 + HTTP 回调，格式 **JSON**，勾「工作流完成回调」 | 同左 |
 
 必须注意：
 
 - 输入路径**结尾必须带斜杠**（`tracks/`）；**留空表示整桶生效**，会把封面、附件和转码产物一起卷进来，形成循环转码刷费用。
-- 转码节点的目标路径**必须从默认的 `${InputPath}` 改掉**，否则结果写回 `tracks/` / `knowledge/`，自己触发自己。
-- `${RunId}` 是工作流实例 ID，同一工作流的两个转码节点共用同一个值，所以两个节点**不能**用同一个输出文件名，否则互相覆盖。
+- 转码节点输出路径保持 `${InputPath}`：控制台实测 `${InputPath}` 已包含完整源目录（如 `tracks/25/`），不要写 `tracks/${InputPath}` 或 `knowledge/${InputPath}`，否则会生成 `tracks/tracks/...` / `knowledge/knowledge/...`。
+- 两个节点必须使用不同文件名：`${InputName}-720p.${ext}` / `${InputName}-1080p.${ext}`，不要使用同名输出，避免互相覆盖。
+- 文件名必须使用连字符 `-720p` / `-1080p`；后端会拒绝 `_720p` / `_1080p` 这类非当前约定产物。
 - 两个节点都关闭「闲时转码」（闲时资源最长 72 小时才处理，教学场景等不起）；倍速转码、水印保持关闭。
 - 工作流默认关闭，保存后需**启用**，约 5 分钟生效；**启用状态下不能编辑**，要改先暂停。
 - 存量视频不会自动转码，需要在工作流里用「测试 / 创建执行实例」手动触发，可分批做。
@@ -756,22 +760,34 @@ docker ps --filter publish=3000 --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
 
 | 文件 | 职责 |
 |---|---|
-| [transcode.js](file:///c:/Users/user/Desktop/播放器/backend/src/transcode.js) | `parseCiCallbackPayload` 解析 TaskFinish 报文；`resolveTranscodeQuality` 按产物路径 / 画面长边判定档位（竖屏也能判对）；`findVideoIdBySourceKey` 用源 key 反查 `videos.id`；`verifyCiCallbackRequest` 校验回调身份 |
-| [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js) | `POST /api/videos/transcode/callback`：验签 → 解析 → 反查 → 写档位状态；失败写 `failed`，回调一律返回 200 避免 CI 反复重试 |
-| [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) | `publicKeyPrefixes` 已加入 `transcoded/`，转码产物才能生成公开地址 |
+| [transcode.js](file:///c:/Users/user/Desktop/播放器/backend/src/transcode.js) | `parseCiWorkflowCallbackPayload` 解析工作流完成回调真实结构 `WorkflowExecution.Tasks[].ResultInfo.ObjectInfo[]`；`resolveTranscodeQuality` 按产物路径 / 画面长边判定档位；`isAllowedCiOutputKey` 校验产物必须与源视频同目录且文件名为 `原名-720p/-1080p`；`findVideoIdBySourceKey` 用源 key 反查 `videos.id`；`verifyCiCallbackRequest` 校验回调身份 |
+| [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js) | `POST /api/videos/transcode/callback`：验签 → 解析工作流任务 → 反查视频 → HeadObject 确认产物存在 → 写档位状态；失败写 `failed`，无效产物返回 400 便于排查 |
+| [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) | `publicKeyPrefixes` 允许 `tracks/` / `knowledge/` / `transcoded/` 等公开视频 key 生成公开地址 |
 
 回调安全策略（重要）：
 
 - 密钥来自环境变量 `CI_CALLBACK_SECRET`（服务器根目录 `/root/player/.env`；`docker-compose.yml` 的 backend 用这个文件；本地直接跑后端时读 `backend/.env`）。
 - **未配置密钥时回调接口一律拒绝**（返回 503），不会像旧实现那样「没配密钥就放行」——那个写法等于任何人构造一个 POST 就能伪造回调。
 - 回调 URL 用 `?token=<CI_CALLBACK_SECRET>` 传密钥（CI 控制台没有密钥配置项）；另保留 HMAC 签名头校验分支备用。
-- 额外两道防御：产物 key 必须以 `transcoded/` 开头；并用 HeadObject 确认产物确实存在（只有 404 才拒绝，网络抖动类异常放行不丢结果）。
+- 额外防御：产物 key 必须满足“源目录同级 + 原文件名后追加 `-720p/-1080p`”，或兼容旧 `transcoded/` 前缀；并用 HeadObject 确认产物确实存在（只有 404 才拒绝，网络抖动类异常放行不丢结果）。
 
-配好后验证：在工作流手动跑一个 `tracks/` 下的小视频，后端日志会出现 `[ci-callback] { state, inputKey, outputKey, quality }`，桶里应出现 `transcoded/720p/` 与 `transcoded/1080p/` 两个文件，播放页画质菜单能看到并切换 720P / 1080P。
+配好后验证：在工作流手动跑一个 `tracks/` 下的小视频，后端日志应出现 `[ci-callback-job]` 且包含非空 `outputKey` 与 `quality`，随后出现“已登记转码结果”；桶里应出现 `tracks/<曲目id>/<uuid>-720p.mp4` 与 `tracks/<曲目id>/<uuid>-1080p.mp4`，播放页画质菜单能看到并切换 720P / 1080P。
 
-控制台逐步操作指南与交接说明：
+排查命令：
+
+```bash
+cd /root/player
+
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml logs --tail=300 backend | grep -i ci-callback
+
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml exec postgres \
+psql -U postgres -d video_player -c "SELECT video_id, quality, status, video_url, file_size, updated_at FROM video_renditions WHERE video_id = <视频ID> ORDER BY quality;"
+```
+
+控制台逐步操作指南与问题复盘：
 
 - [debug复盘/2026-10-01-腾讯云数据万象转码接入操作指南.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-10-01-腾讯云数据万象转码接入操作指南.md)
+- [debug复盘/2026-10-04-数据万象工作流回调与清晰度不显示复盘.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-10-04-数据万象工作流回调与清晰度不显示复盘.md)
 
 ---
 
@@ -784,3 +800,4 @@ docker ps --filter publish=3000 --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
 | 2026-10-01 | 公安备案通过，临时配置全部恢复，未登录正常跳转 `/login` |
 | 2026-10-01 | 新增腾讯云数据万象转码接入操作指南 |
 | 2026-10-03 | 播放器控制栏改为 上一P / 播放 / 下一P 布局；默认超管仅在无超管时创建且禁止删除；`prerequisites` 视频封面字段改用 `cover_url` 修复详情页 500；实现数据万象转码回调（真实报文解析 + 回调密钥校验 + `transcoded/` 公开地址） |
+| 2026-10-04 | 数据万象转码产物改为输出到源目录同级（`${InputPath}` + `${InputName}-720p/-1080p.${ext}`），修复工作流完成回调真实结构 `WorkflowExecution.Tasks[].ResultInfo.ObjectInfo[]` 解析，解决 COS 已生成转码文件但前端只显示原画的问题 |

@@ -35,6 +35,7 @@
     <block wx:for="{{homework.assignments}}" wx:key="id">
       <view class="material-card" data-item="{{item}}" bindtap="openAssignment">
         <view class="material-cover">
+          <image wx:if="{{item.coverUrl}}" class="material-cover-img" src="{{item.coverUrl}}" mode="aspectFill" />
           <text wx:if="{{item.partLabel}}" class="material-part">{{item.partLabel}}</text>
         </view>
         <view class="material-info">

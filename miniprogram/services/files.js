@@ -56,9 +56,14 @@ async function openLibraryFile(file) {
   const type = getFileType(file);
 
   if (type === 'mp3') {
-    wx.navigateTo({
-      url: `/pages/audio-player/index?fileId=${file.id}&fileSource=${encodeURIComponent(file.fileSource || file.sourceType || 'library')}&title=${encodeURIComponent(file.title || '')}&source=${encodeURIComponent(file.source || file.sourceText || '资料库')}`
-    });
+    const query = [
+      `fileId=${encodeURIComponent(file.id)}`,
+      `fileSource=${encodeURIComponent(file.fileSource || file.sourceType || 'library')}`,
+      `title=${encodeURIComponent(file.title || '')}`,
+      `source=${encodeURIComponent(file.sourceTitle || file.courseTitle || file.source || file.sourceText || '资料库')}`,
+      `coverUrl=${encodeURIComponent(file.coverUrl || file.cover_url || '')}`
+    ].join('&');
+    wx.navigateTo({ url: `/pages/audio-player/index?${query}` });
     return;
   }
 

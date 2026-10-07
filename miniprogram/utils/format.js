@@ -108,6 +108,7 @@ function getFileType(item = {}) {
   if (text.includes('mpeg') || text.includes('mp3') || text.endsWith('.mp3')) return 'MP3';
   if (text.includes('png') || text.endsWith('.png')) return 'PNG';
   if (text.includes('jpeg') || text.includes('jpg') || text.endsWith('.jpg') || text.endsWith('.jpeg')) return 'JPG';
+  if (text.includes('octet-stream')) return 'FILE';
 
   const normalized = text.replace(/^application\//, '').replace(/^audio\//, '').replace(/^image\//, '').replace('.', '').toUpperCase();
   return normalized || 'FILE';

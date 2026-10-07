@@ -7,8 +7,11 @@
   <view class="audio-card">
     <view class="info-head">
       <view class="audio-mark">
-        <view class="pick"></view>
-        <view class="wave-bars"><text></text><text></text><text></text><text></text><text></text></view>
+        <image wx:if="{{coverUrl}}" class="audio-cover" src="{{coverUrl}}" mode="aspectFill" />
+        <block wx:else>
+          <view class="pick"></view>
+          <view class="wave-bars"><text></text><text></text><text></text><text></text><text></text></view>
+        </block>
       </view>
       <view class="audio-title-wrap">
         <view class="audio-title">{{title || '音频文件'}}</view>
@@ -25,13 +28,7 @@
       <slider value="{{progress}}" bindchanging="onSeeking" bindchange="onSeekEnd" activeColor="#ff7f00" backgroundColor="#e7dac2" block-color="#5d4326" block-size="14" />
     </view>
     <view class="transport">
-      <view class="transport-icon loop-icon {{loop ? 'active' : ''}}" bindtap="toggleLoop">
-        <svg class="loop-svg" viewBox="0 0 56 44">
-          <path class="loop-path" d="M38 8 C30 1 15 3 8 11 C1 19 4 31 14 35 C22 38 34 35 40 28" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
-          <path class="loop-head" d="M37 4 L49 9 L39 16 Z" fill="currentColor"/>
-          <text class="loop-one" x="26" y="26" text-anchor="middle">1</text>
-        </svg>
-      </view>
+      <view class="transport-icon loop-toggle {{loop ? 'active' : ''}}" bindtap="toggleLoop">循环</view>
       <view class="transport-icon rewind-icon" bindtap="rewind"><view></view><text></text></view>
       <view class="transport-icon play-button" bindtap="togglePlay">
         <view wx:if="{{playing}}" class="pause-shape"><text></text><text></text></view>

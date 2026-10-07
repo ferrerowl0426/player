@@ -13,10 +13,12 @@ function buildDetail(raw = {}) {
     sectionTitle: '收录单课',
     sectionDesc: '合集内展示单课封面',
     emptyText: '如果合集内单课被删除或暂不可见，学生端只显示暂无可学习内容。',
+    coverUrl: raw.coverUrl || raw.cover_url || raw.cover || '',
     lessons: items.map((item, index) => ({
       ...item,
       no: String(index + 1).padStart(2, '0'),
       title: item.title || '未命名单课',
+      coverUrl: item.coverUrl || item.cover_url || item.cover || '',
       meta: item.meta || item.updateDateText || '点击进入详情'
     }))
   };

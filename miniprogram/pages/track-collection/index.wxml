@@ -2,9 +2,12 @@
   <view class="collection-content">
     <view class="set-head">
       <view class="set-cover track-cover">
-        <view class="cover-line line-1"></view>
-        <view class="cover-line line-2"></view>
-        <view class="cover-line line-3"></view>
+        <image wx:if="{{detail.coverUrl}}" class="set-cover-img" src="{{detail.coverUrl}}" mode="aspectFill" />
+        <block wx:else>
+          <view class="cover-line line-1"></view>
+          <view class="cover-line line-2"></view>
+          <view class="cover-line line-3"></view>
+        </block>
       </view>
       <view class="set-info">
         <view class="type-tag">{{detail.typeLabel}}</view>
@@ -24,7 +27,8 @@
     <view class="lesson-list">
       <view class="lesson-card" wx:for="{{detail.lessons}}" wx:key="id" data-id="{{item.id}}" bindtap="openLesson">
         <view class="lesson-cover">
-          <view class="lesson-lines"></view>
+          <image wx:if="{{item.coverUrl}}" class="lesson-cover-img" src="{{item.coverUrl}}" mode="aspectFill" />
+          <view wx:else class="lesson-lines"></view>
         </view>
         <view class="lesson-no">{{item.no}}</view>
         <view class="lesson-main">

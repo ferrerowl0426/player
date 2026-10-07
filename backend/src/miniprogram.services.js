@@ -49,8 +49,12 @@ function pagination(page, pageSize, total) {
 
 function assignmentTarget(row) {
   const objectType = row.object_type || 'video';
-  const objectId = row.object_id || row.video_id;
   const partId = row.part_id || '';
+  let objectId = row.object_id || row.video_id;
+
+  if (objectType === 'track_part') objectId = row.parent_track_id || row.object_id || row.video_id;
+  if (objectType === 'knowledge_part') objectId = row.parent_knowledge_id || row.object_id || row.video_id;
+
   const target = { type: objectType, id: objectId ? String(objectId) : '', partId: partId ? String(partId) : '' };
 
   if (objectType === 'track_collection') target.page = 'track-collection';
@@ -106,6 +110,8 @@ export async function getTodayHomework(student) {
             ${assignmentTitleSql()} AS title,
             ${assignmentCoverSql()} AS cover_url,
             COALESCE(tpart.part_no, kpart.part_no) AS part_no,
+            parent_tp.id AS parent_track_id,
+            parent_kp.id AS parent_knowledge_id,
             COALESCE(a.nickname, a.username, a.account, '') AS teacher_name
        FROM user_assignments ua
        ${assignmentJoinsSql()}
@@ -171,6 +177,8 @@ export async function getHomeworkHistory(student, { page = 1, pageSize = 20 } = 
             ${assignmentTitleSql()} AS title,
             ${assignmentCoverSql()} AS cover_url,
             COALESCE(tpart.part_no, kpart.part_no) AS part_no,
+            parent_tp.id AS parent_track_id,
+            parent_kp.id AS parent_knowledge_id,
             COALESCE(a.nickname, a.username, a.account, '') AS teacher_name
        FROM user_assignments ua
        ${assignmentJoinsSql()}
@@ -270,6 +278,18 @@ export async function listKnowledge(query) {
   return listContent({ table: 'knowledge_points', collectionTable: '', kind: 'knowledge_point', ...query });
 }
 
+function formatRendition(row = {}) {
+  const quality = String(row.quality || 'source');
+  return {
+    quality,
+    label: quality === 'source' ? '原画' : quality.toUpperCase(),
+    videoUrl: normalizePublicUrl(row.video_url || ''),
+    fileSize: Number(row.file_size || 0),
+    status: row.status || '',
+    updatedAt: row.updated_at || ''
+  };
+}
+
 async function getParts(table, parentColumn, parentId) {
   const result = await pool.query(
     `SELECT p.id, p.part_no, p.title, p.duration, p.video_id, v.video_url, v.cover_url
@@ -280,16 +300,46 @@ async function getParts(table, parentColumn, parentId) {
     [parentId]
   );
 
-  return result.rows.map((row) => ({
-    id: String(row.id),
-    partNo: row.part_no,
-    title: row.title,
-    duration: row.duration,
-    durationText: durationText(row.duration),
-    videoId: row.video_id ? String(row.video_id) : '',
-    videoUrl: normalizePublicUrl(row.video_url || ''),
-    coverUrl: normalizePublicUrl(row.cover_url || '')
-  }));
+  const videoIds = result.rows.map((row) => row.video_id).filter(Boolean);
+  const renditionsByVideoId = new Map();
+
+  if (videoIds.length > 0) {
+    const renditions = await pool.query(
+      `SELECT video_id, quality, video_url, file_size, status, updated_at
+         FROM video_renditions
+        WHERE video_id = ANY($1::int[])
+          AND status = 'ready'
+          AND video_url <> ''
+        ORDER BY CASE quality WHEN 'source' THEN 1 WHEN '1080p' THEN 2 WHEN '720p' THEN 3 ELSE 4 END`,
+      [videoIds]
+    );
+
+    for (const row of renditions.rows) {
+      const list = renditionsByVideoId.get(row.video_id) || [];
+      list.push(formatRendition(row));
+      renditionsByVideoId.set(row.video_id, list);
+    }
+  }
+
+  return result.rows.map((row) => {
+    const sourceUrl = normalizePublicUrl(row.video_url || '');
+    const renditions = renditionsByVideoId.get(row.video_id) || [];
+    if (sourceUrl && !renditions.some((item) => item.quality === 'source')) {
+      renditions.unshift({ quality: 'source', label: '原画', videoUrl: sourceUrl, fileSize: 0, status: 'ready', updatedAt: '' });
+    }
+
+    return {
+      id: String(row.id),
+      partNo: row.part_no,
+      title: row.title,
+      duration: row.duration,
+      durationText: durationText(row.duration),
+      videoId: row.video_id ? String(row.video_id) : '',
+      videoUrl: sourceUrl,
+      coverUrl: normalizePublicUrl(row.cover_url || ''),
+      renditions
+    };
+  });
 }
 
 export async function getTrackDetail(id) {

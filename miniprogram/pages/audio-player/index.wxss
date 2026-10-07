@@ -60,6 +60,12 @@
   overflow: hidden;
 }
 
+.audio-cover {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .pick {
   width: 42rpx;
   height: 54rpx;
@@ -194,24 +200,19 @@
   color: #5d4326;
 }
 
-.loop-icon {
-  color: #c9b795;
+.loop-toggle {
+  width: 88rpx;
+  height: 52rpx;
+  justify-self: center;
+  color: rgba(93, 67, 38, 0.46);
+  background: transparent;
+  font-size: 22rpx;
+  font-weight: 950;
+  line-height: 52rpx;
 }
 
-.loop-icon.active {
+.loop-toggle.active {
   color: #5d4326;
-}
-
-.loop-svg {
-  width: 56rpx;
-  height: 44rpx;
-  display: block;
-}
-
-.loop-one {
-  fill: currentColor;
-  font-size: 17px;
-  font-weight: 800;
 }
 
 .rewind-icon,

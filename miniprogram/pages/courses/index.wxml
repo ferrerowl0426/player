@@ -27,7 +27,8 @@
     <block wx:for="{{items}}" wx:key="key">
       <view class="course-card" data-item="{{item}}" bindtap="openCourse">
         <view class="course-cover {{item.coverTheme}}">
-          <view class="disc"></view>
+          <image wx:if="{{item.coverUrl}}" class="course-cover-img" src="{{item.coverUrl}}" mode="aspectFill" />
+          <view wx:else class="disc"></view>
           <text class="course-count">{{item.countLabel}}</text>
         </view>
         <view class="course-info">

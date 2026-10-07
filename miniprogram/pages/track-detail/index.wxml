@@ -1,15 +1,25 @@
 <view class="page lesson-page">
-  <view class="player">
-    <view class="video">
-      <view class="play"></view>
-    </view>
-    <view class="vctrl">
-      <view class="pause-icon"></view>
-      <view class="pbar"><view class="pbar-fill"></view><view class="knob"></view></view>
-      <view class="ctime">{{detail.progressText}}</view>
-      <view class="vselect">{{detail.quality}}</view>
-      <view class="vselect">1.0x</view>
-      <view class="fullscreen-icon"><view class="fs-corner tl"></view><view class="fs-corner tr"></view><view class="fs-corner bl"></view><view class="fs-corner br"></view></view>
+  <view class="player {{isFullscreen ? 'fullscreen' : ''}}">
+    <video wx:if="{{detail.currentPart.videoUrl}}" id="lessonVideo" class="video-player" src="{{detail.currentPart.videoUrl}}" poster="{{detail.currentPart.coverUrl || detail.coverUrl}}" autoplay controls="{{false}}" enable-progress-gesture show-fullscreen-btn="{{false}}" show-play-btn="{{false}}" show-center-play-btn="{{false}}" show-casting-button="{{false}}" object-fit="contain" direction="{{videoDirection}}" bindloadedmetadata="handleVideoLoadedMeta" bindplay="handleVideoPlay" bindpause="handleVideoPause" bindtimeupdate="handleVideoTimeUpdate" bindended="handleVideoEnded" bindfullscreenchange="handleFullscreenChange">
+      <cover-view class="video-controls {{isFullscreen ? 'full' : 'compact'}}">
+        <cover-view wx:if="{{isFullscreen}}" class="ctrl-btn part-ctrl prev-ctrl" data-step="-1" bindtap="switchPartByStep"><cover-view class="bar"></cover-view><cover-view class="tri left"></cover-view></cover-view>
+        <cover-view class="ctrl-btn icon-ctrl" bindtap="togglePlay">{{isPlaying ? 'Ⅱ' : '▶'}}</cover-view>
+        <cover-view wx:if="{{isFullscreen}}" class="ctrl-btn part-ctrl next-ctrl" data-step="1" bindtap="switchPartByStep"><cover-view class="tri right"></cover-view><cover-view class="bar"></cover-view></cover-view>
+        <cover-view class="progress-zone">
+          <cover-view class="progress-track" bindtap="seekVideo" bindtouchstart="startSeekVideo" bindtouchmove="moveSeekVideo">
+            <cover-view class="progress-fill" style="width: {{progressPercent}}%;"></cover-view>
+            <cover-view class="progress-dot" style="left: {{progressPercent}}%;"></cover-view>
+          </cover-view>
+        </cover-view>
+        <cover-view wx:if="{{isFullscreen}}" class="time-label">{{currentTimeText}} / {{durationText}}</cover-view>
+        <cover-view wx:if="{{isFullscreen && detail.currentPart.hasQualityOptions}}" class="ctrl-btn text-ctrl" bindtap="cycleQuality">{{qualityLabel}}</cover-view>
+        <cover-view wx:if="{{isFullscreen}}" class="ctrl-btn text-ctrl" bindtap="cycleSpeed">{{speedLabel}}</cover-view>
+        <cover-view class="ctrl-btn icon-ctrl" bindtap="toggleFullscreen">{{isFullscreen ? '↙' : '⛶'}}</cover-view>
+      </cover-view>
+    </video>
+    <view wx:else class="video-empty">
+      <view class="video-empty-title">当前分 P 暂无视频</view>
+      <view class="video-empty-desc">请切换其他分 P 或等待老师上传视频。</view>
     </view>
   </view>
 
@@ -20,7 +30,7 @@
     <view class="lesson-summary">{{detail.summary}}</view>
   </view>
 
-  <view class="lesson-card">
+  <view wx:if="{{detail.prerequisites.length}}" class="lesson-card">
     <view class="sec-head">
       <view class="mini-title">前置知识点</view>
       <view class="sec-note">滑动查看</view>
@@ -47,7 +57,7 @@
           <view class="part-no">{{item.no}}</view>
           <view class="part-main">
             <view class="clip-title">{{item.title}}</view>
-            <view class="part-meta">{{item.duration}}{{item.active ? ' · 当前播放' : ''}}</view>
+            <view class="part-meta">{{item.duration}}</view>
           </view>
           <view class="part-status">{{item.statusText}}</view>
         </view>
@@ -55,7 +65,7 @@
     </view>
   </view>
 
-  <view class="lesson-card">
+  <view wx:if="{{detail.attachments.length}}" class="lesson-card">
     <view class="sec-head">
       <view class="mini-title">附件资料</view>
     </view>
@@ -71,14 +81,14 @@
           <view class="actions">
             <view wx:if="{{item.fileType === 'PDF'}}" class="action-btn" data-file="{{item}}" data-action="preview" bindtap="handleFileAction">预览</view>
             <view wx:if="{{item.canPlay}}" class="action-btn" data-file="{{item}}" data-action="play" bindtap="handleFileAction">播放</view>
-            <view class="action-btn solid" data-file="{{item}}" data-action="open" bindtap="handleFileAction">打开</view>
+            <view class="action-btn solid" data-file="{{item}}" data-action="open" bindtap="handleFileAction">下载</view>
           </view>
         </view>
       </block>
     </view>
   </view>
 
-  <view class="lesson-card">
+  <view wx:if="{{detail.libraryItems.length}}" class="lesson-card">
     <view class="sec-head">
       <view class="mini-title">关联图书馆</view>
     </view>
@@ -94,7 +104,7 @@
           <view class="actions">
             <view wx:if="{{item.fileType === 'PDF'}}" class="action-btn" data-file="{{item}}" data-action="preview" bindtap="handleFileAction">预览</view>
             <view wx:if="{{item.canPlay}}" class="action-btn" data-file="{{item}}" data-action="play" bindtap="handleFileAction">播放</view>
-            <view class="action-btn solid" data-file="{{item}}" data-action="open" bindtap="handleFileAction">打开</view>
+            <view class="action-btn solid" data-file="{{item}}" data-action="open" bindtap="handleFileAction">下载</view>
           </view>
         </view>
       </block>

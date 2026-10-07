@@ -14,17 +14,16 @@
         <view class="set-title">{{detail.title}}</view>
         <view class="meta-row">
           <text>{{detail.totalText}}</text>
-          <text>{{detail.updatedText}}</text>
         </view>
       </view>
-      <view class="set-desc">{{detail.desc}}</view>
+      <view wx:if="{{detail.desc}}" class="set-desc">{{detail.desc}}</view>
     </view>
 
     <view class="section-head">
       <view class="section-name">{{detail.sectionTitle}}</view>
     </view>
 
-    <view class="lesson-list">
+    <view wx:if="{{detail.lessons.length}}" class="lesson-list">
       <view class="lesson-card" wx:for="{{detail.lessons}}" wx:key="id" data-id="{{item.id}}" bindtap="openLesson">
         <view class="lesson-cover knowledge-lesson-cover">
           <image wx:if="{{item.coverUrl}}" class="lesson-cover-img" src="{{item.coverUrl}}" mode="aspectFill" />
@@ -38,8 +37,8 @@
       </view>
     </view>
 
-    <view class="empty-demo">
-      <view class="empty-title">空态样例</view>
+    <view wx:else class="empty-demo">
+      <view class="empty-title">暂无可学习内容</view>
       <view>{{detail.emptyText}}</view>
     </view>
   </view>

@@ -10,6 +10,7 @@ import {
   createMultipartPartUrl,
   deleteFromBucket,
   ensureObjectExists,
+  finalizePdfInlineMetadata,
   getPublicUrl,
   normalizePublicUrl
 } from './storage.js';
@@ -82,6 +83,9 @@ async function replaceAttachments({ objectType, objectId, values }) {
     await client.query('DELETE FROM content_attachments WHERE object_type = $1 AND object_id = $2', [objectType, objectId]);
     for (const [index, attachment] of next.entries()) {
       await ensureObjectExists(attachment.fileKey);
+      if (String(attachment.fileType || '').toLowerCase().includes('application/pdf')) {
+        await finalizePdfInlineMetadata(attachment.fileKey);
+      }
       await client.query(
         `INSERT INTO content_attachments (object_type, object_id, file_name, file_url, file_key, file_type, file_size, sort_order)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,

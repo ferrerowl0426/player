@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { pool } from './db.js';
 import { requireSuperAdmin } from './auth.js';
-import { createUploadUrl, deleteFromBucket, ensureObjectExists, getPublicUrl, normalizePublicUrl } from './storage.js';
+import { logStandaloneDeletion } from './deletion.js';
+import { createUploadUrl, deleteFromBucket, ensureObjectExists, finalizePdfInlineMetadata, getPublicUrl, normalizePublicUrl } from './storage.js';
 
 const LINK_TYPES = new Set(['track_point', 'track_collection', 'knowledge_point', 'knowledge_collection']);
 const TITLE_MAX_LENGTH = 120;
@@ -223,6 +224,10 @@ libraryRouter.post('/', requireSuperAdmin, async (req, res, next) => {
       res.status(400).json({ message: 'PDF 文件不能超过 500MB' });
       return;
     }
+
+    // 线上 COS 可能不会从浏览器 PUT 请求保留 Content-Disposition。
+    // 在后端确认对象存在后，用服务端 CopyObject 覆盖元数据，确保新上传 PDF 可 inline 预览。
+    await finalizePdfInlineMetadata(fileKey);
 
     const uploader = await findUploader(req.admin);
     await client.query('BEGIN');

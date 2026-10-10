@@ -174,7 +174,7 @@ export default function KnowledgePage() {
 
   useEffect(() => {
     loadLibrary('');
-    fetchCurrentViewer().then((result) => setAdmin(result.data)).catch(() => setAdmin(null));
+    fetchCurrentViewer({ prefer: 'admin' }).then((result) => setAdmin(result.data)).catch(() => setAdmin(null));
   }, []);
 
   function handleSubmit(event) {

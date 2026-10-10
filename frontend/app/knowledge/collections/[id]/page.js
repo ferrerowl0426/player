@@ -59,7 +59,7 @@ export default function KnowledgeCollectionPage() {
 
   useEffect(() => {
     loadCollection();
-    fetchCurrentViewer()
+    fetchCurrentViewer({ prefer: 'admin' })
       .then((result) => setViewer(result.data))
       .catch(() => setViewer({ role: 'guest', username: '访客', nickname: '访客' }));
   }, [loadCollection]);

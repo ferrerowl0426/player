@@ -20,7 +20,7 @@ export default function LibraryBookPage() {
   const [status, setStatus] = useState('正在加载资料...');
 
   useEffect(() => {
-    fetchCurrentViewer().then((result) => setAdmin(result.data)).catch(() => setAdmin(null));
+    fetchCurrentViewer({ prefer: 'admin' }).then((result) => setAdmin(result.data)).catch(() => setAdmin(null));
     fetchLibraryResourceById(params.id).then((result) => {
       setBook(result.data);
       setStatus('');

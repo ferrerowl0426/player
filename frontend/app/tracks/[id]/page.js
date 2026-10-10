@@ -96,7 +96,7 @@ export default function TrackDetailPage() {
     }
 
     loadTrack();
-    fetchCurrentViewer().then((result) => setViewer(result.data)).catch(() => setViewer({ role: 'guest', username: '访客', nickname: '访客' }));
+    fetchCurrentViewer({ prefer: 'admin' }).then((result) => setViewer(result.data)).catch(() => setViewer({ role: 'guest', username: '访客', nickname: '访客' }));
   }, [params.id, initialPart]);
 
   const accountName = viewer.nickname || viewer.username || '访客';

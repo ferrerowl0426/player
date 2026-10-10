@@ -71,7 +71,7 @@ export default function LibraryPage() {
   }, [keyword]);
 
   useEffect(() => {
-    fetchCurrentViewer().then((result) => setViewer(result.data)).catch(() => setViewer({ role: 'guest' }));
+    fetchCurrentViewer({ prefer: 'admin' }).then((result) => setViewer(result.data)).catch(() => setViewer({ role: 'guest' }));
     loadLibrary('').catch((error) => setStatus(error.message));
   }, [loadLibrary]);
 

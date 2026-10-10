@@ -619,13 +619,17 @@ export async function fetchAdminMe() {
   return parseJsonResponse(response, '请先登录老师账号');
 }
 
-export async function fetchCurrentViewer() {
+export async function fetchCurrentViewer({ prefer = 'user' } = {}) {
+  const primary = prefer === 'admin' ? fetchAdminMe : fetchUserMe;
+  const fallback = prefer === 'admin' ? fetchUserMe : fetchAdminMe;
+
   try {
-    const result = await fetchUserMe();
-    return { ...result, data: { ...result.data, role: 'user' } };
+    const result = await primary();
+    return prefer === 'admin' ? result : { ...result, data: { ...result.data, role: 'user' } };
   } catch {
     try {
-      return await fetchAdminMe();
+      const result = await fallback();
+      return prefer === 'admin' ? { ...result, data: { ...result.data, role: 'user' } } : result;
     } catch {
       return { data: { role: 'guest', username: '访客', nickname: '访客' } };
     }

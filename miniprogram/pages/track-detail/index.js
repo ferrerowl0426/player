@@ -148,8 +148,11 @@ Page({
     speed: 1,
     speedLabel: '1.0x',
     videoDirection: 0,
+    videoObjectFit: 'contain',
     isPlaying: false,
     isFullscreen: false,
+    fullscreenDirection: 'none',
+    isPortraitFullscreen: false,
     isPortraitVideo: false,
     controlsVisible: true,
     isSeeking: false,
@@ -157,8 +160,13 @@ Page({
     duration: 0,
     currentTimeText: '0:00',
     durationText: '0:00',
+    seekTimeText: '0:00',
     progressPercent: 0,
+    progressDotPercent: 2,
     loading: false,
+    videoWaiting: false,
+    videoErrorText: '',
+    pendingQualityRollback: null,
     detail: buildDetail({})
   },
 
@@ -177,6 +185,7 @@ Page({
 
   onUnload() {
     this.pauseCurrentVideo();
+    if (this.fullscreenExitTimer) clearTimeout(this.fullscreenExitTimer);
   },
 
   async loadDetail() {
@@ -188,7 +197,10 @@ Page({
       this.setData({
         detail: viewDetail,
         quality: viewDetail.currentPart.selectedQuality || '',
-        qualityLabel: qualityLabel(viewDetail.currentPart.selectedQuality || 'source')
+        qualityLabel: qualityLabel(viewDetail.currentPart.selectedQuality || 'source'),
+        videoWaiting: false,
+        videoErrorText: '',
+        pendingQualityRollback: null
       }, () => this.playCurrentVideo());
     } catch (error) {
       wx.showToast({ title: error.userMessage || '课程详情加载失败', icon: 'none' });
@@ -240,11 +252,18 @@ Page({
       quality,
       qualityLabel: qualityLabel(quality || 'source'),
       videoDirection: 0,
+      videoObjectFit: 'contain',
+      isPortraitFullscreen: false,
       currentTime: 0,
       duration: 0,
       currentTimeText: '0:00',
       durationText: '0:00',
+      seekTimeText: '0:00',
       progressPercent: 0,
+      progressDotPercent: 2,
+      videoWaiting: false,
+      videoErrorText: '',
+      pendingQualityRollback: null,
       detail
     }, () => this.playCurrentVideo());
     if (shouldScroll && !this.data.isFullscreen) wx.pageScrollTo({ scrollTop: 0, duration: 180 });
@@ -270,11 +289,24 @@ Page({
     const quality = String(nextQuality || '');
     if (!quality || quality === this.data.quality) return;
     const currentTime = this.data.currentTime;
+    const rollback = {
+      quality: this.data.quality,
+      currentTime,
+      detail: this.data.detail
+    };
     const detail = buildDetail(this.data.detail, this.data.part, quality);
+    if (!detail.currentPart.videoUrl) {
+      wx.showToast({ title: '当前清晰度暂无视频', icon: 'none' });
+      return;
+    }
     this.setData({
       quality,
       qualityLabel: qualityLabel(quality),
       videoDirection: 0,
+      videoObjectFit: 'contain',
+      videoWaiting: true,
+      videoErrorText: '',
+      pendingQualityRollback: rollback,
       detail
     }, () => {
       wx.nextTick(() => {
@@ -315,12 +347,25 @@ Page({
   },
 
   toggleFullscreen() {
-    const video = this.getVideoContext();
     if (this.data.isFullscreen) {
-      video.exitFullScreen();
-    } else {
-      video.requestFullScreen({ direction: this.data.videoDirection });
+      this.exitFullscreenWithFallback();
+      return;
     }
+    this.getVideoContext().requestFullScreen({ direction: this.data.videoDirection });
+  },
+
+  exitFullscreenWithFallback() {
+    if (this.fullscreenExitTimer) clearTimeout(this.fullscreenExitTimer);
+    this.getVideoContext().exitFullScreen();
+    this.fullscreenExitTimer = setTimeout(() => {
+      if (!this.data.isFullscreen) return;
+      this.setData({
+        isFullscreen: false,
+        fullscreenDirection: 'none',
+        isPortraitFullscreen: false,
+        controlsVisible: true
+      });
+    }, 500);
   },
 
   updateVideoProgress(currentTime, duration) {
@@ -332,12 +377,14 @@ Page({
       duration: safeDuration,
       currentTimeText: formatVideoTime(safeCurrent),
       durationText: formatVideoTime(safeDuration),
-      progressPercent: safeDuration > 0 ? clampPercent((safeCurrent / safeDuration) * 100) : 0
+      seekTimeText: formatVideoTime(safeCurrent),
+      progressPercent: safeDuration > 0 ? clampPercent((safeCurrent / safeDuration) * 100) : 0,
+      progressDotPercent: safeDuration > 0 ? Math.max(2, Math.min(98, clampPercent((safeCurrent / safeDuration) * 100))) : 2
     });
   },
 
   handleVideoPlay() {
-    this.setData({ isPlaying: true }, () => this.showVideoControls());
+    this.setData({ isPlaying: true, videoWaiting: false, videoErrorText: '', pendingQualityRollback: null }, () => this.showVideoControls());
   },
 
   handleVideoPause() {
@@ -353,7 +400,8 @@ Page({
       controlsVisible: true,
       currentTime: duration,
       currentTimeText: formatVideoTime(duration),
-      progressPercent: 100
+      progressPercent: 100,
+      progressDotPercent: 98
     });
   },
 
@@ -362,8 +410,55 @@ Page({
     this.updateVideoProgress(currentTime, duration);
   },
 
+  handleVideoWaiting() {
+    this.setData({ videoWaiting: true, controlsVisible: true });
+  },
+
+  handleVideoError() {
+    const rollback = this.data.pendingQualityRollback;
+    if (rollback?.quality && rollback.quality !== this.data.quality) {
+      this.rollbackQuality(rollback);
+      return;
+    }
+    this.setData({
+      isPlaying: false,
+      videoWaiting: false,
+      videoErrorText: '视频加载失败，请稍后重试',
+      controlsVisible: true,
+      pendingQualityRollback: null
+    });
+  },
+
+  rollbackQuality(rollback) {
+    wx.showToast({ title: '清晰度切换失败，已恢复原画面', icon: 'none' });
+    this.setData({
+      quality: rollback.quality,
+      qualityLabel: qualityLabel(rollback.quality || 'source'),
+      detail: rollback.detail,
+      currentTime: rollback.currentTime || 0,
+      videoWaiting: false,
+      videoErrorText: '',
+      pendingQualityRollback: null
+    }, () => {
+      wx.nextTick(() => {
+        const video = this.getVideoContext();
+        if (rollback.currentTime > 0) video.seek(rollback.currentTime);
+        video.play();
+        video.playbackRate(this.data.speed);
+      });
+    });
+  },
+
   handleFullscreenChange(event) {
-    this.setData({ isFullscreen: Boolean(event.detail?.fullScreen) }, () => this.showVideoControls());
+    if (this.fullscreenExitTimer) clearTimeout(this.fullscreenExitTimer);
+    const isFullscreen = Boolean(event.detail?.fullScreen);
+    const direction = isFullscreen ? (event.detail?.direction || (this.data.videoDirection === 90 ? 'horizontal' : 'vertical')) : 'none';
+    this.setData({
+      isFullscreen,
+      fullscreenDirection: direction,
+      isPortraitFullscreen: isFullscreen && (direction === 'vertical' || this.data.isPortraitVideo),
+      controlsVisible: true
+    }, () => this.showVideoControls());
   },
 
   previewSeekByTouch(touch, shouldCommit = false) {
@@ -371,7 +466,7 @@ Page({
     const clientX = Number(touch.clientX ?? touch.x ?? 0);
     if (!clientX) return;
     const query = wx.createSelectorQuery().in(this);
-    query.select('.progress-track').boundingClientRect((rect) => {
+    query.select('.progress-touch').boundingClientRect((rect) => {
       if (!rect || !rect.width) return;
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       const nextTime = ratio * this.data.duration;
@@ -380,7 +475,9 @@ Page({
         controlsVisible: true,
         currentTime: nextTime,
         currentTimeText: formatVideoTime(nextTime),
-        progressPercent: clampPercent(ratio * 100)
+        seekTimeText: formatVideoTime(nextTime),
+        progressPercent: clampPercent(ratio * 100),
+        progressDotPercent: Math.max(2, Math.min(98, clampPercent(ratio * 100)))
       });
       if (shouldCommit) this.commitSeek(nextTime);
     }).exec();
@@ -388,7 +485,10 @@ Page({
 
   commitSeek(nextTime = this.data.currentTime) {
     this.getVideoContext().seek(nextTime);
-    this.setData({ isSeeking: false }, () => this.showVideoControls());
+    if (this.seekBubbleTimer) clearTimeout(this.seekBubbleTimer);
+    this.seekBubbleTimer = setTimeout(() => {
+      this.setData({ isSeeking: false }, () => this.showVideoControls());
+    }, 180);
   },
 
   seekVideo(event) {
@@ -420,9 +520,12 @@ Page({
     // 横屏视频全屏横屏，竖屏/正方形视频全屏竖屏并保留必要黑边。
     const isPortraitVideo = height > width;
     const videoDirection = width > height ? 90 : 0;
+    const ratio = width > 0 && height > 0 ? width / height : 0;
+    const videoObjectFit = ratio >= 1.7 && ratio <= 1.9 ? 'fill' : 'contain';
     this.setData({
       videoDirection,
       isPortraitVideo,
+      videoObjectFit,
       duration,
       durationText: formatVideoTime(duration)
     }, () => this.getVideoContext().playbackRate(this.data.speed));

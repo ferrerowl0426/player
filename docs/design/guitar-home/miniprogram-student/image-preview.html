@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序学生端 · 图片预览</title>
+<style>
+:root{--ink:#261d10;--ink-3:#7a6a52;--hair:#ddd0b4;--coffee:#5d4326;--orange:#ff7f00;--font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif}*{margin:0;padding:0;box-sizing:border-box}body{min-height:100dvh;font-family:var(--font);color:var(--ink);background:#fff}a{text-decoration:none;color:inherit}.head{height:48px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--hair);background:#fff;position:sticky;top:0}.head h1{font-size:15px;letter-spacing:1px}.page{max-width:430px;margin:0 auto;padding:14px 14px 78px}.image{height:560px;border:1px solid var(--hair);border-radius:8px;background:#fffaf1;position:relative;overflow:hidden;box-shadow:0 4px 14px rgba(93,67,38,.08)}.image::before{content:"右手触弦角度示意图";position:absolute;left:18px;top:18px;font-size:18px;font-weight:900}.line{position:absolute;height:2px;background:var(--coffee);transform-origin:left center}.l1{left:54px;top:160px;width:270px;transform:rotate(-18deg)}.l2{left:54px;top:252px;width:270px;transform:rotate(-8deg)}.l3{left:54px;top:344px;width:270px;transform:rotate(6deg)}.dot{position:absolute;width:42px;height:42px;border-radius:50%;border:2px solid var(--orange);background:#fff}.d1{left:168px;top:132px}.d2{left:196px;top:228px}.d3{left:224px;top:326px}.note{position:absolute;left:18px;right:18px;bottom:18px;font-size:12px;color:var(--ink-3);line-height:1.8}.bottom{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(430px,100%);background:rgba(255,255,255,.96);border-top:1px solid var(--hair);padding:9px 14px 12px;display:grid;grid-template-columns:1fr 1fr;gap:9px}.bottom a{height:42px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:950}.return{background:var(--coffee);color:#fff}.download{border:1px solid var(--hair);color:var(--coffee);background:#fff}@media (max-width:430px){.bottom{left:0;transform:none;width:100%}}
+</style>
+</head>
+<body>
+<header class="head"><h1>图片预览</h1></header>
+<main class="page"><section class="image" aria-label="图片预览"><i class="line l1"></i><i class="line l2"></i><i class="line l3"></i><i class="dot d1"></i><i class="dot d2"></i><i class="dot d3"></i><p class="note">预览图片时进入单独预览页，可放大查看；底部保留返回课程与下载图片。</p></section></main>
+<div class="bottom"><a class="return" href="lesson-player.html">回到课程</a><a class="download" href="javascript:void(0)">下载图片</a></div>
+</body>
+</html>

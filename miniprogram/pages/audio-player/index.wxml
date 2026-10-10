@@ -22,6 +22,8 @@
   </view>
 
   <view class="player-card {{playing ? 'playing' : ''}}">
+    <view wx:if="{{audioWaiting}}" class="audio-state">音频加载中…</view>
+    <view wx:if="{{audioErrorText}}" class="audio-state error">{{audioErrorText}}</view>
     <view class="time-row"><text>{{currentTimeText}}</text><text>{{audioFormat}}</text><text>{{durationText}}</text></view>
     <view class="progress-wrap">
       <view wx:if="{{seeking}}" class="seek-bubble" style="left: {{progress}}%;">{{currentTimeText}}</view>

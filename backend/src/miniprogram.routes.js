@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import { pool } from './db.js';
 import { createDownloadUrl } from './storage.js';
 import { clearUserCookie, getUserCookieOptions, signUserToken } from './auth.js';
+
+const MINI_TOKEN_EXPIRES_IN_SECONDS = 15 * 24 * 60 * 60;
 import { requireMiniStudent, sendMiniError, sendMiniSuccess, serializeStudent } from './miniprogram.auth.js';
 import { issueMiniSts } from './miniprogram.sts.js';
 import {
@@ -74,9 +76,10 @@ miniprogramRouter.post('/login', asyncHandler(async (req, res) => {
     return;
   }
 
-  const token = signUserToken(user);
-  res.cookie('user_token', token, getUserCookieOptions());
-  sendMiniSuccess(res, { token, student: serializeStudent(user) });
+  const token = signUserToken(user, { expiresIn: MINI_TOKEN_EXPIRES_IN_SECONDS });
+  const expiresAt = Date.now() + MINI_TOKEN_EXPIRES_IN_SECONDS * 1000;
+  res.cookie('user_token', token, { ...getUserCookieOptions(), maxAge: MINI_TOKEN_EXPIRES_IN_SECONDS * 1000 });
+  sendMiniSuccess(res, { token, expiresAt, expiresIn: MINI_TOKEN_EXPIRES_IN_SECONDS, student: serializeStudent(user) });
 }));
 
 miniprogramRouter.post('/logout', (req, res) => {

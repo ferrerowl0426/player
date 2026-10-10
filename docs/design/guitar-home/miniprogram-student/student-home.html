@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序学生端 · 首页</title>
+<style>
+/* ============================================================
+   能学慧吉他教室 · 小程序学生端 / 首页
+   命名参照 Web 端：student-home.html
+   来源：docs/PRD-小程序端学生功能.md 7.1 首页 / 今日作业
+   交付口径：无手机样机外壳，直接作为前端页面参考
+============================================================ */
+:root{
+  --white:#fff;--ink:#261d10;--ink-2:#4f4230;--ink-3:#7a6a52;
+  --hair:#ddd0b4;--hair-2:#c9b795;--coffee:#5d4326;--orange:#ff7f00;
+  --green:#4f7d3a;--danger:#b4452e;--wood:#3a2a18;--ease:cubic-bezier(.16,1,.3,1);
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{min-height:100%}body{font-family:var(--font);color:var(--ink);background:#fff;font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}a:focus-visible,button:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}.num{font-variant-numeric:tabular-nums}
+
+.app-page{min-height:100dvh;position:relative;background:#fff;overflow-x:hidden}.app-page::before{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(122,74,38,.16) 0 1px,transparent 1px 42px),repeating-linear-gradient(0deg,rgba(122,74,38,.16) 0 1px,transparent 1px 42px);-webkit-mask:linear-gradient(180deg,rgba(0,0,0,.08) 0%,rgba(0,0,0,.18) 24%,rgba(0,0,0,.5) 100%);mask:linear-gradient(180deg,rgba(0,0,0,.08) 0%,rgba(0,0,0,.18) 24%,rgba(0,0,0,.5) 100%)}
+.mp-head{height:48px;display:flex;align-items:center;justify-content:center;position:sticky;top:0;border-bottom:1px solid rgba(221,208,180,.68);background:rgba(255,255,255,.96);backdrop-filter:blur(10px);z-index:20}.mp-head h1{font-size:15px;letter-spacing:1px;color:var(--ink);font-weight:850}.mp-capsule{position:absolute;right:14px;width:54px;height:25px;border:1px solid var(--hair-2);border-radius:999px;display:flex;align-items:center;justify-content:center;gap:4px;background:#fff}.mp-capsule i{width:4px;height:4px;border-radius:50%;background:var(--coffee);display:block}
+.content{position:relative;z-index:1;max-width:430px;margin:0 auto;padding:14px 14px 86px}.tabbar{height:58px;position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(430px,100%);background:rgba(255,255,255,.96);border-top:1px solid rgba(201,183,149,.75);display:grid;grid-template-columns:repeat(5,1fr);z-index:30}.tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9.5px;color:var(--ink-3);letter-spacing:.3px}.tabbar a.active{color:var(--coffee);font-weight:850}.tabbar svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8}
+.hero-card{margin:3px 0 12px;padding:2px 2px 6px}.student b{font-size:21px;line-height:1.35;letter-spacing:.4px;color:var(--ink);font-weight:900}.student span{display:none}.date,.status-line{display:none}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:14px 2px 9px}.section-head h2{font-size:15px;color:var(--coffee);letter-spacing:1.2px;display:flex;align-items:center;gap:7px}.section-head h2::before{content:"";width:4px;height:15px;background:var(--orange);border-radius:1px}.section-head span{font-size:10px;color:var(--ink-3);white-space:nowrap}.card{background:#fff;border:1px solid var(--hair-2);border-radius:10px;box-shadow:0 2px 9px rgba(93,67,38,.08);padding:12px;margin-bottom:12px}.card-title{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}.card-title h3{font-size:14px;color:var(--ink);letter-spacing:.7px}.card-title span{font-size:10px;color:var(--ink-3)}
+.require{border:1px dashed rgba(93,67,38,.2);border-radius:8px;padding:10px;background:#fff;margin-bottom:9px}.require:last-child{margin-bottom:0}.require h4{font-size:12px;color:var(--coffee);letter-spacing:1px;margin-bottom:6px}.req-content{position:relative}.req-content p{font-size:12px;color:var(--ink-2);line-height:1.75;white-space:pre-wrap}.empty.courseware-empty{padding:20px 10px}
+.hw-list{display:grid;gap:9px}.hw-card{display:grid;grid-template-columns:74px 1fr;gap:10px;align-items:center;border:1px solid var(--hair);border-radius:8px;padding:7px;background:#fff;transition:transform .2s var(--ease),border-color .2s var(--ease)}.hw-card:active{transform:scale(.985);border-color:var(--coffee)}.cover{width:74px;height:74px;border-radius:6px;background:var(--wood);position:relative;overflow:hidden;background-image:linear-gradient(135deg,rgba(255,127,0,.22),rgba(255,255,255,.02)),repeating-linear-gradient(45deg,rgba(255,255,255,.08) 0 1px,transparent 1px 10px)}.cover.k{background-color:#4a3b27}.cover.s{background-color:#65461f}.tag{display:inline-flex;align-items:center;height:19px;padding:0 6px;border-radius:3px;font-size:9px;font-weight:900;letter-spacing:.7px;background:var(--orange);color:#fff}.tag.set{background:#8a5a12}.tag.k{background:var(--coffee)}.cover .tag{position:absolute;left:5px;top:5px}.cover .p{position:absolute;right:5px;bottom:5px;background:rgba(93,67,38,.88);color:#fff;border-radius:3px;padding:1px 6px;font-size:9px;font-weight:850}.hw-info{min-width:0}.hw-info b{display:block;font-size:13px;line-height:1.42;color:var(--ink);overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}.hw-info span{display:block;font-size:10px;color:var(--ink-3);margin-top:5px}.hw-info em{font-style:normal;display:inline-flex;margin-top:7px;font-size:10px;color:var(--coffee);font-weight:850}.notice{border:1.5px dashed rgba(180,69,46,.5);background:rgba(255,252,242,.92);border-radius:9px;padding:10px 11px;color:var(--ink-2);font-size:12px;line-height:1.7;margin-bottom:12px}.notice b{color:var(--danger)}.empty{padding:26px 10px;text-align:center;color:var(--ink-3);font-size:12px;letter-spacing:.4px}.empty b{display:block;color:var(--ink);font-size:14px;margin-bottom:5px;letter-spacing:1px}
+@media (max-width:430px){.content{max-width:none}.tabbar{width:100%;left:0;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+  <main class="app-page" aria-label="小程序学生端首页">
+    <header class="mp-head"><h1>首页</h1><div class="mp-capsule" aria-hidden="true"><i></i><i></i><i></i></div></header>
+    <section class="content">
+      <section class="hero-card" aria-label="学生问候"><div class="student"><b>陈一一，今天练琴了吗？</b></div></section>
+      <div class="notice"><b>停用学生置顶提示：</b>上次老师带你学到了这里，联系老师恢复课程。</div>
+      <div class="section-head"><h2>最新作业</h2></div>
+      <section class="card" aria-label="本次作业要求"><div class="card-title"><h3>9 月 29 日作业</h3><span class="num">李弦安老师 · 18:30</span></div><div class="require"><h4>练习要求</h4><div class="req-content"><p>卡农 P2 段落衔接，先慢速跟练三遍，节拍器 60。
+天空之城重点练右手分解和弦，低音要保持住。
+每天练琴 20 分钟，手腕放松，保持稳定节奏。
+注意每一遍都要先稳住节拍，再逐步提升速度。</p></div></div><div class="require"><h4>提交要求</h4><div class="req-content"><p>完成后录制一段卡农 P2 衔接视频，课前发给老师。
+视频请保持画面稳定，声音清晰；遇到问题可以在下次课前留言。</p></div></div></section>
+      <section class="card" aria-label="今日课件列表"><div class="card-title"><h3>你今日需要用到的课件</h3><span>点击直达内容</span></div><div class="hw-list"><a class="hw-card" href="javascript:void(0)" aria-label="打开卡农 P2"><div class="cover"><span class="tag">曲目</span><span class="p">P2</span></div><div class="hw-info"><b>卡农 · P2 段落衔接练习</b><span>单曲目分 P · 自动定位到 P2</span><em>进入详情并播放</em></div></a><a class="hw-card" href="javascript:void(0)" aria-label="打开天空之城"><div class="cover s"><span class="tag set">合集</span><span class="p">6 首</span></div><div class="hw-info"><b>天空之城指弹入门合集</b><span>曲目合集 · 查看收录内容</span><em>进入合集详情</em></div></a><a class="hw-card" href="javascript:void(0)" aria-label="打开右手分解和弦"><div class="cover k"><span class="tag k">知识点</span><span class="p">P1</span></div><div class="hw-info"><b>右手分解和弦：低音保持</b><span>知识点分 P · 自动定位到 P1</span><em>进入知识点详情</em></div></a></div><div class="empty courseware-empty"><b>空态样例</b>如果今天没有需要用到的课件，就显示：今天暂无学习资料。</div></section>
+      <section class="card" aria-label="空态样例"><div class="empty"><b>空态样例</b>如果本次作业的内容全部被删除，今日作业不展示死链，仅提示暂无可学习内容。</div></section>
+    </section>
+    <nav class="tabbar" aria-label="小程序底部导航"><a class="active" href="javascript:void(0)"><svg viewBox="0 0 24 24"><path d="M3 10.8 12 3l9 7.8V21h-6v-6H9v6H3z"/></svg>首页</a><a href="javascript:void(0)"><svg viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-1.5Z"/><path d="M8 7h7"/></svg>课程</a><a href="javascript:void(0)"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/></svg>图书馆</a><a href="javascript:void(0)"><svg viewBox="0 0 24 24"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>历史</a><a href="mine.html"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>我的</a></nav>
+  </main>
+</body>
+</html>

@@ -30,6 +30,13 @@ function speedText(speed) {
   return `${String(speed).replace(/^0\./, '0.')}x`;
 }
 
+function validateAudioUrl(url) {
+  if (!url) return '音频地址获取失败';
+  if (!/^https:\/\//i.test(url)) return '音频地址必须使用 HTTPS';
+  if (/\s/.test(url)) return '音频地址包含空格，可能无法播放';
+  return '';
+}
+
 Page({
   data: {
     fileId: '',
@@ -49,7 +56,10 @@ Page({
     durationText: '00:00',
     seeking: false,
     speedIndex: 2,
-    speedText: '1.0x'
+    speedText: '1.0x',
+    audioReady: false,
+    audioWaiting: false,
+    audioErrorText: ''
   },
 
   onLoad(options) {
@@ -89,7 +99,8 @@ Page({
     try {
       const signed = await getSignedUrl(this.data.fileId, this.data.fileSource);
       const url = signed.url || signed.signedUrl;
-      if (!url) throw new Error('音频地址获取失败');
+      const urlError = validateAudioUrl(url);
+      if (urlError) throw new Error(urlError);
       this.initAudio(url);
     } catch (error) {
       wx.showToast({ title: error.userMessage || error.message || '音频加载失败', icon: 'none' });
@@ -100,15 +111,18 @@ Page({
 
   initAudio(url) {
     this.destroyAudio();
+    this.setData({ audioReady: false, audioWaiting: true, audioErrorText: '' });
     const audio = wx.createInnerAudioContext();
     this.audio = audio;
     audio.src = url;
     audio.loop = this.data.loop;
-    audio.playbackRate = SPEED_OPTIONS[this.data.speedIndex] || 1;
+    this.applyAudioSpeed();
 
     audio.onCanplay(() => {
       const duration = Number(audio.duration || this.data.duration || 0);
       if (duration > 0) this.updateDuration(duration);
+      this.applyAudioSpeed();
+      this.setData({ audioReady: true, audioWaiting: false, audioErrorText: '' });
     });
 
     audio.onTimeUpdate(() => {
@@ -119,24 +133,74 @@ Page({
       this.updateCurrentTime(currentTime, duration || this.data.duration);
     });
 
-    audio.onPlay(() => this.setData({ playing: true }));
-    audio.onPause(() => this.setData({ playing: false }));
-    audio.onStop(() => this.setData({ playing: false }));
+    audio.onPlay(() => {
+      this.applyAudioSpeed();
+      this.setData({ playing: true, audioWaiting: false, audioErrorText: '' });
+    });
+    audio.onPause(() => this.setData({ playing: false, audioWaiting: false }));
+    audio.onStop(() => this.setData({ playing: false, audioWaiting: false }));
+    audio.onWaiting(() => this.setData({ audioWaiting: true }));
     audio.onEnded(() => {
       if (this.data.loop) return;
-      this.setData({ playing: false, currentTime: 0, progress: 0, currentTimeText: '00:00' });
+      this.setData({ playing: false, audioWaiting: false, currentTime: 0, progress: 0, currentTimeText: '00:00' });
     });
-    audio.onError(() => {
-      this.setData({ playing: false });
-      wx.showToast({ title: '音频播放失败', icon: 'none' });
+    audio.onError((error) => {
+      const errorText = this.getAudioErrorMessage(error);
+      this.setData({ playing: false, audioWaiting: false, audioErrorText: errorText });
+      wx.showToast({ title: errorText, icon: 'none' });
     });
   },
 
   destroyAudio() {
     if (!this.audio) return;
-    this.audio.stop();
-    this.audio.destroy();
+    try {
+      this.audio.stop();
+      this.audio.destroy();
+    } catch (error) {
+      // ignore destroy errors from native audio context
+    }
     this.audio = null;
+    this.setData({ playing: false, audioReady: false, audioWaiting: false });
+  },
+
+  getAudioErrorMessage(error = {}) {
+    const errCode = error.errCode || error.errorCode || '';
+    if (errCode === 10001 || errCode === '10001') return '音频地址无效';
+    if (errCode === 10002 || errCode === '10002') return '网络异常，音频加载失败';
+    if (errCode === 10003 || errCode === '10003') return '音频格式暂不支持';
+    if (errCode === 10004 || errCode === '10004') return '音频播放被中断';
+    return '音频播放失败，请稍后重试';
+  },
+
+  ensureInnerAudioOption() {
+    return new Promise((resolve) => {
+      wx.setInnerAudioOption({
+        obeyMuteSwitch: false,
+        success: resolve,
+        fail: () => resolve()
+      });
+    });
+  },
+
+  async playAudio() {
+    if (!this.audio) return;
+    await this.ensureInnerAudioOption();
+    this.applyAudioSpeed();
+    this.audio.play();
+  },
+
+  applyAudioSpeed(speed = SPEED_OPTIONS[this.data.speedIndex] || 1) {
+    if (!this.audio) return false;
+    try {
+      if (typeof this.audio.playbackRate === 'function') {
+        this.audio.playbackRate(speed);
+      } else {
+        this.audio.playbackRate = speed;
+      }
+      return true;
+    } catch (error) {
+      return false;
+    }
   },
 
   updateDuration(duration) {
@@ -168,23 +232,28 @@ Page({
 
   togglePlay() {
     if (!this.audio) {
-      this.prepareAudio().then(() => {
-        if (this.audio) this.audio.play();
-      });
+      this.prepareAudio().then(() => this.playAudio());
       return;
     }
     if (this.data.playing) {
       this.audio.pause();
     } else {
-      this.audio.play();
+      this.playAudio();
     }
   },
 
   toggleSpeed() {
     const speedIndex = (this.data.speedIndex + 1) % SPEED_OPTIONS.length;
     const speed = SPEED_OPTIONS[speedIndex];
-    if (this.audio) this.audio.playbackRate = speed;
-    this.setData({ speedIndex, speedText: speedText(speed) });
+    this.setData({ speedIndex, speedText: speedText(speed) }, () => {
+      const applied = this.applyAudioSpeed(speed);
+      if (this.audio) {
+        setTimeout(() => this.applyAudioSpeed(speed), 120);
+      }
+      if (!applied && this.audio) {
+        wx.showToast({ title: '当前环境暂不支持倍速', icon: 'none' });
+      }
+    });
   },
 
   updateProgress(progress, seeking = false) {

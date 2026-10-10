@@ -1,0 +1,16 @@
+图书馆详情页修复部署核验
+
+本地 HEAD: 见下方提交
+已提交修复: fix: isolate library detail page styles
+
+服务器执行：
+cd /root/player
+git fetch gitee
+git reset --hard gitee/main
+git log -1 --oneline
+
+预期最新提交：fix: isolate library detail page styles
+
+然后重建：
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml build frontend
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml up -d --force-recreate frontend

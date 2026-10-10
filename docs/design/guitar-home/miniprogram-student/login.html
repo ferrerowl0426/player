@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序学生端 · 登录</title>
+<style>
+/* ============================================================
+   能学慧吉他教室 · 小程序学生端 / 登录页
+   命名参照 Web 端：login.html
+   PRD 调整：取消身份预绑流程，直接账号密码登录
+   交付口径：无手机样机外壳，直接作为前端页面参考
+============================================================ */
+:root{
+  --white:#fff;--ink:#261d10;--ink-2:#4f4230;--ink-3:#7a6a52;
+  --hair:#ddd0b4;--hair-2:#c9b795;--coffee:#5d4326;--orange:#ff7f00;
+  --danger:#b4452e;--ease:cubic-bezier(.16,1,.3,1);
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{min-height:100%}
+body{font-family:var(--font);color:var(--ink);background:#fff;font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}button{border:0;background:none;cursor:pointer}button:focus-visible,input:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}.num{font-variant-numeric:tabular-nums}
+
+.app-page{min-height:100dvh;position:relative;overflow:hidden;background:linear-gradient(180deg,#fff 0%,#fff7ea 100%)}
+.app-page::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(122,74,38,.10) 0 1px,transparent 1px 42px),repeating-linear-gradient(0deg,rgba(122,74,38,.10) 0 1px,transparent 1px 42px);-webkit-mask:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.07) 28%,rgba(0,0,0,.42) 100%);mask:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.07) 28%,rgba(0,0,0,.42) 100%)}
+.mp-head{height:48px;display:flex;align-items:center;justify-content:center;position:sticky;top:0;border-bottom:1px solid rgba(221,208,180,.68);background:rgba(255,255,255,.96);backdrop-filter:blur(10px);z-index:5}.mp-head h1{font-size:15px;letter-spacing:1px;color:var(--ink);font-weight:850}.mp-capsule{position:absolute;right:14px;width:54px;height:25px;border:1px solid var(--hair-2);border-radius:999px;display:flex;align-items:center;justify-content:center;gap:4px;background:#fff}.mp-capsule i{width:4px;height:4px;border-radius:50%;background:var(--coffee);display:block}
+.content{position:relative;z-index:1;min-height:calc(100dvh - 48px);padding:22px 18px 72px;max-width:430px;margin:0 auto}.brand{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--coffee);font-weight:900;letter-spacing:1.2px;font-size:22px;line-height:1.25;margin-bottom:12px;text-align:center}.brand::before{content:"";width:12px;height:12px;background:var(--orange);display:block;box-shadow:6px 6px 0 rgba(255,127,0,.18);flex:none}.audit-line{margin:0 auto 20px;display:flex;align-items:center;justify-content:center;width:fit-content;max-width:100%;padding:6px 10px;border:1px solid rgba(201,183,149,.9);border-radius:999px;background:rgba(255,255,255,.9);color:var(--coffee);font-size:10.5px;font-weight:800;letter-spacing:.35px;line-height:1.3;text-align:center;white-space:nowrap}
+.hero{display:none}
+.login-card{background:rgba(255,255,255,.96);border:1.5px solid var(--coffee);border-radius:14px;padding:17px 15px 15px;box-shadow:0 14px 34px rgba(93,67,38,.13)}.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:15px}.card-head h3{font-size:17px;letter-spacing:1px;color:var(--ink);font-weight:900}.card-head span{font-size:10px;color:var(--ink-3);letter-spacing:.6px;white-space:nowrap}
+.input-block{display:grid;gap:7px;margin-bottom:12px}.input-block label{font-size:11px;color:var(--coffee);font-weight:850;letter-spacing:1px}.input-shell{height:44px;border:1px solid var(--hair-2);border-radius:8px;background:#fff;display:flex;align-items:center;gap:8px;padding:0 11px;transition:border-color .22s var(--ease),box-shadow .22s var(--ease)}.input-shell:focus-within{border-color:var(--coffee);box-shadow:0 0 0 3px rgba(93,67,38,.08)}.input-shell svg{width:16px;height:16px;stroke:var(--ink-3);flex:none}.input-shell input{border:0;outline:0;min-width:0;flex:1;background:transparent;font-size:14px}.input-shell input::placeholder{color:#aa9a80}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0 14px}.check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-3)}.check i{width:13px;height:13px;border:1px solid var(--hair-2);border-radius:3px;background:#fff;display:grid;place-items:center}.check i::after{content:"";width:6px;height:3px;border-left:1.5px solid var(--coffee);border-bottom:1.5px solid var(--coffee);transform:rotate(-45deg);margin-top:-1px}.help{font-size:11px;color:var(--coffee);font-weight:800}.primary{height:44px;width:100%;border-radius:8px;background:var(--coffee);color:#fff;font-size:14px;font-weight:900;letter-spacing:1.6px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(93,67,38,.2);transition:transform .2s var(--ease),box-shadow .2s var(--ease)}.primary:active{transform:scale(.98);box-shadow:0 3px 10px rgba(93,67,38,.16)}
+.note{margin-top:13px;border-top:1px dashed var(--hair);padding-top:11px;font-size:10.5px;color:var(--ink-3);line-height:1.75}.state-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.state{border:1px solid var(--hair);background:#fff;border-radius:8px;padding:9px 8px;text-align:center}.state b{display:block;font-size:12px;color:var(--coffee);line-height:1.2}.state span{display:block;font-size:9px;color:var(--ink-3);margin-top:4px}.error-tip{margin-top:12px;border:1px dashed rgba(180,69,46,.42);background:rgba(255,250,244,.88);border-radius:8px;padding:9px 10px;color:var(--danger);font-size:11px;line-height:1.65}
+@media (max-width:430px){.content{max-width:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+  <main class="app-page" aria-label="小程序学生端登录页">
+    <header class="mp-head">
+      <h1>学生登录</h1>
+      <div class="mp-capsule" aria-hidden="true"><i></i><i></i><i></i></div>
+    </header>
+    <section class="content">
+      <div class="brand">能学慧吉他教室</div>
+      <div class="audit-line">吉他课堂笔记整理工具 · 无公开注册 · 无交易广告 · 无支付功能</div>
+      <form class="login-card">
+        <div class="card-head"><h3>账号密码登录</h3><span>学生端专用</span></div>
+        <div class="input-block"><label for="account">账号 / 手机号</label><div class="input-shell"><svg viewBox="0 0 24 24" fill="none"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg><input id="account" type="text" placeholder="请输入学生账号" value="chenyiyi"></div></div>
+        <div class="input-block"><label for="password">密码</label><div class="input-shell"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><input id="password" type="password" placeholder="请输入密码" value="123456"></div></div>
+        <div class="row"><span class="check"><i aria-hidden="true"></i>记住登录状态</span><button class="help" type="button">联系老师</button></div>
+        <button class="primary" type="button">进入学习首页</button>
+        <p class="note">忘记账号或密码时，请联系老师处理。账号停用时，页面会提示联系老师恢复课程。</p>
+      </form>
+      <div class="state-strip" aria-label="登录状态样例"><div class="state"><b>正常</b><span>进入首页</span></div><div class="state"><b>密码错误</b><span>提示重试</span></div><div class="state"><b>已停用</b><span>显示说明</span></div></div>
+      <div class="error-tip">错误态示例：账号或密码不正确，请检查后重新输入。</div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序学生端 · 我的</title>
+<style>
+/* ============================================================
+   能学慧吉他教室 · 小程序学生端 / 我的
+   学生端只展示账号信息，不提供其它操作功能
+============================================================ */
+:root{--white:#fff;--ink:#261d10;--ink-2:#4f4230;--ink-3:#7a6a52;--hair:#ddd0b4;--hair-2:#c9b795;--coffee:#5d4326;--orange:#ff7f00;--danger:#b4452e;--ease:cubic-bezier(.16,1,.3,1);--font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}html,body{min-height:100%}body{font-family:var(--font);color:var(--ink);background:#fff;font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}a{color:inherit;text-decoration:none}button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}a:focus-visible,button:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}.app-page{min-height:100dvh;position:relative;background:#fff;overflow-x:hidden}.app-page::before{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(122,74,38,.16) 0 1px,transparent 1px 42px),repeating-linear-gradient(0deg,rgba(122,74,38,.16) 0 1px,transparent 1px 42px),repeating-linear-gradient(90deg,rgba(122,74,38,.055) 0 1px,transparent 1px 14px),repeating-linear-gradient(0deg,rgba(122,74,38,.055) 0 1px,transparent 1px 14px);-webkit-mask:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.48));mask:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.48))}.mp-head{height:48px;display:flex;align-items:center;justify-content:center;position:sticky;top:0;border-bottom:1px solid rgba(221,208,180,.68);background:rgba(255,255,255,.96);backdrop-filter:blur(10px);z-index:20}.mp-head h1{font-size:15px;letter-spacing:1px;color:var(--ink);font-weight:850}.mp-capsule{position:absolute;right:14px;width:54px;height:25px;border:1px solid var(--hair-2);border-radius:999px;display:flex;align-items:center;justify-content:center;gap:4px;background:#fff}.mp-capsule i{width:4px;height:4px;border-radius:50%;background:var(--coffee);display:block}.content{position:relative;z-index:1;max-width:430px;margin:0 auto;padding:16px 14px 86px}.tabbar{height:58px;position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(430px,100%);background:rgba(255,255,255,.96);border-top:1px solid rgba(201,183,149,.75);display:grid;grid-template-columns:repeat(5,1fr);z-index:30}.tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9.5px;color:var(--ink-3);letter-spacing:.3px}.tabbar a.active{color:var(--coffee);font-weight:850}.tabbar svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8}
+.profile-card{background:#fff;border:1px solid var(--hair-2);border-radius:10px;box-shadow:0 2px 9px rgba(93,67,38,.08);padding:14px}.profile-head{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:center;padding-bottom:13px;border-bottom:1px solid rgba(221,208,180,.75)}.avatar{width:64px;height:64px;border-radius:10px;border:1px solid rgba(93,67,38,.22);background:#f7f1e6;display:grid;place-items:center;color:var(--coffee);font-size:22px;font-weight:950;letter-spacing:1px}.identity{min-width:0}.identity h2{font-size:21px;line-height:1.3;color:var(--ink);font-weight:950;letter-spacing:.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.identity p{font-size:12px;color:var(--ink-3);margin-top:4px}.info-list{margin-top:4px}.info-row{min-height:44px;display:grid;grid-template-columns:82px minmax(0,1fr);align-items:center;gap:10px;border-bottom:1px solid rgba(221,208,180,.62)}.info-row:last-child{border-bottom:0}.info-row span{font-size:12px;color:var(--ink-3)}.info-row b{font-size:13px;color:var(--ink);font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.contact-note{margin-top:12px;border:1.5px dashed rgba(93,67,38,.28);background:rgba(255,252,242,.92);border-radius:9px;padding:11px 12px;color:var(--ink-2);font-size:12px;line-height:1.7}.contact-note b{display:block;color:var(--coffee);font-size:13px;margin-bottom:2px}.only-note{margin:13px 2px 0;font-size:10.5px;color:var(--ink-3);line-height:1.7}.only-note b{color:var(--coffee)}
+@media (max-width:430px){.content{max-width:none}.tabbar{width:100%;left:0;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+  <main class="app-page" aria-label="小程序学生端我的页面">
+    <header class="mp-head"><h1>我的</h1><div class="mp-capsule" aria-hidden="true"><i></i><i></i><i></i></div></header>
+    <section class="content">
+      <section class="profile-card" aria-label="学生账号信息"><div class="profile-head"><div class="avatar" aria-label="学生头像">陈</div><div class="identity"><h2>陈一一</h2><p>学生端账号信息</p></div></div><div class="info-list"><div class="info-row"><span>账号</span><b>chenyiyi</b></div><div class="info-row"><span>昵称</span><b>陈一一</b></div><div class="info-row"><span>所属老师</span><b>李弦安老师</b></div></div></section>
+      <div class="contact-note"><b>账号问题请联系教务老师</b>如忘记账号、密码错误、账号停用或老师信息不正确，请联系教务老师处理。</div>
+      <p class="only-note"><b>学生端说明：</b>头像已在顶部直接展示；本页只展示学生自己的账号、昵称和所属老师，不提供其它操作功能。</p>
+    </section>
+    <nav class="tabbar" aria-label="小程序底部导航"><a href="student-home.html"><svg viewBox="0 0 24 24"><path d="M3 10.8 12 3l9 7.8V21h-6v-6H9v6H3z"/></svg>首页</a><a href="course.html"><svg viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-1.5Z"/><path d="M8 7h7"/></svg>课程</a><a href="library.html"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/></svg>图书馆</a><a href="history.html"><svg viewBox="0 0 24 24"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>历史</a><a class="active" href="mine.html"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>我的</a></nav>
+  </main>
+</body>
+</html>

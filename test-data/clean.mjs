@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { config } from '../backend/src/config.js';
+import { getRuntimeConfig } from './runtime-config.mjs';
 
 const require = createRequire(new URL('../backend/package.json', import.meta.url));
 const { Pool } = require('pg');
@@ -22,6 +22,7 @@ if (!fs.existsSync(MANIFEST_PATH)) {
 }
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf-8'));
+const config = getRuntimeConfig();
 const pool = new Pool({ connectionString: config.databaseUrl });
 const s3 = new S3Client({
   endpoint: config.s3.endpoint,

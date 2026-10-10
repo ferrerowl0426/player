@@ -29,6 +29,6 @@ export default function ListRow({ type = 'file', href = '', title, meta = '', ac
     return href ? <a className="brow" href={href}>{body}</a> : <div className="brow">{body}</div>;
   }
 
-  const body = <><span className={`fico ${String(label).toLowerCase()}`}>{label}</span><span><span className="fname" {...marquee}><span className="tt">{title}</span></span><span className="fmeta">{meta}</span></span>{action ? <span className="fops">{action}</span> : null}</>;
+  const body = <><span className={`fico ${String(label).toLowerCase()}`}>{label}</span><span><span className="fname" {...marquee}><span className="tt">{title}</span></span>{meta ? <span className="fmeta">{meta}</span> : null}</span>{action ? <span className="fops">{action}</span> : null}</>;
   return href ? <a className="frow" href={href}>{body}</a> : <div className="frow">{body}</div>;
 }

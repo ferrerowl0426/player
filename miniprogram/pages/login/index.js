@@ -1,13 +1,11 @@
 const { login } = require('../../services/auth');
-const { ENABLE_DEV_PREVIEW } = require('../../utils/constants');
 
 Page({
   data: {
     account: '',
     password: '',
     loading: false,
-    error: '',
-    enableDevPreview: ENABLE_DEV_PREVIEW
+    error: ''
   },
 
   onAccountInput(event) {
@@ -18,20 +16,6 @@ Page({
     this.setData({ password: event.detail.value, error: '' });
   },
 
-  enterPreview() {
-    const student = {
-      id: 'dev-preview-student',
-      account: '13776186160',
-      nickname: '林小雨',
-      username: '林小雨',
-      className: '内部测试班',
-      status: 'active',
-      role: 'user'
-    };
-
-    getApp().setSession({ token: 'dev-preview-token', student });
-    wx.switchTab({ url: '/pages/home/index' });
-  },
 
   async onLogin() {
     const account = String(this.data.account || '').trim();

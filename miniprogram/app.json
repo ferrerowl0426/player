@@ -20,10 +20,6 @@
     "backgroundColor": "#ffffff",
     "backgroundTextStyle": "dark"
   },
-  "usingComponents": {
-    "empty-state": "/components/empty-state/index",
-    "status-banner": "/components/status-banner/index"
-  },
   "tabBar": {
     "color": "#7a6a52",
     "selectedColor": "#5d4326",

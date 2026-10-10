@@ -1,0 +1,110 @@
+﻿=== STAT ===
+5efb218 chore: add temporary ICP review access note
+ ...205\215\347\275\256\350\257\264\346\230\216.md" | 168 +++++++++++++++++++++
+ frontend/app/login/LoginForm.js                    |   8 +-
+ frontend/app/login/login.module.css                |  39 +++++
+ frontend/app/page.js                               |   3 +-
+ 4 files changed, 216 insertions(+), 2 deletions(-)
+=== page.js DIFF ===
+commit 5efb2180cd44e673679ac9298a7051fd6b60b2c4
+Author: ferrerowl0426 <ferrerowl0426@gmail.com>
+Date:   Tue Sep 29 11:16:30 2026 +0800
+
+    chore: add temporary ICP review access note
+
+diff --git a/frontend/app/page.js b/frontend/app/page.js
+index 12cb6f7..41fb83c 100644
+--- a/frontend/app/page.js
++++ b/frontend/app/page.js
+@@ -52,7 +52,8 @@ export default function HomePage() {
+         setUser(result.data);
+         await loadTodayAssignments();
+       } catch {
+-        router.replace('/login');
++        // 鍏畨澶囨瀹℃牳鏈熶复鏃堕厤缃細鏈櫥褰曢娆℃墦寮€绔欑偣鏃剁洿鎺ュ睍绀烘父瀹㈠彲瑙佺殑鏇茬洰鍖恒€?+        router.replace('/tracks');
+       }
+     }
+     init();
+=== LoginForm DIFF ===
+commit 5efb2180cd44e673679ac9298a7051fd6b60b2c4
+Author: ferrerowl0426 <ferrerowl0426@gmail.com>
+Date:   Tue Sep 29 11:16:30 2026 +0800
+
+    chore: add temporary ICP review access note
+
+diff --git a/frontend/app/login/LoginForm.js b/frontend/app/login/LoginForm.js
+index aae1608..14a81f6 100644
+--- a/frontend/app/login/LoginForm.js
++++ b/frontend/app/login/LoginForm.js
+@@ -91,7 +91,13 @@ export default function LoginForm() {
+             </div>
+           </div>
+ 
+-          <div className={`${styles.image} ${styles.rise}`}></div>
++          <div className={`${styles.image} ${styles.rise}`}>
++            <div className={styles.auditNote}>
++              <strong>澶囨瀹℃牳璇存槑</strong>
++              <p>鏈珯浠呬緵鍚変粬鐖卞ソ鑰呮暣鐞嗗涔犵瑪璁颁笌璇剧▼璧勬枡锛屾棤骞垮憡锛屼笉寮€鏀惧叕鍏辨敞鍐岋紝鏃犳敮浠樺姛鑳姐€?/p>
++              <p>瀹℃牳娴嬭瘯璐﹀彿锛?3382800426<br />瀹℃牳娴嬭瘯瀵嗙爜锛歞emo123</p>
++            </div>
++          </div>
+ 
+           <div className={styles.formSide}>
+           <div className={`${styles.formHead} ${styles.rise} ${styles.delay1}`}>
+=== login css DIFF ===
+commit 5efb2180cd44e673679ac9298a7051fd6b60b2c4
+Author: ferrerowl0426 <ferrerowl0426@gmail.com>
+Date:   Tue Sep 29 11:16:30 2026 +0800
+
+    chore: add temporary ICP review access note
+
+diff --git a/frontend/app/login/login.module.css b/frontend/app/login/login.module.css
+index 4fb3a3c..844bd36 100644
+--- a/frontend/app/login/login.module.css
++++ b/frontend/app/login/login.module.css
+@@ -141,6 +141,45 @@
+   border-right: 1px solid var(--guitar-glass-line);
+ }
+ 
++.auditNote {
++  position: absolute;
++  right: 24px;
++  bottom: 24px;
++  left: 24px;
++  z-index: 2;
++  padding: 16px 18px;
++  color: var(--guitar-ink);
++  background: rgba(255, 255, 255, 0.88);
++  border: 1px solid rgba(93, 67, 38, 0.32);
++  border-radius: 6px;
++  box-shadow: 0 10px 26px rgba(38, 29, 16, 0.18);
++  backdrop-filter: blur(8px);
++  -webkit-backdrop-filter: blur(8px);
++}
++
++.auditNote strong {
++  display: block;
++  margin-bottom: 8px;
++  color: var(--guitar-coffee);
++  font-size: 13px;
++  font-weight: 700;
++  letter-spacing: 1.5px;
++}
++
++.auditNote p {
++  margin: 0;
++  color: var(--guitar-ink-2);
++  font-size: 12px;
++  line-height: 1.75;
++  letter-spacing: 0.4px;
++}
++
++.auditNote p + p {
++  margin-top: 10px;
++  padding-top: 10px;
++  border-top: 1px dashed rgba(93, 67, 38, 0.24);
++}
++
+ .formSide {
+   position: relative;
+   z-index: 3;

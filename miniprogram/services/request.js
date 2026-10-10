@@ -13,8 +13,30 @@ function normalizeError(statusCode, body) {
   return error;
 }
 
+function clearLocalSession() {
+  [
+    'studentToken',
+    'student',
+    'studentTokenExpiresAt',
+    'homeworkTodayCache',
+    'homeworkHistoryCache',
+    'coursesCache',
+    'libraryCache',
+    'studentMeCache'
+  ].forEach((key) => wx.removeStorageSync(key));
+}
+
+function getValidToken() {
+  const expiresAt = Number(wx.getStorageSync('studentTokenExpiresAt') || 0);
+  if (expiresAt && Date.now() >= expiresAt) {
+    clearLocalSession();
+    return '';
+  }
+  return wx.getStorageSync('studentToken') || '';
+}
+
 function request({ url, method = 'GET', data, header = {} }) {
-  const token = wx.getStorageSync('studentToken');
+  const token = getValidToken();
   const finalHeader = {
     'content-type': 'application/json',
     ...header
@@ -37,8 +59,7 @@ function request({ url, method = 'GET', data, header = {} }) {
         }
 
         if (res.statusCode === 401) {
-          wx.removeStorageSync('studentToken');
-          wx.removeStorageSync('student');
+          clearLocalSession();
         }
 
         console.warn('[mini-request]', method, `${getBaseUrl()}${url}`, res.statusCode, res.data);

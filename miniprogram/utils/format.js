@@ -50,10 +50,31 @@ function normalizeAssignment(item = {}) {
   };
 }
 
+function isDeletedAssignment(item = {}) {
+  const target = item.target || {};
+  const status = String(item.status || item.objectStatus || item.object_status || target.status || '').toLowerCase();
+  return Boolean(
+    item.deleted ||
+    item.isDeleted ||
+    item.is_deleted ||
+    item.deletedAt ||
+    item.deleted_at ||
+    item.objectDeleted ||
+    item.object_deleted ||
+    target.deleted ||
+    target.isDeleted ||
+    target.is_deleted ||
+    target.deletedAt ||
+    target.deleted_at ||
+    status === 'deleted' ||
+    status === 'removed'
+  );
+}
+
 function normalizeHomeworkGroup(data) {
   const payload = data || {};
   const source = payload.latestHomework || payload.homework || payload;
-  const assignments = (source.assignments || source.items || []).map(normalizeAssignment);
+  const assignments = (source.assignments || source.items || []).filter((item) => !isDeletedAssignment(item)).map(normalizeAssignment);
   const first = assignments[0] || {};
   const assignmentTime = source.assignmentDate || source.assignment_date || source.createdAt || source.created_at;
   return {

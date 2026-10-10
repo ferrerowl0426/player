@@ -1,5 +1,4 @@
 const API_BASE_URL = 'https://api.nxhguitar.com/api/miniprogram';
-const ENABLE_DEV_PREVIEW = true;
 
 const OBJECT_TYPE_LABELS = {
   track_collection: '合集',
@@ -22,7 +21,6 @@ const OBJECT_TYPE_ACTIONS = {
 
 module.exports = {
   API_BASE_URL,
-  ENABLE_DEV_PREVIEW,
   OBJECT_TYPE_LABELS,
   OBJECT_TYPE_ACTIONS
 };

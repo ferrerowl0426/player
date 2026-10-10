@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序学生端 · PDF 全屏预览</title>
+<style>
+/* ============================================================
+   能学慧吉他教室 · 小程序学生端 / PDF 全屏预览交互页
+   从图书馆点“预览”跳转进入；不套手机边框；底部提供返回按钮
+============================================================ */
+:root{--ink:#261d10;--ink-2:#4f4230;--ink-3:#7a6a52;--hair:#ddd0b4;--hair-2:#c9b795;--coffee:#5d4326;--orange:#ff7f00;--paper:#fffaf1;--font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;--ease:cubic-bezier(.16,1,.3,1)}
+*{margin:0;padding:0;box-sizing:border-box}html,body{min-height:100%;background:#f4ead7;color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased}body{font-size:14px;line-height:1.6}a{color:inherit;text-decoration:none}button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}a:focus-visible,button:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}.num{font-variant-numeric:tabular-nums}
+.preview-page{min-height:100dvh;display:flex;flex-direction:column;background:var(--paper);position:relative;overflow:hidden}.preview-page::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(122,74,38,.09) 0 1px,transparent 1px 42px),repeating-linear-gradient(0deg,rgba(122,74,38,.09) 0 1px,transparent 1px 42px);opacity:.42}.topbar{height:52px;flex:none;position:sticky;top:0;z-index:10;display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid rgba(93,67,38,.18);background:rgba(255,250,241,.96);backdrop-filter:blur(12px)}.title{min-width:0;text-align:left}.title b{display:block;font-size:13px;line-height:1.25;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.title span{display:block;font-size:9px;color:var(--ink-3);letter-spacing:.6px;margin-top:1px}.pager{font-size:10px;font-weight:850;color:var(--coffee);border:1px solid var(--hair-2);background:#fff;border-radius:999px;padding:4px 8px;white-space:nowrap}.pdf-viewport{position:relative;z-index:1;flex:1;overflow:auto;padding:10px 10px 74px;scrollbar-width:thin;scrollbar-color:rgba(93,67,38,.42) transparent}.pdf-document{max-width:430px;margin:0 auto;display:grid;gap:12px}.pdf-page{min-height:620px;background:#fffdf8;border:1px solid rgba(93,67,38,.22);box-shadow:0 6px 20px rgba(93,67,38,.13);padding:24px 20px 30px;position:relative}.pdf-page::after{content:attr(data-page);position:absolute;right:18px;bottom:12px;color:#aa9a80;font-size:10px}.pdf-title{font-size:19px;line-height:1.32;letter-spacing:.4px;color:var(--ink);font-weight:950;margin-bottom:4px}.pdf-sub{font-size:11px;color:var(--ink-3);margin-bottom:18px}.section-title{font-size:12px;color:var(--coffee);font-weight:950;margin:18px 0 8px;letter-spacing:.4px}.stave{height:43px;border-top:1px solid rgba(93,67,38,.42);border-bottom:1px solid rgba(93,67,38,.42);background:repeating-linear-gradient(180deg,transparent 0 8px,rgba(93,67,38,.32) 8px 9px);margin:12px 0;position:relative}.stave::before{content:"𝄞";position:absolute;left:8px;top:-8px;color:rgba(93,67,38,.58);font-size:34px;line-height:1}.note{position:absolute;width:11px;height:8px;border-radius:50%;background:rgba(93,67,38,.68);transform:rotate(-18deg)}.n1{left:58px;top:18px}.n2{left:118px;top:11px}.n3{left:178px;top:26px}.n4{left:244px;top:15px}.n5{left:314px;top:23px}.text-line{height:7px;background:rgba(93,67,38,.16);border-radius:999px;margin:9px 0}.text-line.w1{width:92%}.text-line.w2{width:78%}.text-line.w3{width:62%}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}.tip{border:1px solid rgba(93,67,38,.22);background:#fffaf1;border-radius:8px;padding:9px}.tip b{display:block;font-size:11px;color:var(--coffee);margin-bottom:3px}.tip span{display:block;font-size:10px;color:var(--ink-3)}.floating-actions{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;width:min(430px,calc(100% - 24px));z-index:20;display:flex;gap:8px}.floating-actions a,.floating-actions button{height:44px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:950}.return-main{flex:1;background:var(--coffee);color:#fff;box-shadow:0 10px 24px rgba(93,67,38,.22)}.download{width:92px;border:1px solid var(--hair-2);background:rgba(255,255,255,.96);color:var(--coffee)}.hint{position:fixed;left:50%;transform:translateX(-50%);bottom:66px;z-index:19;background:rgba(38,29,16,.78);color:#fff;border-radius:999px;padding:6px 11px;font-size:10px;letter-spacing:.3px;pointer-events:none;animation:fadeHint 4s var(--ease) forwards}@keyframes fadeHint{0%,62%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,8px)}}
+@media (max-width:430px){.pdf-viewport{padding-left:0;padding-right:0}.pdf-page{border-left:0;border-right:0;box-shadow:none;min-height:calc(100dvh - 126px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}.hint{display:none}}
+</style>
+</head>
+<body>
+  <main class="preview-page" aria-label="PDF 全屏预览页">
+    <header class="topbar">
+      <div class="title"><b>卡农 P2 段落衔接练习谱.pdf</b><span>PDF 预览 · 短时有效</span></div>
+      <div class="pager"><span class="num">1</span>/<span class="num">6</span></div>
+    </header>
+    <section class="pdf-viewport" aria-label="PDF 内容预览区域">
+      <article class="pdf-document">
+        <section class="pdf-page" data-page="第 1 页">
+          <h1 class="pdf-title">卡农 P2 段落衔接练习谱</h1>
+          <p class="pdf-sub">能学慧吉他教室 · 课堂练习 PDF</p>
+          <div class="section-title">一、右手分解和弦保持均匀</div>
+          <div class="stave"><i class="note n1"></i><i class="note n2"></i><i class="note n3"></i><i class="note n4"></i><i class="note n5"></i></div>
+          <div class="text-line w1"></div><div class="text-line w2"></div><div class="text-line w3"></div>
+          <div class="section-title">二、P2 段落连接</div>
+          <div class="stave"><i class="note n1"></i><i class="note n2"></i><i class="note n3"></i><i class="note n4"></i></div>
+          <div class="text-line w1"></div><div class="text-line w2"></div>
+          <div class="grid"><div class="tip"><b>练习速度</b><span>60 BPM 起，每组 4 遍</span></div><div class="tip"><b>提交要求</b><span>录制完整衔接段落</span></div></div>
+        </section>
+        <section class="pdf-page" data-page="第 2 页">
+          <h2 class="pdf-title">慢速分句练习</h2>
+          <p class="pdf-sub">向下滑动继续查看 PDF 后续页面</p>
+          <div class="section-title">三、左手换把位置</div>
+          <div class="stave"><i class="note n2"></i><i class="note n3"></i><i class="note n4"></i><i class="note n5"></i></div>
+          <div class="text-line w1"></div><div class="text-line w1"></div><div class="text-line w2"></div><div class="text-line w3"></div>
+          <div class="section-title">四、常见错误</div>
+          <div class="grid"><div class="tip"><b>节拍提前</b><span>先跟节拍器空弹两遍</span></div><div class="tip"><b>低音断开</b><span>左手按住根音再换指</span></div><div class="tip"><b>声音不匀</b><span>右手拇指轻一点</span></div><div class="tip"><b>停顿明显</b><span>单独循环连接小节</span></div></div>
+          <div class="stave"><i class="note n1"></i><i class="note n3"></i><i class="note n5"></i></div>
+        </section>
+      </article>
+    </section>
+    <div class="hint">预览页为新页面全屏打开，可上下滑动查看 PDF</div>
+    <div class="floating-actions" aria-label="PDF 预览操作">
+      <a class="return-main" href="library.html">返回小程序</a>
+      <button class="download" type="button">下载</button>
+    </div>
+  </main>
+</body>
+</html>

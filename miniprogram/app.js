@@ -1,4 +1,4 @@
-const { getStoredToken, setStoredStudent, clearSession } = require('./services/auth');
+const { getStoredToken, getStoredStudent, setStoredSession, clearSession } = require('./services/auth');
 
 App({
   globalData: {
@@ -9,16 +9,14 @@ App({
 
   onLaunch() {
     this.globalData.token = getStoredToken();
-    const student = wx.getStorageSync('student');
-    this.globalData.student = student || null;
+    this.globalData.student = getStoredStudent();
   },
 
-  setSession({ token, student }) {
+  setSession({ token, student, expiresAt }) {
     this.globalData.token = token || '';
     this.globalData.student = student || null;
-    setStoredStudent(student);
-    if (token) {
-      wx.setStorageSync('studentToken', token);
+    if (token && student) {
+      setStoredSession({ token, student, expiresAt });
     }
   },
 

@@ -1,0 +1,91 @@
+﻿--- push origin ---
+origin_exit=128
+--- push gitee ---
+gitee_exit=128
+--- status ---
+## main...origin/main [ahead 2]
+ M "debug\345\244\215\347\233\230/2026-09-20-\346\234\215\345\212\241\345\231\250\351\203\250\347\275\262\351\227\256\351\242\230\345\244\215\347\233\230.md"
+ D docs/design/guitar-home/_shot/_tipshot.png
+ D docs/design/guitar-home/_shot/admin-col-full.png
+ D docs/design/guitar-home/_shot/admin-col-uploaded.png
+ D docs/design/guitar-home/_shot/admin-col-v2.png
+ D docs/design/guitar-home/_shot/admin-col-v3.png
+ D docs/design/guitar-home/_shot/admin-col-v4.png
+ D docs/design/guitar-home/_shot/admin-col-v5.png
+ D docs/design/guitar-home/_shot/admin-col-v6.png
+ D docs/design/guitar-home/_shot/admin-col-v7.png
+ D docs/design/guitar-home/_shot/class-manage.png
+ D docs/design/guitar-home/_shot/collection-detail-k.png
+ D docs/design/guitar-home/_shot/collection-detail-t.png
+ D docs/design/guitar-home/_shot/collection-detail.png
+ D docs/design/guitar-home/_shot/course-detail.png
+ D docs/design/guitar-home/_shot/knowledge-full.png
+ D docs/design/guitar-home/_shot/knowledge-vp.png
+ D docs/design/guitar-home/_shot/lesson-v2.png
+ D docs/design/guitar-home/_shot/library.png
+ D docs/design/guitar-home/_shot/my-homework.png
+ D docs/design/guitar-home/_shot/student-home.png
+ D docs/design/guitar-home/_shot/student-manage.png
+ D docs/design/guitar-home/_shot/tracks-full.png
+ D docs/design/guitar-home/assets/bg-final.jpg
+ D docs/design/guitar-home/assets/bg-music-room.jpg
+ D docs/design/guitar-home/assets/bg-wood-v5-warm.jpg
+ D docs/design/guitar-home/assets/bg-wood-v5.jpg
+ D docs/design/guitar-home/assets/bg-wood.jpg
+ D docs/design/guitar-home/assets/covers/cover-1.png
+ D docs/design/guitar-home/assets/covers/cover-2.png
+ D docs/design/guitar-home/assets/covers/cover-3.png
+ D docs/design/guitar-home/assets/covers/cover-4.png
+ D docs/design/guitar-home/assets/covers/cover-5.png
+ D docs/design/guitar-home/assets/covers/cover-6.png
+ D docs/design/guitar-home/assets/covers/real-01.jpg
+ D docs/design/guitar-home/assets/covers/real-02.jpg
+ D docs/design/guitar-home/assets/covers/real-03.jpg
+ D docs/design/guitar-home/assets/covers/real-04.jpg
+ D docs/design/guitar-home/assets/covers/real-05.jpg
+ D docs/design/guitar-home/assets/covers/real-06.jpg
+ D docs/design/guitar-home/assets/covers/real-07.jpg
+ D docs/design/guitar-home/assets/covers/real-08.jpg
+ D docs/design/guitar-home/assets/covers/real-09.jpg
+ D docs/design/guitar-home/assets/covers/real-10.jpg
+ D docs/design/guitar-home/assets/covers/real-11.jpg
+ D docs/design/guitar-home/assets/covers/real-12.jpg
+ D docs/design/guitar-home/assets/covers/real-13.jpg
+ D docs/design/guitar-home/assets/covers/real-14.jpg
+ D docs/design/guitar-home/assets/covers/real-15.jpg
+ D docs/design/guitar-home/assets/covers/real-16.jpg
+ D docs/design/guitar-home/assets/covers/real-17.jpg
+ D docs/design/guitar-home/assets/covers/real-18.jpg
+ D docs/design/guitar-home/assets/pdf/doc-01.pdf
+ D docs/design/guitar-home/assets/pdf/doc-02.pdf
+ D docs/design/guitar-home/assets/pdf/doc-03.pdf
+ D docs/design/guitar-home/assets/pdf/doc-04.pdf
+ D docs/design/guitar-home/assets/pdf/doc-05.pdf
+ D docs/design/guitar-home/assets/pdf/doc-06.pdf
+ D docs/design/guitar-home/assets/pdf/doc-07.pdf
+ D docs/design/guitar-home/assets/pdf/doc-08.pdf
+ D docs/design/guitar-home/assets/pdf/doc-09.pdf
+ D docs/design/guitar-home/assets/pdf/doc-10.pdf
+ D docs/design/guitar-home/assets/pdf/doc-11.pdf
+ D docs/design/guitar-home/assets/pdf/doc-12.pdf
+ D docs/design/guitar-home/assets/wc-metronome-full.jpg
+ D docs/design/guitar-home/assets/wc-metronome-tall.jpg
+ D docs/design/guitar-home/assets/wc-metronome.jpg
+ D "docs/design/guitar-home/assets/\345\237\272\344\272\216\350\277\231\345\274\240\346\236\201\347\256\200\346\260\264\345\275\251\345\271\264\350\275\256\350\203\214\346\231\257\345\233\276\345\201\232\350\275\273\345\276\256\344\277\256\346\224\271_\344\270\245\347\246\201\346\224\271\345\217\230\345\216\237\345\233\276\346\236\204\345\233\276_1__2026-09-08T18-49-29.png"
+ D "docs/design/guitar-home/assets/\345\237\272\344\272\216\350\277\231\345\274\240\346\260\264\345\275\251\346\211\213\347\273\230\345\271\264\350\275\256\347\272\271\347\220\206\350\203\214\346\231\257\345\233\276\350\277\233\350\241\214\345\261\200\351\203\250\344\277\256\346\224\271_1__\346\225\264\344\275\223\350\211\262\350\260\203\345\212\240_2026-09-08T18-49-03.png"
+ D "docs/design/guitar-home/assets/\345\237\272\344\272\216\350\277\231\345\274\240\346\260\264\345\275\251\346\217\222\347\224\273\350\277\233\350\241\214\345\261\200\351\203\250\344\277\256\345\244\215_1__\347\224\273\351\235\242\345\217\263\344\270\213\350\247\222\346\234\211\344\270\200\345\235\227\346\250\241\347\263\212\347\232\204\346\266\202_2026-09-08T19-01-53.png"
+ D "docs/design/guitar-home/assets/\345\237\272\344\272\216\350\277\231\345\274\240\346\260\264\345\275\251\346\217\222\347\224\273\350\277\233\350\241\214\347\224\273\345\270\203\346\211\251\345\261\225_outpainting__\345\216\237\345\233\276_2026-09-08T18-58-00.png"
+ D "docs/design/guitar-home/assets/\347\224\237\346\210\220\344\270\200\345\274\240\346\260\264\345\275\251\346\211\213\347\273\230\351\243\216\346\240\274\347\232\204\345\216\237\346\234\250\345\271\264\350\275\256\347\272\271\347\220\206\350\203\214\346\231\257\345\233\276_1__\346\236\204\345\233\276_\344\270\200\346\225\264\345\235\227_2026-09-08T18-41-23.png"
+ D "docs/design/guitar-home/assets/\347\224\237\346\210\220\344\270\200\345\274\240\346\260\264\345\275\251\346\211\213\347\273\230\351\243\216\346\240\274\347\232\204\345\216\237\346\234\250\345\271\264\350\275\256\347\272\271\347\220\206\350\203\214\346\231\257\345\233\276_1__\346\236\204\345\233\276_\347\224\273\351\235\242\344\270\213_2026-09-08T18-41-28.png"
+ D "docs/design/guitar-home/assets/\347\224\237\346\210\220\344\270\200\345\274\240\346\260\264\345\275\251\346\211\213\347\273\230\351\243\216\346\240\274\347\232\204\345\216\237\346\234\250\345\271\264\350\275\256\347\272\271\347\220\206\350\203\214\346\231\257\345\233\276_1__\347\224\273\351\235\242\344\270\272\344\270\244\347\273\204\345\244\247_2026-09-08T18-41-28.png"
+ D "docs/design/guitar-home/assets/\347\224\237\346\210\220\344\270\200\345\274\240\346\260\264\345\275\251\346\211\213\347\273\230\351\243\216\346\240\274\347\232\204\345\216\237\346\234\250\345\271\264\350\275\256\347\272\271\347\220\206\350\203\214\346\231\257\345\233\276_1__\347\224\273\351\235\242\346\230\257\346\250\252\350\267\250\346\225\264_2026-09-08T18-41-25.png"
+ D "docs/design/guitar-home/assets/\347\224\237\346\210\220\344\270\200\345\274\240\346\260\264\345\275\251\346\211\213\347\273\230\351\243\216\346\240\274\347\232\204\346\234\250\347\272\271\350\203\214\346\231\257\345\233\276_1__\346\236\204\345\233\276_\344\270\215\347\224\273\345\271\264\350\275\256\345\234\210_\346\224\271_2026-09-08T18-41-28.png"
+ D docs/design/guitar-home/class-manage-gap-report.md
+ M test-data/README.md
+ M test-data/TEST_ACCOUNTS.md
+ M test-data/seed.mjs
+?? "docs/PRD-\345\260\217\347\250\213\345\272\217\347\253\257\345\255\246\347\224\237\345\212\237\350\203\275.md"
+?? docs/design/guitar-home.zip
+?? docs/design/guitar-home/miniprogram-student.html
+?? docs/design/guitar-home/miniprogram-student/
+?? outputs/

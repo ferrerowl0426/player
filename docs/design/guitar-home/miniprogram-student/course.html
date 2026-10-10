@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序学生端 · 课程</title>
+<style>
+/* ============================================================
+   能学慧吉他教室 · 小程序学生端 / 课程页
+   交互口径：四个类型按钮单选，列表标题右侧保留排序控件
+============================================================ */
+:root{--white:#fff;--ink:#261d10;--ink-2:#4f4230;--ink-3:#7a6a52;--hair:#ddd0b4;--hair-2:#c9b795;--coffee:#5d4326;--orange:#ff7f00;--amber:#b98e3e;--green:#4f7d3a;--wood:#3a2a18;--ease:cubic-bezier(.16,1,.3,1);--font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}html{scroll-behavior:smooth}html,body{min-height:100%}body{font-family:var(--font);color:var(--ink);background:#fff;font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}a{color:inherit;text-decoration:none}button,input,select{font:inherit;color:inherit}button{border:0;background:none;cursor:pointer}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px}.num{font-variant-numeric:tabular-nums}
+.app-page{min-height:100dvh;position:relative;background:#fff;overflow-x:hidden}.app-page::before{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(122,74,38,.16) 0 1px,transparent 1px 42px),repeating-linear-gradient(0deg,rgba(122,74,38,.16) 0 1px,transparent 1px 42px),repeating-linear-gradient(90deg,rgba(122,74,38,.055) 0 1px,transparent 1px 14px),repeating-linear-gradient(0deg,rgba(122,74,38,.055) 0 1px,transparent 1px 14px);-webkit-mask:linear-gradient(180deg,rgba(0,0,0,.1) 0%,rgba(0,0,0,.2) 28%,rgba(0,0,0,.55) 100%);mask:linear-gradient(180deg,rgba(0,0,0,.1) 0%,rgba(0,0,0,.2) 28%,rgba(0,0,0,.55) 100%)}
+.mp-head{height:48px;display:flex;align-items:center;justify-content:center;position:sticky;top:0;border-bottom:1px solid rgba(221,208,180,.68);background:rgba(255,255,255,.96);backdrop-filter:blur(10px);z-index:20}.mp-head h1{font-size:15px;letter-spacing:1px;color:var(--ink);font-weight:850}.mp-capsule{position:absolute;right:14px;width:54px;height:25px;border:1px solid var(--hair-2);border-radius:999px;display:flex;align-items:center;justify-content:center;gap:4px;background:#fff}.mp-capsule i{width:4px;height:4px;border-radius:50%;background:var(--coffee);display:block}
+.content{position:relative;z-index:1;max-width:430px;margin:0 auto;padding:14px 14px 90px}.type-switch{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:2px 0 10px}.type-btn{height:36px;border:1px solid var(--hair-2);border-radius:8px;background:#fff;color:var(--coffee);font-size:12px;font-weight:900;letter-spacing:.5px;box-shadow:0 1px 4px rgba(93,67,38,.05);transition:transform .2s var(--ease),background .2s var(--ease),border-color .2s var(--ease)}.type-btn:active{transform:scale(.97)}.type-btn.active{background:var(--coffee);border-color:var(--coffee);color:#fff;box-shadow:0 5px 14px rgba(93,67,38,.18)}
+.toolbar{position:sticky;top:48px;z-index:15;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);padding:8px 0 10px;border-bottom:1px solid rgba(221,208,180,.45);margin:0 -14px 12px}.toolbar-inner{padding:0 14px;display:grid;gap:9px}.searchbar{height:42px;border:1.5px solid var(--coffee);border-radius:8px;background:#fff;display:flex;align-items:center;gap:9px;padding:0 12px;box-shadow:0 2px 9px rgba(93,67,38,.07)}.searchbar svg{width:16px;height:16px;stroke:var(--ink-3);fill:none;stroke-width:1.8;flex:none}.searchbar input{border:0;outline:0;background:transparent;min-width:0;flex:1;font-size:13px}.searchbar input::placeholder{color:#aa9a80}.searchbar .clear{font-size:10px;color:var(--coffee);font-weight:850;border:1px solid var(--hair-2);border-radius:4px;padding:2px 7px;background:#fff}.sort-row{display:flex;align-items:center;justify-content:flex-end;gap:10px}.result-meta{display:none}.sort-select{appearance:none;-webkit-appearance:none;height:32px;border:1px solid var(--hair-2);border-radius:7px;background:#fff;color:var(--coffee);font-size:11px;font-weight:850;padding:0 28px 0 10px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%235d4326' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.list-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:2px 2px 9px}.list-head h3{font-size:15px;color:var(--coffee);letter-spacing:1.2px;display:flex;align-items:center;gap:7px}.list-head h3::before{content:"";width:4px;height:15px;background:var(--orange);border-radius:1px}.list-head span{font-size:10px;color:var(--ink-3);white-space:nowrap}.course-list{display:grid;gap:9px}.course-card{display:grid;grid-template-columns:72px 1fr;gap:10px;align-items:center;background:#fff;border:1px solid var(--hair);border-radius:9px;padding:7px;box-shadow:0 1px 4px rgba(93,67,38,.06);transition:transform .2s var(--ease),border-color .2s var(--ease)}.course-card:active{transform:scale(.985);border-color:var(--coffee)}.cover{width:72px;height:72px;border-radius:6px;background:var(--wood);position:relative;overflow:hidden;display:grid;place-items:center;background-image:linear-gradient(135deg,rgba(255,127,0,.22),rgba(255,255,255,.02)),repeating-linear-gradient(45deg,rgba(255,255,255,.08) 0 1px,transparent 1px 10px)}.cover .disc{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);box-shadow:inset 0 0 0 14px rgba(58,42,24,.65)}.cover.k{background-color:#4a3b27}.cover.s{background-color:#65461f}.cover .tag{position:absolute;left:5px;top:5px;height:18px;padding:0 6px;border-radius:3px;background:var(--orange);color:#fff;font-size:9px;font-weight:900;letter-spacing:.6px}.cover .tag.set{background:#8a5a12}.cover .tag.k{background:var(--coffee)}.cover .count{position:absolute;right:5px;bottom:5px;background:rgba(93,67,38,.88);color:#fff;border-radius:3px;padding:1px 6px;font-size:9px;font-weight:850}.info{min-width:0}.info b{display:block;font-size:13px;line-height:1.42;color:var(--ink);overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}.info span{display:block;font-size:10px;color:var(--ink-3);margin-top:5px}.info em{font-style:normal;display:inline-flex;margin-top:7px;font-size:10px;color:var(--coffee);font-weight:850}.load-more{height:40px;margin:10px 0 0;border:1px dashed var(--hair-2);border-radius:9px;background:rgba(255,255,255,.9);color:var(--ink-3);font-size:11px;letter-spacing:.5px;display:grid;place-items:center}.empty{background:#fff;border:1px dashed var(--hair-2);border-radius:8px;padding:18px 10px;text-align:center;color:var(--ink-3);font-size:12px}
+.backtop{position:fixed;right:max(14px,calc((100vw - 430px)/2 + 14px));bottom:72px;z-index:35;width:42px;height:42px;border-radius:50%;background:var(--coffee);color:#fff;display:grid;place-items:center;box-shadow:0 8px 18px rgba(93,67,38,.22)}.backtop svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2}.tabbar{height:58px;position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(430px,100%);background:rgba(255,255,255,.96);border-top:1px solid rgba(201,183,149,.75);display:grid;grid-template-columns:repeat(5,1fr);z-index:30}.tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9.5px;color:var(--ink-3);letter-spacing:.3px}.tabbar a.active{color:var(--coffee);font-weight:850}.tabbar svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8}
+@media (max-width:430px){.content{max-width:none}.tabbar{width:100%;left:0;transform:none}.backtop{right:14px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+  <main class="app-page" id="top" aria-label="小程序学生端课程页">
+    <header class="mp-head"><h1>课程</h1><div class="mp-capsule" aria-hidden="true"><i></i><i></i><i></i></div></header>
+    <section class="content">
+      <div class="type-switch" role="tablist" aria-label="课程类型切换">
+        <button class="type-btn active" type="button" data-type="knowledge-set" role="tab" aria-selected="true">知识点集</button>
+        <button class="type-btn" type="button" data-type="track-set" role="tab" aria-selected="false">曲目集</button>
+        <button class="type-btn" type="button" data-type="knowledge" role="tab" aria-selected="false">知识点</button>
+        <button class="type-btn" type="button" data-type="track" role="tab" aria-selected="false">曲目</button>
+      </div>
+      <div class="toolbar">
+        <div class="toolbar-inner">
+          <label class="searchbar" aria-label="搜索当前课程类型"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg><input id="courseSearch" type="search" placeholder="在当前类型内搜索"><button class="clear" type="button" id="clearSearch">清空</button></label>
+        </div>
+      </div>
+
+      <div class="list-head"><h3 id="currentTitle">知识点集</h3><select class="sort-select" aria-label="选择排序方式"><option>更新时间倒序</option><option>名称 A-Z</option><option>学习热度优先</option><option>最近布置优先</option></select></div>
+      <section class="course-list" id="courseList" aria-live="polite"></section>
+      <div class="empty" id="emptyState" hidden>没有找到相关课程，请换个关键词试试。</div>
+    </section>
+    <a class="backtop" href="#top" aria-label="回到顶部"><svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg></a>
+    <nav class="tabbar" aria-label="小程序底部导航"><a href="student-home.html"><svg viewBox="0 0 24 24"><path d="M3 10.8 12 3l9 7.8V21h-6v-6H9v6H3z"/></svg>首页</a><a class="active" href="javascript:void(0)"><svg viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-1.5Z"/><path d="M8 7h7"/></svg>课程</a><a href="library.html"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/></svg>图书馆</a><a href="javascript:void(0)"><svg viewBox="0 0 24 24"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>历史</a><a href="mine.html"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>我的</a></nav>
+  </main>
+<script>
+const data={
+  "knowledge-set":{title:"知识点集",tag:"知识点集",theme:"k",items:["右手分解和弦系统训练","节拍器与稳定速度专题","左手换和弦入门路径","扫弦节奏型组合训练","拨片控制基础合集","常见错音修正合集","音阶位置记忆训练","读谱与节奏综合训练"]},
+  "track-set":{title:"曲目集",tag:"曲目集",theme:"s",items:["天空之城指弹入门合集","经典旋律分段练习合集","启蒙阶段 10 首小曲","民谣弹唱入门合集","卡农主题练习合集","儿童歌曲伴奏合集","双音旋律小品合集","期末汇演曲目合集"]},
+  "knowledge":{title:"知识点",tag:"知识点",theme:"k",items:["右手分解和弦：低音保持","左手换和弦的提前准备","节拍器 60 慢速跟练","拨片下拨与上拨稳定","扫弦重音位置控制","开放和弦手型检查","音阶第一把位练习","附点节奏识别"]},
+  "track":{title:"曲目",tag:"曲目",theme:"",items:["卡农 · P2 段落衔接练习","小星星变奏 · 完整分段","天空之城 · 主歌段落","送别 · 和弦转换练习","虫儿飞 · 旋律版","童年 · 弹唱入门","生日快乐歌 · 单音版","爱的罗曼史 · 片段练习"]}
+};
+const list=document.getElementById('courseList');
+const title=document.getElementById('currentTitle');
+const empty=document.getElementById('emptyState');
+const search=document.getElementById('courseSearch');
+let current='knowledge-set';
+function render(){
+  const group=data[current];
+  const q=search.value.trim().toLowerCase();
+  const items=group.items.filter(name=>name.toLowerCase().includes(q));
+  title.textContent=group.title;
+  empty.hidden=items.length>0;
+  list.innerHTML=items.map((name,i)=>`<a class="course-card" href="javascript:void(0)"><div class="cover ${group.theme}"><span class="tag ${group.theme==='s'?'set':group.theme}">${group.tag}</span><span class="count">${group.tag.includes('集')?(i%4+5)+' 项':'P'+(i%4+1)}</span><i class="disc"></i></div><div class="info"><b>${name}</b><span>${group.tag.includes('集')?'合集详情 · 查看收录内容':'单项详情 · 可进入分 P 播放'}</span><em>${group.tag.includes('集')?'进入合集详情':'进入详情'}</em></div></a>`).join('');
+}
+document.querySelectorAll('.type-btn').forEach(btn=>btn.addEventListener('click',()=>{
+  current=btn.dataset.type;
+  document.querySelectorAll('.type-btn').forEach(item=>{item.classList.toggle('active',item===btn);item.setAttribute('aria-selected',item===btn?'true':'false')});
+  search.value='';
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
+}));
+search.addEventListener('input',render);
+document.getElementById('clearSearch').addEventListener('click',()=>{search.value='';render();search.focus()});
+render();
+</script>
+</body>
+</html>

@@ -38,10 +38,8 @@ function getClearCookieOptions() {
   return options;
 }
 
-function signToken(payload) {
-  return jwt.sign(payload, config.auth.jwtSecret, {
-    expiresIn: config.auth.tokenExpiresInSeconds
-  });
+function signToken(payload, expiresIn = config.auth.tokenExpiresInSeconds) {
+  return jwt.sign(payload, config.auth.jwtSecret, { expiresIn });
 }
 
 // 老师和学员使用不同 Cookie 名称，并且 token 里写入 type。
@@ -64,13 +62,13 @@ export function signAdminToken(admin) {
   });
 }
 
-export function signUserToken(user) {
+export function signUserToken(user, options = {}) {
   return signToken({
     type: 'user',
     userId: user.id,
     role: user.role || 'user',
     status: user.status || 'active'
-  });
+  }, options.expiresIn);
 }
 
 export function getAdminCookieOptions() {

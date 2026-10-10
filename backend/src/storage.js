@@ -67,13 +67,19 @@ export function normalizePublicUrl(url) {
   return text;
 }
 
+function isPdfContentType(contentType = '') {
+  return String(contentType).toLowerCase().includes('application/pdf');
+}
+
 // 生成一个短时间有效的 PUT 上传地址。
 // 浏览器拿到这个地址后，可以直接把小文件上传到对象存储，不再经过后端中转。
-export async function createUploadUrl({ key, contentType }) {
+// PDF 默认写入 inline 响应头，用于新窗口预览；下载入口由前端单独提供。
+export async function createUploadUrl({ key, contentType, contentDisposition }) {
   const command = new PutObjectCommand({
     Bucket: config.s3.bucket,
     Key: key,
-    ContentType: contentType
+    ContentType: contentType,
+    ...(contentDisposition || isPdfContentType(contentType) ? { ContentDisposition: contentDisposition || 'inline' } : {})
   });
 
   return getSignedUrl(presignClient, command, { expiresIn: 10 * 60 });

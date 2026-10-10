@@ -519,10 +519,10 @@ body.library-index-page .card:hover {
 .picked-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; font-size: 11px; letter-spacing: .4px; color: #4a6b3f; background: rgba(111,143,99,.08); border: 1px solid rgba(111,143,99,.45); border-radius: 4px; padding: 4px 6px 4px 10px; }
 .picked-chip.inherited { color: var(--ink-3); background: rgba(242,234,217,.62); border-style: dashed; border-color: var(--hair-2); }
 .picked-chip .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picked-chip .seq { flex: none; width: 34px; height: 20px; padding: 0 3px; text-align: center; border: 1px solid rgba(111,143,99,.45); border-radius: 3px; background: rgba(255,255,255,.76); color: #4a6b3f; font-size: 11px; font-weight: 600; }
+.picked-chip .seq { flex: none; width: 48px; height: 20px; padding: 0 6px; text-align: center; border: 1px solid rgba(111,143,99,.45); border-radius: 3px; background: rgba(255,255,255,.76); color: #4a6b3f; font-size: 12px; line-height: 20px; font-weight: 600; box-sizing: border-box; appearance: textfield; }
 .picked-chip .seq:focus { outline: 2px solid rgba(111,143,99,.24); border-color: #6f8f63; }
 .picked-chip .seq::-webkit-outer-spin-button,
-.picked-chip .seq::-webkit-inner-spin-button { margin: 0; }
+.picked-chip .seq::-webkit-inner-spin-button { margin: 0; appearance: none; }
 .picked-chip .mv { flex: none; min-width: 18px; height: 18px; border-radius: 3px; display: grid; place-items: center; font-size: 11px; line-height: 1; color: #4a6b3f; border: 1px solid rgba(111,143,99,.35); background: rgba(255,255,255,.58); }
 .picked-chip .mv:disabled { opacity: .36; cursor: not-allowed; }
 .picked-chip .mv:not(:disabled):hover { border-color: #4a6b3f; background: rgba(111,143,99,.12); }

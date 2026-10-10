@@ -60,6 +60,32 @@ node seed.mjs
 node clean.mjs
 ```
 
+### 服务器宿主机执行
+
+服务器代码目录是 `/root/player`，测试数据脚本在宿主机目录中，不在 backend 容器镜像里。因此不要进入 backend 容器执行 `node clean.mjs`。
+
+```bash
+cd /root/player/test-data
+node clean.mjs
+```
+
+脚本会通过 `runtime-config.mjs` 自动读取根目录 `.env` 和 `backend/.env`，并兼容 `DATABASE_URL`、`DB_*`、`PG*` 变量。
+
+如果服务器根目录 `.env` 不适合宿主机直接连接数据库，可显式覆盖连接串。本项目当前 compose 将 PostgreSQL 映射为 `15432:5432`，宿主机端口应使用 `15432`：
+
+```bash
+cd /root/player/test-data
+DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:15432/video_player' node clean.mjs
+```
+
+如果要先确认真实数据库名和映射端口：
+
+```bash
+cd /root/player
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml ps
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml exec postgres psql -U postgres -d postgres -c '\l'
+```
+
 ## 文件结构
 
 ```txt
@@ -78,6 +104,7 @@ test-data/
 
 - **可删除性**：seed 把所有插入的 id、上传的 COS key、改过密码的账号全部记进 `manifest.json`，clean 按清单**精确删除**——不会碰你自己手工建的曲目/资料/作业
 - **COS 隔离**：所有对象都在 `test-data/` 前缀下，且库里存的是完整公开 URL（与真实上传一致，`normalizePublicUrl` 原样放行）
+- **PDF 预览**：测试 PDF 上传时写入 `Content-Disposition: inline`，用于网页端新窗口预览；音频和其他附件只保留下载入口
 - **幂等保护**：manifest.json 存在时 seed 会拒绝重复执行，先 clean 再 seed
 - **超级管理员不注入**：系统自带超级管理员由业务初始化流程提供，seed 不创建、不修改、不清理该账号
 - 样例视频源：assets 内已准备的短视频文件；封面和 PDF 均随包提供，不依赖运行时联网

@@ -149,7 +149,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
 
 - 只保留 `https://nxhguitar.com` 一个业务 Origin；`www`、HTTP 一律 301 跳主站，避免登录态 / CORS / localStorage 分裂。
 - 证书由 Certbot（Let's Encrypt）签发并自动续期，覆盖 `nxhguitar.com`、`www`、`api` 三个域名。
-- 生产环境变量（`/root/player/.env`，同时需要同步到 `/root/player/backend/.env`）：
+- 生产环境变量：Docker Compose 统一读取 `/root/player/.env`；本机直接跑后端时才读取 `backend/.env`。除非明确要在服务器宿主机直接执行后端 Node 进程，否则不要把服务器配置分散维护成两份。
 
 ```env
 FRONTEND_URL=https://nxhguitar.com
@@ -259,6 +259,8 @@ npm run test:reset
 
 ### 5.3 注入 / 清理完整测试数据
 
+本地常规用法：
+
 ```bash
 cd test-data
 node generate-assets.mjs
@@ -266,17 +268,35 @@ node seed.mjs
 node clean.mjs
 ```
 
+服务器宿主机用法：
+
+```bash
+cd /root/player/test-data
+node clean.mjs
+```
+
+如果服务器根目录 `.env` 未提供适合宿主机访问的 `DATABASE_URL`，可显式指定连接串。本项目 Docker Compose 当前将 PostgreSQL 映射为 `15432:5432`，所以宿主机端口应使用 `15432`，不要使用容器内端口 `5432`：
+
+```bash
+cd /root/player/test-data
+DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:15432/video_player' node clean.mjs
+```
+
 说明：
 
 - `generate-assets.mjs` 生成封面、PDF、MP3 等静态素材。
 - `seed.mjs` 新建普通教导主任、老师、学员、内容、图书馆、附件和作业历史。
 - `clean.mjs` 按 `manifest.json` 精确清理 seed 生成的数据，不清理手工数据。
+- `seed.mjs` / `clean.mjs` 通过 `test-data/runtime-config.mjs` 读取配置，兼容根目录 `.env`、`backend/.env`、`DATABASE_URL`、`DB_*` 和 `PG*` 变量。
+- 新上传 / 新注入的 PDF 对象会写入 `Content-Disposition: inline`，网页端仅 PDF 显示“预览 + 下载”；MP3/JPG/PNG/ZIP 等其他附件只显示下载。
+- 后端容器镜像不包含 `test-data/` 目录，不要进入 backend 容器执行 `node clean.mjs`。
 - 系统自带超级管理员不由测试数据注入，seed 不创建、不修改、不清理该账号。
 
 详细测试数据说明见：
 
 - [test-data/README.md](file:///c:/Users/user/Desktop/播放器/test-data/README.md)
 - [test-data/TEST_ACCOUNTS.md](file:///c:/Users/user/Desktop/播放器/test-data/TEST_ACCOUNTS.md)
+- [debug复盘/2026-10-09-测试数据清理脚本环境变量问题复盘.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-10-09-测试数据清理脚本环境变量问题复盘.md)
 
 ### 5.4 启动后端
 

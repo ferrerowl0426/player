@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { config } from '../backend/src/config.js';
+import { getRuntimeConfig } from './runtime-config.mjs';
 
 const require = createRequire(new URL('../backend/package.json', import.meta.url));
 const { Pool } = require('pg');
@@ -16,6 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS = path.join(HERE, 'assets');
 const MANIFEST_PATH = path.join(HERE, 'manifest.json');
 const TEST_PASSWORD = 'demo123';
+const config = getRuntimeConfig();
 
 if (!config.s3.publicBaseUrl) throw new Error('缺少 PUBLIC_BUCKET_BASE_URL 配置');
 if (fs.existsSync(MANIFEST_PATH)) throw new Error('检测到 manifest.json，请先执行 node clean.mjs');
@@ -42,7 +43,13 @@ const manifest = {
 async function q(sql, params = []) { return (await pool.query(sql, params)).rows; }
 async function upload(key, relativeFile, contentType) {
   const body = fs.readFileSync(path.join(ASSETS, relativeFile));
-  await s3.send(new PutObjectCommand({ Bucket: config.s3.bucket, Key: key, Body: body, ContentType: contentType }));
+  await s3.send(new PutObjectCommand({
+    Bucket: config.s3.bucket,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+    ...(contentType === 'application/pdf' ? { ContentDisposition: 'inline' } : {})
+  }));
   manifest.uploadedKeys.push(key);
   return { url: publicUrl(key), size: body.length, key };
 }

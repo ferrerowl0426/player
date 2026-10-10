@@ -52,7 +52,11 @@ function buildKeywordQuery(keyword) {
   return query ? `?${query}` : '';
 }
 
-function uploadBlobWithProgress({ uploadUrl, body, contentType, onProgress, errorMessage, resolveValue }) {
+function isPdfContentType(contentType = '') {
+  return String(contentType).toLowerCase().includes('application/pdf');
+}
+
+function uploadBlobWithProgress({ uploadUrl, body, contentType, contentDisposition, onProgress, errorMessage, resolveValue }) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
@@ -60,6 +64,9 @@ function uploadBlobWithProgress({ uploadUrl, body, contentType, onProgress, erro
 
     if (contentType) {
       xhr.setRequestHeader('Content-Type', contentType);
+    }
+    if (contentDisposition) {
+      xhr.setRequestHeader('Content-Disposition', contentDisposition);
     }
 
     xhr.upload.onprogress = (event) => {
@@ -160,6 +167,7 @@ export async function uploadLibraryFileToBucket({ uploadUrl, file, onProgress })
     uploadUrl,
     body: file,
     contentType: file.type,
+    contentDisposition: isPdfContentType(file.type) ? 'inline' : '',
     onProgress,
     errorMessage: '上传图书馆资料到存储桶失败'
   });
@@ -900,6 +908,7 @@ export async function uploadFileToBucket({ uploadUrl, file, onProgress }) {
     uploadUrl,
     body: file,
     contentType: file.type,
+    contentDisposition: isPdfContentType(file.type) ? 'inline' : '',
     onProgress,
     errorMessage: '直传文件到存储桶失败'
   });

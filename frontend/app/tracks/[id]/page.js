@@ -29,7 +29,9 @@ function formatFileSize(bytes) {
 function fileLabel(fileName = '', fileType = '') {
   const value = `${fileName} ${fileType}`.toLowerCase();
   if (value.includes('mp4') || value.includes('video')) return 'MP4';
-  if (value.includes('mp3') || value.includes('wav') || value.includes('audio')) return 'AUDIO';
+  if (value.includes('mp3')) return 'MP3';
+  if (value.includes('wav')) return 'WAV';
+  if (value.includes('audio')) return 'AUD';
   if (value.includes('png')) return 'PNG';
   if (value.includes('jpg') || value.includes('jpeg')) return 'JPG';
   if (value.includes('pdf')) return 'PDF';
@@ -40,23 +42,18 @@ function fileLabel(fileName = '', fileType = '') {
   return 'FILE';
 }
 
-function isPlayableFile(attachment) {
-  return ['MP4', 'AUDIO'].includes(fileLabel(attachment.file_name, attachment.file_type));
-}
-
-function isPreviewableFile(attachment) {
-  return ['PNG', 'JPG', 'PDF', 'DOC', 'XLS'].includes(fileLabel(attachment.file_name, attachment.file_type));
+function isPdfFile(attachment) {
+  return fileLabel(attachment.file_name, attachment.file_type) === 'PDF';
 }
 
 function resourceActions(resource) {
   const url = resource?.file_url;
   if (!url) return null;
-  const playable = isPlayableFile(resource);
-  const previewable = isPreviewableFile(resource);
+  const isPdf = isPdfFile(resource);
   return (
     <>
-      {playable || previewable ? <a className="fbtn" href={url} target="_blank" rel="noreferrer">{playable ? '播放' : '预览'}</a> : null}
-      <a className="fbtn solid" href={url} download>下载</a>
+      {isPdf ? <a className="fbtn" href={url} target="_blank" rel="noreferrer">预览</a> : null}
+      <a className="fbtn solid" href={url} download={resource?.file_name || true}>下载</a>
     </>
   );
 }
@@ -192,7 +189,6 @@ export default function TrackDetailPage() {
                 return (
                   <ListRow
                     title={attachment.file_name}
-                    meta={formatFileSize(attachment.file_size)}
                     label={label}
                     action={resourceActions(attachment)}
                     key={attachment.id}

@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { clearAdminCookie, getAdminCookieOptions, requireAdmin, requireAdminSession, requireSuperAdmin, signAdminToken } from './auth.js';
 
 const USERNAME_PATTERN = /^\d+$/;
+const ADMIN_USERNAME_PATTERN = /^[A-Za-z0-9_]+$/;
 const USERNAME_MAX_LENGTH = 50;
 const NICKNAME_PATTERN = /^[\u4e00-\u9fa5A-Za-z0-9_]{1,10}$/;
 const NICKNAME_MAX_LENGTH = 10;
@@ -25,7 +26,7 @@ function isInvalidTextValue(value) {
   return INVALID_TEXT_VALUES.includes(value.toLowerCase());
 }
 
-function validateUsername(username) {
+function validateUsernameBase(username) {
   if (!username) {
     return '请填写账号';
   }
@@ -38,8 +39,26 @@ function validateUsername(username) {
     return `账号最多 ${USERNAME_MAX_LENGTH} 位`;
   }
 
+  return '';
+}
+
+function validateUsername(username) {
+  const baseError = validateUsernameBase(username);
+  if (baseError) return baseError;
+
   if (!USERNAME_PATTERN.test(username)) {
-    return '账号只能包含数字';
+    return '学员账号只能包含数字';
+  }
+
+  return '';
+}
+
+function validateAdminUsername(username) {
+  const baseError = validateUsernameBase(username);
+  if (baseError) return baseError;
+
+  if (!ADMIN_USERNAME_PATTERN.test(username)) {
+    return '老师/教导主任账号只能包含字母、数字或下划线';
   }
 
   return '';
@@ -670,7 +689,7 @@ adminRouter.post('/admins', requireSuperAdmin, async (req, res, next) => {
     const username = normalizeLoginText(req.body.username);
     const password = String(req.body.password ?? '');
     const role = req.body.role;
-    const usernameError = validateUsername(username);
+    const usernameError = validateAdminUsername(username);
     const passwordError = validatePassword(password);
 
     if (usernameError || passwordError) {

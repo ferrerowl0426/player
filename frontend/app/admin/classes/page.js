@@ -194,8 +194,12 @@ export default function ClassesPage() {
     if (!createAccount) return;
     const username = createAccount.username.trim();
     const nickname = createAccount.nickname.trim();
-    if (!/^\d+$/.test(username)) {
-      showToast('账号只能填写数字');
+    if (createAccount.role === 'student' && !/^\d+$/.test(username)) {
+      showToast('学员账号只能填写数字');
+      return;
+    }
+    if (createAccount.role !== 'student' && !/^[A-Za-z0-9_]+$/.test(username)) {
+      showToast('老师/教导主任账号只能填写字母、数字或下划线');
       return;
     }
     if (!/^[\u4e00-\u9fa5A-Za-z0-9_]{1,10}$/.test(nickname)) {
@@ -535,8 +539,8 @@ function CreateAccountModal({ data, classes, onChange, onClose, onSubmit, onCopy
         <div className="f-tip">角色由新建入口决定，不能在弹层内切换。</div>
       </div>
       <div className="f-row">
-        <label>账号（纯数字）</label>
-        <input type="text" value={data.username} onChange={(event) => onChange({ ...data, username: event.target.value })} placeholder="如 13800001234 · 全局唯一" />
+        <label>{data.role === 'student' ? '账号（纯数字）' : '账号（字母/数字/下划线）'}</label>
+        <input type="text" value={data.username} onChange={(event) => onChange({ ...data, username: event.target.value })} placeholder={data.role === 'student' ? '如 13800001234 · 全局唯一' : '如 admin、teacher01 · 全局唯一'} />
       </div>
       <div className="f-row">
         <label>昵称</label>

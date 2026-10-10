@@ -218,11 +218,27 @@ export async function ensureAppSchema() {
     CREATE TABLE IF NOT EXISTS track_collection_items (
       collection_id INTEGER NOT NULL REFERENCES track_collections(id) ON DELETE CASCADE,
       track_id INTEGER NOT NULL REFERENCES track_points(id) ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (collection_id, track_id)
     )
   `);
+  await pool.query('ALTER TABLE track_collection_items ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0');
+  await pool.query(`
+    WITH ranked AS (
+      SELECT collection_id, track_id,
+             ROW_NUMBER() OVER (PARTITION BY collection_id ORDER BY created_at ASC, track_id ASC) AS row_no
+      FROM track_collection_items
+    )
+    UPDATE track_collection_items item
+       SET sort_order = ranked.row_no
+      FROM ranked
+     WHERE item.collection_id = ranked.collection_id
+       AND item.track_id = ranked.track_id
+       AND item.sort_order = 0
+  `);
   await pool.query('CREATE INDEX IF NOT EXISTS idx_track_collection_items_track_id ON track_collection_items (track_id)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_track_collection_items_order ON track_collection_items (collection_id, sort_order)');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS knowledge_points (
@@ -269,11 +285,27 @@ export async function ensureAppSchema() {
     CREATE TABLE IF NOT EXISTS knowledge_collection_items (
       collection_id INTEGER NOT NULL REFERENCES knowledge_collections(id) ON DELETE CASCADE,
       knowledge_point_id INTEGER NOT NULL REFERENCES knowledge_points(id) ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (collection_id, knowledge_point_id)
     )
   `);
+  await pool.query('ALTER TABLE knowledge_collection_items ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0');
+  await pool.query(`
+    WITH ranked AS (
+      SELECT collection_id, knowledge_point_id,
+             ROW_NUMBER() OVER (PARTITION BY collection_id ORDER BY created_at ASC, knowledge_point_id ASC) AS row_no
+      FROM knowledge_collection_items
+    )
+    UPDATE knowledge_collection_items item
+       SET sort_order = ranked.row_no
+      FROM ranked
+     WHERE item.collection_id = ranked.collection_id
+       AND item.knowledge_point_id = ranked.knowledge_point_id
+       AND item.sort_order = 0
+  `);
   await pool.query('CREATE INDEX IF NOT EXISTS idx_knowledge_collection_items_kp_id ON knowledge_collection_items (knowledge_point_id)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_knowledge_collection_items_order ON knowledge_collection_items (collection_id, sort_order)');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS content_attachments (

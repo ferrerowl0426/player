@@ -640,6 +640,17 @@ function AdminKnowledgeContent() {
     });
   }
 
+  function reorderPoint(index, value) {
+    const target = Math.min(Math.max(Number(value) || index + 1, 1), selectedPointIds.length) - 1;
+    if (target === index) return;
+    setSelectedPointIds((current) => {
+      const next = [...current];
+      const [item] = next.splice(index, 1);
+      next.splice(target, 0, item);
+      return next;
+    });
+  }
+
   async function submitCollection(event) {
     event.preventDefault();
     if (busy) return;
@@ -748,11 +759,11 @@ function AdminKnowledgeContent() {
 
                 <section className="fsec full">
                   <div className="fsec-title">从已有单知识点中多选加入 <span className="note">一个知识点可同时进入多个知识点集</span></div>
-                  <p className="pick-count">已选 <b className="num">{selectedPointIds.length}</b> 个知识点<span style={{ fontSize: 10, color: 'var(--ink-3)' }}>· 顺序即合集内播放顺序：上方已选条目可点 ↑↓ 调序、✕ 快捷移除</span></p>
+                  <p className="pick-count">已选 <b className="num">{selectedPointIds.length}</b> 个知识点<span style={{ fontSize: 10, color: 'var(--ink-3)' }}>· 顺序即合集内显示顺序：可点 ↑↓，也可直接修改编号插入指定位置</span></p>
                   <div className={`picked-list${selectedPoints.length ? ' has-items' : ''}`} aria-label="已加入知识点集的内容">
                     {selectedPoints.map((item, index) => (
                       <span className="picked-chip" key={item.id}>
-                        <span className="seq num">{index + 1}</span><span className="nm">{item.name}</span>
+                        <input className="seq num" type="number" min="1" max={selectedPoints.length} value={index + 1} onChange={(event) => reorderPoint(index, event.target.value)} aria-label={`调整 ${item.name} 到第几位`} /><span className="nm">{item.name}</span>
                         <button type="button" className="mv" disabled={index === 0} onClick={() => movePoint(index, -1)} aria-label="上移">↑</button>
                         <button type="button" className="mv" disabled={index === selectedPoints.length - 1} onClick={() => movePoint(index, 1)} aria-label="下移">↓</button>
                         <button type="button" className="rm" onClick={() => togglePoint(item.id)} aria-label={`移除 ${item.name}`}>✕</button>

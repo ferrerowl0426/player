@@ -165,6 +165,17 @@ function AdminTrackCollectionsContent() {
     });
   }
 
+  function reorderTrack(index, value) {
+    const target = Math.min(Math.max(Number(value) || index + 1, 1), selectedTrackIds.length) - 1;
+    if (target === index) return;
+    setSelectedTrackIds((current) => {
+      const next = [...current];
+      const [item] = next.splice(index, 1);
+      next.splice(target, 0, item);
+      return next;
+    });
+  }
+
   async function searchLibraryResources(keyword) {
     setLibraryKeyword(keyword);
     try {
@@ -364,11 +375,11 @@ function AdminTrackCollectionsContent() {
 
               <section className="fsec full collection-pick-sec">
                 <div className="fsec-title">从已有单课中多选加入 <span className="note">一首课可同时进入多个合集</span></div>
-                <p className="pick-count">已选 <b className="num">{selectedTrackIds.length}</b> 首曲目<span style={{ fontSize: 10, color: 'var(--ink-3)' }}>· 顺序即合集内播放顺序：上方已选条目可点 ↑↓ 调序、✕ 快捷移除</span></p>
+                <p className="pick-count">已选 <b className="num">{selectedTrackIds.length}</b> 首曲目<span style={{ fontSize: 10, color: 'var(--ink-3)' }}>· 顺序即合集内显示顺序：可点 ↑↓，也可直接修改编号插入指定位置</span></p>
                 <div className={`picked-list${selectedTracks.length ? ' has-items' : ''}`} id="pickChips" aria-label="已加入合集的内容">
                   {selectedTracks.map((track, index) => (
                     <span className="picked-chip" key={track.id}>
-                      <span className="seq num">{index + 1}</span><span className="nm">{track.name}</span>
+                      <input className="seq num" type="number" min="1" max={selectedTracks.length} value={index + 1} onChange={(event) => reorderTrack(index, event.target.value)} aria-label={`调整 ${track.name} 到第几位`} /><span className="nm">{track.name}</span>
                       <button type="button" className="mv" disabled={index === 0} onClick={() => moveTrack(index, -1)} aria-label="上移">↑</button>
                       <button type="button" className="mv" disabled={index === selectedTracks.length - 1} onClick={() => moveTrack(index, 1)} aria-label="下移">↓</button>
                       <button type="button" className="rm" onClick={() => toggleTrack(track.id)} aria-label={`移除 ${track.name}`}>✕</button>

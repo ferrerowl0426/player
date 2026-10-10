@@ -25,6 +25,19 @@ function text(value) {
   return String(value ?? '').trim();
 }
 
+function orderedIds(values) {
+  const seen = new Set();
+  const result = [];
+  for (const value of Array.isArray(values) ? values : []) {
+    const normalized = id(value);
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(normalized);
+    }
+  }
+  return result;
+}
+
 function videoKey(value) {
   return typeof value === 'string' && value.startsWith('knowledge/') && !value.includes('..');
 }
@@ -286,7 +299,7 @@ knowledgeRouter.get('/collections/:id', async (req, res, next) => {
         `SELECT kp.id, kp.name, kp.cover, kp.description, kp.updated_at, COUNT(kpp.id)::int AS part_count
          FROM knowledge_collection_items ci JOIN knowledge_points kp ON kp.id = ci.knowledge_point_id
          LEFT JOIN knowledge_parts kpp ON kpp.knowledge_point_id = kp.id
-         WHERE ci.collection_id = $1 GROUP BY kp.id ORDER BY kp.name ASC, kp.id ASC`,
+         WHERE ci.collection_id = $1 GROUP BY kp.id, ci.sort_order ORDER BY ci.sort_order ASC, kp.id ASC`,
         [collectionId]
       ),
       linkedLibraryResources('knowledge_collection', collectionId)
@@ -467,7 +480,7 @@ knowledgeRouter.patch('/collections/:id/points', requireSuperAdmin, async (req, 
   const client = await pool.connect();
   try {
     const collectionId = id(req.params.id);
-    const pointIds = [...new Set((Array.isArray(req.body.pointIds) ? req.body.pointIds : []).map(id).filter(Boolean))];
+    const pointIds = orderedIds(req.body.pointIds);
     await client.query('BEGIN');
     if (!(await client.query('SELECT 1 FROM knowledge_collections WHERE id = $1', [collectionId])).rowCount) {
       await client.query('ROLLBACK');
@@ -480,7 +493,14 @@ knowledgeRouter.patch('/collections/:id/points', requireSuperAdmin, async (req, 
       return;
     }
     await client.query('DELETE FROM knowledge_collection_items WHERE collection_id = $1', [collectionId]);
-    if (pointIds.length) await client.query('INSERT INTO knowledge_collection_items (collection_id, knowledge_point_id) SELECT $1, unnest($2::int[])', [collectionId, pointIds]);
+    if (pointIds.length) {
+      await client.query(
+        `INSERT INTO knowledge_collection_items (collection_id, knowledge_point_id, sort_order)
+         SELECT $1, item.knowledge_point_id, item.sort_order
+           FROM unnest($2::int[]) WITH ORDINALITY AS item(knowledge_point_id, sort_order)`,
+        [collectionId, pointIds]
+      );
+    }
     await client.query('UPDATE knowledge_collections SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [collectionId]);
     await client.query('COMMIT');
     res.json({ data: { collectionId, pointIds } });

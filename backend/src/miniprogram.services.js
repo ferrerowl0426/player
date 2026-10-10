@@ -412,7 +412,7 @@ async function getCollectionDetail({ id, table, itemsTable, itemTable, itemColum
        FROM ${itemsTable} ci
        JOIN ${itemTable} i ON i.id = ci.${itemColumn}
       WHERE ci.collection_id = $1
-      ORDER BY ci.created_at ASC, i.updated_at DESC, i.id DESC`,
+      ORDER BY ci.sort_order ASC, ci.created_at ASC, i.id ASC`,
     [id]
   );
 

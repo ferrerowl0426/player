@@ -33,6 +33,19 @@ function normalizeIds(values) {
   return [...new Set((Array.isArray(values) ? values : []).map(normalizeId).filter(Boolean))];
 }
 
+function normalizeOrderedIds(values) {
+  const seen = new Set();
+  const ids = [];
+  for (const value of Array.isArray(values) ? values : []) {
+    const id = normalizeId(value);
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+
 function normalizeMultipartParts(values) {
   if (!Array.isArray(values)) {
     return [];
@@ -405,8 +418,8 @@ tracksRouter.get('/collections/:id', async (req, res, next) => {
          JOIN track_points t ON t.id = ct.track_id
          LEFT JOIN track_parts tp ON tp.track_id = t.id
          WHERE ct.collection_id = $1
-         GROUP BY t.id
-         ORDER BY t.name ASC, t.id ASC`,
+         GROUP BY t.id, ct.sort_order
+         ORDER BY ct.sort_order ASC, t.id ASC`,
         [collectionId]
       ),
       getLinkedLibraryResources('track_collection', collectionId)
@@ -922,7 +935,7 @@ tracksRouter.patch('/collections/:id/tracks', requireSuperAdmin, async (req, res
 
   try {
     const collectionId = normalizeId(req.params.id);
-    const trackIds = normalizeIds(req.body.trackIds);
+    const trackIds = normalizeOrderedIds(req.body.trackIds);
 
     if (!collectionId) {
       res.status(400).json({ message: '曲谱集 ID 无效' });
@@ -950,8 +963,9 @@ tracksRouter.patch('/collections/:id/tracks', requireSuperAdmin, async (req, res
     await client.query('DELETE FROM track_collection_items WHERE collection_id = $1', [collectionId]);
     if (trackIds.length > 0) {
       await client.query(
-        `INSERT INTO track_collection_items (collection_id, track_id)
-         SELECT $1, unnest($2::int[])`,
+        `INSERT INTO track_collection_items (collection_id, track_id, sort_order)
+         SELECT $1, item.track_id, item.sort_order
+           FROM unnest($2::int[]) WITH ORDINALITY AS item(track_id, sort_order)`,
         [collectionId, trackIds]
       );
     }

@@ -298,10 +298,10 @@ body.dean .card:hover .ops { display: flex; }
 .pl-item.playing { background: rgba(122,166,88,.16); }
 .pl-item.playing .t, .pl-item.playing .idx { color: var(--green); font-weight: 600; }
 
-.frow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; height: 40px; padding: 0 18px; border-bottom: 1px solid rgba(201,183,149,.4); transition: background .3s var(--ease); }
+.frow { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; height: 40px; padding: 0 18px; border-bottom: 1px solid rgba(201,183,149,.4); transition: background .3s var(--ease); }
 a.frow { text-decoration: none; color: inherit; cursor: pointer; }
 .frow:hover { background: rgba(255,252,242,.65); }
-.frow .fico { width: 22px; height: 28px; border: 1px solid var(--hair-2); background: var(--white); display: grid; place-items: center; font-size: 8px; letter-spacing: 1px; color: var(--coffee); font-weight: 600; }
+.frow .fico { width: 28px; height: 28px; border: 1px solid var(--hair-2); background: var(--white); display: grid; place-items: center; font-size: 8px; letter-spacing: .6px; color: var(--coffee); font-weight: 700; }
 .frow .fico.pdf { color: var(--orange); border-color: rgba(255,127,0,.55); }
 .frow .fname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; letter-spacing: .3px; line-height: 1.45; }
 .frow .fmeta { font-size: 10.5px; color: var(--ink-3); letter-spacing: .4px; margin-top: 0; flex: none; }
@@ -354,7 +354,7 @@ a.frow { text-decoration: none; color: inherit; cursor: pointer; }
   .main { display: flex; height: auto; overflow: visible; }
   .note-card { height: auto; }
   .note-card p { max-height: 96px; }
-  .frow { grid-template-columns: 22px minmax(0, 1fr) auto; }
+  .frow { grid-template-columns: 28px minmax(0, 1fr) auto; }
   .brow { grid-template-columns: 22px minmax(0, 1fr) auto; }
 }
 
@@ -519,6 +519,13 @@ body.library-index-page .card:hover {
 .picked-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; font-size: 11px; letter-spacing: .4px; color: #4a6b3f; background: rgba(111,143,99,.08); border: 1px solid rgba(111,143,99,.45); border-radius: 4px; padding: 4px 6px 4px 10px; }
 .picked-chip.inherited { color: var(--ink-3); background: rgba(242,234,217,.62); border-style: dashed; border-color: var(--hair-2); }
 .picked-chip .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picked-chip .seq { flex: none; width: 34px; height: 20px; padding: 0 3px; text-align: center; border: 1px solid rgba(111,143,99,.45); border-radius: 3px; background: rgba(255,255,255,.76); color: #4a6b3f; font-size: 11px; font-weight: 600; }
+.picked-chip .seq:focus { outline: 2px solid rgba(111,143,99,.24); border-color: #6f8f63; }
+.picked-chip .seq::-webkit-outer-spin-button,
+.picked-chip .seq::-webkit-inner-spin-button { margin: 0; }
+.picked-chip .mv { flex: none; min-width: 18px; height: 18px; border-radius: 3px; display: grid; place-items: center; font-size: 11px; line-height: 1; color: #4a6b3f; border: 1px solid rgba(111,143,99,.35); background: rgba(255,255,255,.58); }
+.picked-chip .mv:disabled { opacity: .36; cursor: not-allowed; }
+.picked-chip .mv:not(:disabled):hover { border-color: #4a6b3f; background: rgba(111,143,99,.12); }
 .picked-chip .inherit-note { margin-left: 6px; font-style: normal; font-size: 10px; color: var(--ink-3); }
 .picked-chip .rm { flex: none; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; line-height: 1; color: var(--ink-3); border: 1px solid transparent; background: transparent; }
 .picked-chip .rm.lock { cursor: default; opacity: .7; }

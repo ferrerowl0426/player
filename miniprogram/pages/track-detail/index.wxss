@@ -86,10 +86,14 @@
 
 .video-controls.hide {
   opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .video-controls.show {
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .video-controls.compact {
@@ -365,103 +369,108 @@
 
 /*
  * 横屏时 rpx 会继续按屏幕宽度换算，宽屏手机会把全屏控制条整体放大。
- * 全屏横屏控制层改用固定像素尺寸，保留足够的触摸热区，同时让视觉轨道保持纤细。
+ * 使用全屏方向状态类而不是媒体查询，兼容只旋转原生 video 层的机型。
+ * 控制层采用固定像素尺寸，并为刘海屏保留安全区域。
  */
-@media (orientation: landscape) {
-  .video-controls.full {
-    gap: 4px;
-    min-height: 82px;
-    padding: 10px 28px 12px 20px;
-  }
+.player.landscape-fullscreen .video-controls.full {
+  gap: 4px;
+  min-height: 102px;
+  padding: 10px 20px 12px;
+  padding-left: calc(20px + constant(safe-area-inset-left));
+  padding-right: calc(20px + constant(safe-area-inset-right));
+  padding-bottom: calc(12px + constant(safe-area-inset-bottom));
+  padding-left: calc(20px + env(safe-area-inset-left));
+  padding-right: calc(20px + env(safe-area-inset-right));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
 
-  .video-controls.full .progress-zone {
-    height: 28px;
-  }
+.player.landscape-fullscreen .video-controls.full .progress-zone {
+  height: 44px;
+}
 
-  .video-controls.full .progress-touch {
-    height: 32px;
-    padding: 0 6px;
-  }
+.player.landscape-fullscreen .video-controls.full .progress-touch {
+  height: 44px;
+  padding: 0 8px;
+}
 
-  .video-controls.full .progress-track,
-  .video-controls.full .progress-fill {
-    height: 4px;
-  }
+.player.landscape-fullscreen .video-controls.full .progress-track,
+.player.landscape-fullscreen .video-controls.full .progress-fill {
+  height: 4px;
+}
 
-  .video-controls.full .progress-dot {
-    width: 12px;
-    height: 12px;
-    margin-left: -6px;
-    margin-top: -6px;
-  }
+.player.landscape-fullscreen .video-controls.full .progress-dot {
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+}
 
-  .video-controls.full .progress-dot.active {
-    width: 16px;
-    height: 16px;
-    margin-left: -8px;
-    margin-top: -8px;
-  }
+.player.landscape-fullscreen .video-controls.full .progress-dot.active {
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  margin-top: -8px;
+}
 
-  .video-controls.full .progress-bubble {
-    top: -8px;
-    min-width: 42px;
-    height: 24px;
-    margin-left: -21px;
-    font-size: 12px;
-    line-height: 24px;
-  }
+.player.landscape-fullscreen .video-controls.full .progress-bubble {
+  top: -4px;
+  min-width: 42px;
+  height: 24px;
+  margin-left: -21px;
+  font-size: 12px;
+  line-height: 24px;
+}
 
-  .video-controls.full .control-row {
-    min-height: 36px;
-    gap: 12px;
-  }
+.player.landscape-fullscreen .video-controls.full .control-row {
+  min-height: 36px;
+  gap: 12px;
+}
 
-  .video-controls.full .left-controls,
-  .video-controls.full .right-controls {
-    min-width: 104px;
-    gap: 10px;
-  }
+.player.landscape-fullscreen .video-controls.full .left-controls,
+.player.landscape-fullscreen .video-controls.full .right-controls {
+  min-width: 104px;
+  gap: 10px;
+}
 
-  .video-controls.full .icon-ctrl {
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-  }
+.player.landscape-fullscreen .video-controls.full .icon-ctrl {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
 
-  .video-controls.full .part-ctrl {
-    width: 22px;
-    height: 32px;
-  }
+.player.landscape-fullscreen .video-controls.full .part-ctrl {
+  width: 44px;
+  height: 44px;
+}
 
-  .video-controls.full .part-ctrl .bar {
-    width: 2px;
-    height: 16px;
-  }
+.player.landscape-fullscreen .video-controls.full .part-ctrl .bar {
+  width: 2px;
+  height: 16px;
+}
 
-  .video-controls.full .part-ctrl .tri {
-    border-top-width: 6px;
-    border-bottom-width: 6px;
-  }
+.player.landscape-fullscreen .video-controls.full .part-ctrl .tri {
+  border-top-width: 6px;
+  border-bottom-width: 6px;
+}
 
-  .video-controls.full .part-ctrl .tri.left {
-    border-right-width: 9px;
-  }
+.player.landscape-fullscreen .video-controls.full .part-ctrl .tri.left {
+  border-right-width: 9px;
+}
 
-  .video-controls.full .part-ctrl .tri.right {
-    border-left-width: 9px;
-  }
+.player.landscape-fullscreen .video-controls.full .part-ctrl .tri.right {
+  border-left-width: 9px;
+}
 
-  .video-controls.full .text-ctrl {
-    min-width: 44px;
-    height: 30px;
-    padding: 0 8px;
-    font-size: 13px;
-  }
+.player.landscape-fullscreen .video-controls.full .text-ctrl {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 8px;
+  font-size: 13px;
+}
 
-  .video-controls.full .time-label {
-    font-size: 13px;
-    line-height: 32px;
-  }
+.player.landscape-fullscreen .video-controls.full .time-label {
+  font-size: 13px;
+  line-height: 32px;
 }
 
 .lesson-card {

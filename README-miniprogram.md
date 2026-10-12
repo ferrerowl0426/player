@@ -320,7 +320,7 @@ pages/track-detail/index
 pages/knowledge-detail/index
 ```
 
-两页 JS 基本同构，区别是接口和默认标题；`knowledge-detail/index.wxss` 直接 `@import "../track-detail/index.wxss"`。
+两页通过 `utils/create-video-detail-page.js` 复用播放器状态、生命周期和交互逻辑，各自的 `index.js` 只配置详情接口、默认标题和错误文案；`knowledge-detail/index.wxss` 直接 `@import "../track-detail/index.wxss"`。
 
 当前播放器实现：
 
@@ -332,14 +332,18 @@ pages/knowledge-detail/index
 - 倍速档位：`[0.75, 1, 1.25, 1.5, 2]`；
 - `bindloadedmetadata` 根据视频宽高决定全屏方向，横屏用 `direction: 90`，竖屏用 `direction: 0`；
 - 进度条是“大热区 + 视觉轨道 + 滑块 + 拖动时间气泡”；
-- 拖动时只预览，释放时才 seek；拖动期间 `isSeeking` 会阻止 timeupdate 覆盖 UI；
+- 拖动开始时缓存视觉轨道尺寸，拖动中不重复查询节点；释放时只 seek 一次，拖动期间 `isSeeking` 会阻止 timeupdate 覆盖 UI；
 - 全屏状态以 `bindfullscreenchange` 的 `event.detail.fullScreen` 为准，并记录 `fullscreenDirection`；
 - 退出全屏通过 `exitFullscreenWithFallback()` 执行，500ms 后仍未同步时会兜底重置本地全屏状态；
 - 控制条已拆成“进度条层 + 控制按钮层”，小窗、横屏全屏、竖屏全屏共用同一套结构；
+- 横屏全屏控制层使用固定像素尺寸并适配左右及底部安全区域，隐藏后不再接收触摸；
+- 视频画面统一使用 `contain`，避免异形屏横屏全屏时拉伸；
 - 视频缓冲通过 `bindwaiting` 显示“视频加载中…”；
 - 视频失败通过 `binderror` 显示友好错误态；
 - 清晰度切换会记录原清晰度、原时间和原 detail，切换失败时自动恢复原画面；
-- `onHide` / `onUnload` 会暂停当前视频，并在卸载时清理全屏兜底定时器。
+- 单一视频源不显示清晰度切换按钮；
+- 页面首次加载后主动播放一次，返回页面不会重新请求或自动恢复播放；异步回调仅在页面可见时允许播放；
+- `onHide` / `onUnload` 会暂停当前视频，并清理控制条、拖动气泡和全屏兜底定时器。
 
 ### 6.2 音频播放页
 
@@ -403,7 +407,6 @@ PDF/其他  → getSignedUrl → wx.downloadFile → wx.openDocument(showMenu: t
 ## 8. 已知技术债
 
 - `normalizeCourseItems()` 里仍有部分 mock 兜底值（例如用 index 生成内容数和更新日期），接真实后端字段后应移除；
-- `track-detail` 与 `knowledge-detail` 代码重复度高，后续可抽播放器逻辑，但目前不要为了抽象影响已校对 UI；
 - iPhone 音频无声已做前端兜底，但仍需真机验证签名 URL、Content-Type、Range 支持和微信合法域名配置；
 - `library-detail` 仍保留 `preview=pdf` 的占位承载逻辑，当前主流程图书馆预览直接走 `openLibraryFile()`；
 - `services/files.js` 的下载错误提示仍带「开发者工具是否关闭域名校验」，真机问题需要结合合法域名排查。

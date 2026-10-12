@@ -1,13 +1,13 @@
 <view class="page lesson-page">
-  <view class="player {{isFullscreen ? 'fullscreen' : ''}} {{isPortraitFullscreen ? 'portrait-fullscreen' : ''}}">
-    <video wx:if="{{detail.currentPart.videoUrl}}" id="lessonVideo" class="video-player" src="{{detail.currentPart.videoUrl}}" poster="{{detail.currentPart.coverUrl || detail.coverUrl}}" autoplay controls="{{false}}" enable-progress-gesture show-fullscreen-btn="{{false}}" show-play-btn="{{false}}" show-center-play-btn="{{false}}" show-casting-button="{{false}}" object-fit="{{videoObjectFit}}" direction="{{videoDirection}}" bindloadedmetadata="handleVideoLoadedMeta" bindplay="handleVideoPlay" bindpause="handleVideoPause" bindtimeupdate="handleVideoTimeUpdate" bindended="handleVideoEnded" bindwaiting="handleVideoWaiting" binderror="handleVideoError" bindfullscreenchange="handleFullscreenChange" bindtap="showVideoControls" bindtouchstart="showVideoControls">
+  <view class="player {{isFullscreen ? 'fullscreen' : ''}} {{isPortraitFullscreen ? 'portrait-fullscreen' : ''}} {{isFullscreen && !isPortraitFullscreen ? 'landscape-fullscreen' : ''}}">
+    <video wx:if="{{detail.currentPart.videoUrl}}" id="lessonVideo" class="video-player" src="{{detail.currentPart.videoUrl}}" poster="{{detail.currentPart.coverUrl || detail.coverUrl}}" controls="{{false}}" enable-progress-gesture show-fullscreen-btn="{{false}}" show-play-btn="{{false}}" show-center-play-btn="{{false}}" show-casting-button="{{false}}" object-fit="{{videoObjectFit}}" direction="{{videoDirection}}" bindloadedmetadata="handleVideoLoadedMeta" bindplay="handleVideoPlay" bindpause="handleVideoPause" bindtimeupdate="handleVideoTimeUpdate" bindended="handleVideoEnded" bindwaiting="handleVideoWaiting" binderror="handleVideoError" bindfullscreenchange="handleFullscreenChange" bindtap="showVideoControls" bindtouchstart="showVideoControls">
       <cover-view class="video-controls {{controlsVisible ? 'show' : 'hide'}} {{isFullscreen ? 'full' : 'compact'}}">
         <cover-view class="progress-zone">
-          <cover-view class="progress-touch" bindtap="seekVideo" bindtouchstart="startSeekVideo" bindtouchmove="moveSeekVideo" bindtouchend="endSeekVideo" bindtouchcancel="endSeekVideo">
+          <cover-view class="progress-touch" bindtouchstart="startSeekVideo" bindtouchmove="moveSeekVideo" bindtouchend="endSeekVideo" bindtouchcancel="endSeekVideo">
             <cover-view wx:if="{{isSeeking}}" class="progress-bubble" style="left: {{progressDotPercent}}%;">{{seekTimeText}}</cover-view>
             <cover-view class="progress-track">
               <cover-view class="progress-fill" style="width: {{progressPercent}}%;"></cover-view>
-              <cover-view class="progress-dot {{isSeeking ? 'active' : ''}}" style="left: {{progressDotPercent}}%;"></cover-view>
+              <cover-view class="progress-dot {{isSeeking ? 'active' : ''}}" style="left: {{progressPercent}}%;"></cover-view>
             </cover-view>
           </cover-view>
         </cover-view>

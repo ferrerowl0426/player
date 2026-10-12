@@ -363,6 +363,107 @@
   line-height: 52rpx;
 }
 
+/*
+ * 横屏时 rpx 会继续按屏幕宽度换算，宽屏手机会把全屏控制条整体放大。
+ * 全屏横屏控制层改用固定像素尺寸，保留足够的触摸热区，同时让视觉轨道保持纤细。
+ */
+@media (orientation: landscape) {
+  .video-controls.full {
+    gap: 4px;
+    min-height: 82px;
+    padding: 10px 28px 12px 20px;
+  }
+
+  .video-controls.full .progress-zone {
+    height: 28px;
+  }
+
+  .video-controls.full .progress-touch {
+    height: 32px;
+    padding: 0 6px;
+  }
+
+  .video-controls.full .progress-track,
+  .video-controls.full .progress-fill {
+    height: 4px;
+  }
+
+  .video-controls.full .progress-dot {
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    margin-top: -6px;
+  }
+
+  .video-controls.full .progress-dot.active {
+    width: 16px;
+    height: 16px;
+    margin-left: -8px;
+    margin-top: -8px;
+  }
+
+  .video-controls.full .progress-bubble {
+    top: -8px;
+    min-width: 42px;
+    height: 24px;
+    margin-left: -21px;
+    font-size: 12px;
+    line-height: 24px;
+  }
+
+  .video-controls.full .control-row {
+    min-height: 36px;
+    gap: 12px;
+  }
+
+  .video-controls.full .left-controls,
+  .video-controls.full .right-controls {
+    min-width: 104px;
+    gap: 10px;
+  }
+
+  .video-controls.full .icon-ctrl {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .video-controls.full .part-ctrl {
+    width: 22px;
+    height: 32px;
+  }
+
+  .video-controls.full .part-ctrl .bar {
+    width: 2px;
+    height: 16px;
+  }
+
+  .video-controls.full .part-ctrl .tri {
+    border-top-width: 6px;
+    border-bottom-width: 6px;
+  }
+
+  .video-controls.full .part-ctrl .tri.left {
+    border-right-width: 9px;
+  }
+
+  .video-controls.full .part-ctrl .tri.right {
+    border-left-width: 9px;
+  }
+
+  .video-controls.full .text-ctrl {
+    min-width: 44px;
+    height: 30px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
+  .video-controls.full .time-label {
+    font-size: 13px;
+    line-height: 32px;
+  }
+}
+
 .lesson-card {
   background: rgba(255, 255, 255, 0.97);
   border: 2rpx solid #c9b795;

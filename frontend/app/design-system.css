@@ -59,11 +59,11 @@ body.class-manage-page .home.class-manage { flex: 0 0 auto; min-height: 0; heigh
 .nav-links a:hover, .nav-links button:hover { color: var(--ink); }
 .nav-right { display: flex; align-items: center; gap: 18px; }
 .nav-actions { display: flex; align-items: center; gap: 8px; }
-.avatar-wrap { position: relative; flex: none; display: grid; place-items: center; padding: 8px 0 18px; margin-bottom: -10px; }
+.avatar-wrap { position: relative; z-index: 10000; flex: none; display: grid; place-items: center; padding: 8px 0 18px; margin-bottom: -10px; }
 .avatar { position: relative; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--coffee); background: var(--white); display: grid; place-items: center; font-size: 12.5px; color: var(--coffee); font-weight: 600; transition: all .25s var(--ease); cursor: pointer; }
 .avatar::after { content: ""; position: absolute; top: -1px; right: -1px; width: 9px; height: 9px; border-radius: 50%; background: var(--green); border: 1.5px solid var(--paper); }
 .avatar:hover, .avatar-wrap:hover .avatar, .avatar:focus-visible { border-color: var(--orange); color: var(--orange); }
-.profile-card { position: absolute; top: calc(100% - 2px); right: 50%; z-index: 80; width: 216px; padding: 14px 14px 12px; border: 1px solid rgba(201,183,149,.82); border-radius: 8px; background: rgba(255,255,255,.98); box-shadow: 0 14px 32px rgba(60,42,20,.14); opacity: 0; transform: translate(50%, 6px); pointer-events: none; transition: opacity .2s var(--ease), transform .2s var(--ease); }
+.profile-card { position: absolute; top: calc(100% - 2px); right: 50%; z-index: 10001; width: 216px; padding: 14px 14px 12px; border: 1px solid rgba(201,183,149,.82); border-radius: 8px; background: rgba(255,255,255,.98); box-shadow: 0 14px 32px rgba(60,42,20,.14); opacity: 0; transform: translate(50%, 6px); pointer-events: none; transition: opacity .2s var(--ease), transform .2s var(--ease); }
 .profile-card::before { content: ""; position: absolute; left: 0; right: 0; top: -16px; height: 16px; }
 .avatar-wrap:hover .profile-card, .avatar-wrap:focus-within .profile-card, .profile-card:hover { opacity: 1; transform: translate(50%, 0); pointer-events: auto; }
 .profile-head { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px 0 11px; border-bottom: 1px solid rgba(201,183,149,.55); text-align: center; }

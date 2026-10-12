@@ -37,13 +37,15 @@ function isActive(pathname, href) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function AppNav({ links, role = 'guest', accountName = '访客', actions = null, homeHref }) {
+export default function AppNav({ links, role = 'guest', accountName = '访客', nickname = '', username = '', actions = null, homeHref }) {
   const pathname = usePathname();
   const router = useRouter();
   const navLinks = links || NAV_LINKS_BY_ROLE[role] || NAV_LINKS_BY_ROLE.guest;
   const resolvedHomeHref = homeHref || (role === 'user' ? '/' : '/tracks');
   const isGuest = role === 'guest';
   const roleLabel = role === 'super_admin' ? '教导主任' : role === 'teacher' ? '老师' : role === 'user' ? '学员' : '游客';
+  const displayName = accountName || nickname || username || '访客';
+  const avatarInitial = String(nickname || accountName || username || '访客').trim().slice(0, 1) || '访';
 
   async function handleLogout() {
     if (isGuest) {
@@ -81,11 +83,11 @@ export default function AppNav({ links, role = 'guest', accountName = '访客', 
         <div className="nav-right">
           {actions || (isGuest ? <Link className="role-tag" href="/login">登录</Link> : null)}
           <div className="avatar-wrap">
-            <button className="avatar" type="button" aria-haspopup="menu" aria-label={`账号菜单：${accountName || '访客'}`}>{String(accountName || '访客').slice(0, 1)}</button>
+            <button className="avatar" type="button" aria-haspopup="menu" aria-label={`账号菜单：${displayName}`}>{avatarInitial}</button>
             {!isGuest ? (
               <div className="profile-card" role="menu">
                 <div className="profile-head">
-                  <strong>{accountName || '账号'}</strong>
+                  <strong>{displayName || '账号'}</strong>
                   <small>{roleLabel}</small>
                 </div>
                 <button className="profile-row" type="button" onClick={handleLogout} role="menuitem">

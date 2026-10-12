@@ -39,7 +39,7 @@ function makePart(partNo = '') {
 }
 
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv']);
-const MAX_BATCH_VIDEO_COUNT = 10;
+const MAX_BATCH_VIDEO_COUNT = 50;
 
 function isVideoFile(file) {
   if (!file) return false;
@@ -296,7 +296,8 @@ function AdminTracksContent() {
     const files = Array.from(fileList || []);
     if (!files.length) return;
     if (files.length > MAX_BATCH_VIDEO_COUNT) {
-      setStatus(`单次最多导入 ${MAX_BATCH_VIDEO_COUNT} 个视频`);
+      window.alert(`一次最多选择 ${MAX_BATCH_VIDEO_COUNT} 个视频，请分批导入。`);
+      setStatus(`一次最多选择 ${MAX_BATCH_VIDEO_COUNT} 个视频，请分批导入`);
       return;
     }
     if (files.some((file) => !isVideoFile(file))) {

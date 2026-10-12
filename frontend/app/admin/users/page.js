@@ -422,7 +422,7 @@ export default function AdminUsersPage() {
   if (isDisabledTeacher) {
     return (
       <>
-        <AppNav role={admin.role} accountName={accountName} homeHref="/tracks" actions={<span className="role-tag">老师 · {accountName}</span>} />
+        <AppNav role={admin.role} accountName={accountName} nickname={admin.nickname} username={admin.username} homeHref="/tracks" actions={<span className="role-tag">老师 · {accountName}</span>} />
         <main className={`${styles.studentManage} home student-manage`}>
           <div className="noclass-mask show" role="alert">
             <div className="disabled-note">
@@ -437,7 +437,7 @@ export default function AdminUsersPage() {
 
   return (
     <>
-      <AppNav role={admin.role} accountName={accountName} homeHref="/tracks" actions={<span className="role-tag">{isSuperAdmin ? '教导主任' : '老师'} · {accountName}</span>} />
+      <AppNav role={admin.role} accountName={accountName} nickname={admin.nickname} username={admin.username} homeHref="/tracks" actions={<span className="role-tag">{isSuperAdmin ? '教导主任' : '老师'} · {accountName}</span>} />
       <main className={`${styles.studentManage} home student-manage`}>
         <div className="cols rise d1">
           <section className="zone side">

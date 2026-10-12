@@ -34,12 +34,35 @@ import {
   uploadMultipartPartToBucket
 } from '../../../lib/api.js';
 import { uploadVideoByMultipart } from '../../../components/uploadVideo.js';
+import CoverCropperModal from '../../../components/CoverCropperModal.js';
 
 const PAGE_SIZE = 16;
 const DRAFT_KEY = 'admin:create:knowledge:draft';
 
 function makePart(partNo = '') {
   return { id: null, part_no: partNo, title: '', duration: '', video: null, video_url: '' };
+}
+
+const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv']);
+const MAX_BATCH_VIDEO_COUNT = 10;
+
+function isVideoFile(file) {
+  if (!file) return false;
+  if (file.type?.startsWith('video/')) return true;
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  return VIDEO_EXTENSIONS.has(ext);
+}
+
+function titleFromVideoName(name = '') {
+  return name.replace(/\.[^.]+$/, '').trim() || '未命名视频';
+}
+
+function buildVideoParts(files, startNo) {
+  return files.map((file, index) => ({
+    ...makePart(startNo + index),
+    title: titleFromVideoName(file.name),
+    video: file
+  }));
 }
 
 function SearchIcon() {
@@ -159,6 +182,7 @@ function AdminKnowledgeContent() {
   const [libraryResults, setLibraryResults] = useState([]);
   const [draftAvailable, setDraftAvailable] = useState(false);
   const [errors, setErrors] = useState({});
+  const [pendingCover, setPendingCover] = useState(null);
   const coverInputRef = useRef(null);
   const collectionCoverInputRef = useRef(null);
   const [isLibraryFocused, setIsLibraryFocused] = useState(false);
@@ -383,34 +407,71 @@ function AdminKnowledgeContent() {
     return Object.keys(next).length === 0;
   }
 
-  async function handleCoverFile(file) {
+  function handleBatchVideoFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    if (files.length > MAX_BATCH_VIDEO_COUNT) {
+      setStatus(`单次最多导入 ${MAX_BATCH_VIDEO_COUNT} 个视频`);
+      return;
+    }
+    if (files.some((file) => !isVideoFile(file))) {
+      setStatus('只能批量导入视频文件');
+      return;
+    }
+    const nextParts = buildVideoParts(files, point.parts.length + 1);
+    patchPoint({ parts: [...point.parts, ...nextParts] });
+    setStatus(`已导入 ${nextParts.length} 个视频，请检查顺序和标题后保存`);
+  }
+
+  function handleCoverFile(file) {
     if (!file) return;
     clearError('cover');
+    if (!file.type.startsWith('image/')) {
+      setErrors((current) => ({ ...current, cover: '请上传图片文件' }));
+      setStatus('请上传图片文件');
+      return;
+    }
+    setPendingCover({ target: 'point', file });
+  }
+
+  async function uploadCroppedPointCover(file) {
+    clearError('cover');
     try {
-      if (!file.type.startsWith('image/')) throw new Error('请上传图片文件');
       setStatus('正在上传封面...');
       const result = await createLibraryUploadUrl(file, 'cover');
       await uploadLibraryFileToBucket({ uploadUrl: result.data.uploadUrl, file });
       patchPoint({ cover: result.data.publicUrl });
+      setPendingCover(null);
       setStatus('封面上传成功');
     } catch (error) {
       setErrors((current) => ({ ...current, cover: error.message || '封面上传失败' }));
       setStatus(error.message || '封面上传失败');
+      throw error;
     }
   }
 
-  async function handleCollectionCoverFile(file) {
+  function handleCollectionCoverFile(file) {
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setErrors((current) => ({ ...current, collectionCover: '请上传图片文件' }));
+      setStatus('请上传图片文件');
+      return;
+    }
+    setPendingCover({ target: 'collection', file });
+  }
+
+  async function uploadCroppedCollectionCover(file) {
     try {
-      if (!file.type.startsWith('image/')) throw new Error('请上传图片文件');
       setStatus('正在上传封面...');
       const result = await createLibraryUploadUrl(file, 'cover');
       await uploadLibraryFileToBucket({ uploadUrl: result.data.uploadUrl, file });
       patchCollection({ cover: result.data.publicUrl });
+      setPendingCover(null);
       setStatus('封面上传成功');
     } catch (error) {
       setErrors((current) => ({ ...current, collectionCover: error.message || '封面上传失败' }));
       setStatus(error.message || '封面上传失败');
+      throw error;
     }
   }
 
@@ -728,7 +789,7 @@ function AdminKnowledgeContent() {
                 <section className="fsec">
                   <div className="fsec-title">封面 <span className="note req">支持任意比例 · 上传后裁切为 1:1</span></div>
                   <div className="cover-flex" data-field="collectionCover">
-                    <input ref={collectionCoverInputRef} type="file" accept="image/*" hidden onChange={(event) => handleCollectionCoverFile(event.target.files?.[0]).finally(() => { event.target.value = ''; })} />
+                    <input ref={collectionCoverInputRef} type="file" accept="image/*" hidden onChange={(event) => { handleCollectionCoverFile(event.target.files?.[0]); event.target.value = ''; }} />
                     <div className={`cover-box${collection.cover ? ' has' : ''}`} role="button" tabIndex={0} onClick={() => collectionCoverInputRef.current?.click()} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') collectionCoverInputRef.current?.click(); }}>
                       {collection.cover ? <><img src={collection.cover} alt="知识点集封面" /><button className="cov-rm" type="button" onClick={(event) => { event.stopPropagation(); patchCollection({ cover: '' }); }}>×</button></> : <><span className="t1">＋ 上传封面</span><span className="t2">任意比例 · 自动裁切 1:1</span><div className="vinyl"><i /></div></>}
                     </div>
@@ -859,7 +920,7 @@ function AdminKnowledgeContent() {
                 <section className="fsec">
                   <div className="fsec-title">封面 <span className="note req">支持任意比例 · 上传后裁切为 1:1</span></div>
                   <div className="cover-flex" data-field="cover">
-                    <input ref={coverInputRef} type="file" accept="image/*" hidden onChange={(event) => handleCoverFile(event.target.files?.[0]).finally(() => { event.target.value = ''; })} />
+                    <input ref={coverInputRef} type="file" accept="image/*" hidden onChange={(event) => { handleCoverFile(event.target.files?.[0]); event.target.value = ''; }} />
                     <div className={`cover-box${point.cover ? ' has' : ''}`} role="button" tabIndex={0} onClick={() => coverInputRef.current?.click()} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') coverInputRef.current?.click(); }}>
                       {point.cover ? <><img src={point.cover} alt="知识点封面" /><button className="cov-rm" type="button" onClick={(event) => { event.stopPropagation(); patchPoint({ cover: '' }); }}>×</button></> : <><span className="t1">＋ 上传封面</span><span className="t2">任意比例 · 自动裁切 1:1</span><div className="vinyl"><i /></div></>}
                     </div>
@@ -894,8 +955,10 @@ function AdminKnowledgeContent() {
                     <div className="pmanage-head">
                       <span className="pm-t">P 分段</span>
                       <span className="pm-note">已添加 {point.parts.length} 段</span>
-                      <button type="button" className="pm-add" onClick={() => setPoint({ ...point, parts: [...point.parts, makePart(nextPartNo)] })}>＋ 添加分段</button>
+                      <div className="pm-action-group"><label className="pm-add batch-video-btn">+批量导入视频<input type="file" accept="video/*" multiple hidden onChange={(event) => { handleBatchVideoFiles(event.target.files); event.target.value = ''; }} /></label>
+                    <button type="button" className="pm-add" onClick={() => setPoint({ ...point, parts: [...point.parts, makePart(nextPartNo)] })}>＋ 添加分段</button>
                     </div>
+                  </div>
                     <div className="pm-list">
                       {point.parts.map((part, index) => (
                         <div className={`prow${errors[`part-${index}`] ? ' field error' : ''}`} data-field={`part-${index}`} key={part.id || `new-${index}`}>
@@ -989,7 +1052,15 @@ function AdminKnowledgeContent() {
               </div>
             </form>
           </div>
-        </main>
+              {pendingCover?.file && (
+        <CoverCropperModal
+          file={pendingCover.file}
+          title={pendingCover.target === 'collection' ? '裁切知识点集封面' : '裁切知识点封面'}
+          onCancel={() => setPendingCover(null)}
+          onConfirm={pendingCover.target === 'collection' ? uploadCroppedCollectionCover : uploadCroppedPointCover}
+        />
+      )}
+</main>
       )}
     </>
   );

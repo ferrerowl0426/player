@@ -632,3 +632,221 @@ body.library-index-page .card:hover {
 .collection-pick-sec .pick-grid { width: 100%; }
 .collection-pick-sec .pick-search.big { max-width: 720px; }
 
+
+
+.batch-video-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  gap: 6px;
+}
+
+.crop-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.crop-modal-card {
+  width: min(720px, 100%);
+  max-height: min(92vh, 760px);
+  overflow: auto;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: #fff;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
+  padding: 22px;
+}
+
+.crop-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.crop-modal-head h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: #0f172a;
+}
+
+.crop-modal-head p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.crop-stage {
+  position: relative;
+  width: 100%;
+  height: min(58vh, 460px);
+  min-height: 320px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #111827;
+}
+
+.crop-zoom-row {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 12px;
+  align-items: center;
+  margin: 18px 0 8px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.crop-zoom-row input {
+  width: 100%;
+}
+
+.crop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .crop-modal-backdrop {
+    padding: 12px;
+  }
+
+  .crop-modal-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .crop-modal-head {
+    flex-direction: column;
+  }
+
+  .crop-stage {
+    min-height: 260px;
+    height: 48vh;
+  }
+}
+
+
+/* Upload page polish: grouped part actions and crop modal buttons */
+.pm-action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.batch-video-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.crop-modal-card {
+  border-radius: 28px;
+  border: 1px solid rgba(203, 184, 142, 0.56);
+  background: linear-gradient(180deg, #fffdf9 0%, #ffffff 100%);
+  box-shadow: 0 28px 90px rgba(47, 36, 22, 0.26);
+}
+
+.crop-modal-head {
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(203, 184, 142, 0.22);
+  padding-bottom: 14px;
+}
+
+.crop-modal-head h3 {
+  color: #171307;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.crop-modal-head p {
+  color: #7b6a50;
+}
+
+.crop-modal-head .ghost-btn,
+.crop-actions .ghost-btn,
+.crop-actions .primary-btn {
+  min-height: 42px;
+  border-radius: 12px;
+  padding: 0 18px;
+  border: 1px solid rgba(171, 139, 84, 0.45);
+  font-weight: 800;
+  font-size: 15px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.crop-modal-head .ghost-btn,
+.crop-actions .ghost-btn {
+  color: #5c4523;
+  background: rgba(255, 252, 246, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.crop-actions .primary-btn {
+  color: #5c4523;
+  border-color: rgba(171, 139, 84, 0.45);
+  background: rgba(255, 252, 246, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.crop-modal-head .ghost-btn:hover,
+.crop-actions .ghost-btn:hover,
+.crop-actions .primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(91, 66, 26, 0.16);
+}
+
+.crop-actions .ghost-btn:disabled,
+.crop-actions .primary-btn:disabled,
+.crop-modal-head .ghost-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+  box-shadow: none;
+}
+
+.crop-stage {
+  border: 1px solid rgba(203, 184, 142, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.crop-zoom-row {
+  color: #4b3a1e;
+}
+
+.crop-zoom-row input {
+  accent-color: #b8893f;
+}
+
+@media (max-width: 720px) {
+  .pm-action-group {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .crop-actions {
+    justify-content: stretch;
+  }
+
+  .crop-actions .ghost-btn,
+  .crop-actions .primary-btn {
+    flex: 1 1 180px;
+  }
+}

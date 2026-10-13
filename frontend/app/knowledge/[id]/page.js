@@ -42,20 +42,10 @@ function fileLabel(fileName = '', fileType = '') {
   return 'FILE';
 }
 
-function isPdfFile(attachment) {
-  return fileLabel(attachment.file_name, attachment.file_type) === 'PDF';
-}
-
 function resourceActions(resource) {
   const url = resource?.file_url;
   if (!url) return null;
-  const isPdf = isPdfFile(resource);
-  return (
-    <>
-      {isPdf ? <a className="fbtn" href={url} target="_blank" rel="noreferrer">预览</a> : null}
-      <a className="fbtn solid" href={url} download={resource?.file_name || true}>下载</a>
-    </>
-  );
+  return <a className="fbtn solid" href={url} download={resource?.file_name || true}>下载</a>;
 }
 
 function prerequisiteHref(item) {

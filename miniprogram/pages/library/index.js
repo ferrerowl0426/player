@@ -66,10 +66,6 @@ Page({
     }
   },
 
-  downloadPdf(event) {
-    this.previewPdf(event);
-  },
-
   backToTop() {
     wx.pageScrollTo({ scrollTop: 0, duration: 240 });
   }

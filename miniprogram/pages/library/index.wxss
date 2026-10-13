@@ -148,8 +148,7 @@
   margin-top: 18rpx;
 }
 
-.btn-preview,
-.btn-download {
+.btn-preview {
   height: 56rpx;
   min-width: 104rpx;
   padding: 0 20rpx;
@@ -159,18 +158,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.btn-preview {
   color: #5d4326;
   border: 2rpx solid #ddd0b4;
   background: #f6f3ee;
-}
-
-.btn-download {
-  color: #ffffff;
-  border: 2rpx solid #5d4326;
-  background: #5d4326;
 }
 
 .back-top {

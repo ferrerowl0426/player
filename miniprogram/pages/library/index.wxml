@@ -21,7 +21,6 @@
           </view>
           <view class="pdf-actions">
             <view class="btn-preview" data-id="{{item.id}}" bindtap="previewPdf">预览</view>
-            <view class="btn-download" data-id="{{item.id}}" bindtap="downloadPdf">下载</view>
           </view>
         </view>
       </view>

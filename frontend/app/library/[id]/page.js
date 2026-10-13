@@ -62,10 +62,6 @@ export default function LibraryBookPage() {
               <div className="desc-scroll"><p>{book.description || '暂无简介'}</p></div>
             </div>
             <div className="bops">
-              <a className="bbtn ghost" href={book.file_url} target="_blank" rel="noopener noreferrer">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z" /><circle cx="12" cy="12" r="2.6" /></svg>
-                预 览
-              </a>
               <a className="bbtn solid" href={book.file_url} download={book.file_name}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 4v11m0 0 4.2-4.2M12 15l-4.2-4.2M4.5 19.5h15" /></svg>
                 下 载

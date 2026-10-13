@@ -73,15 +73,27 @@ function normalizeFileType(file = {}) {
   const raw = String(file.fileType || file.type || file.mimeType || file.mime_type || '').toLowerCase();
   const title = String(file.title || file.name || file.fileName || file.file_name || '').toLowerCase();
   if (raw.includes('pdf') || title.endsWith('.pdf')) return 'PDF';
+  if (raw.includes('word') || raw.includes('document') || title.endsWith('.doc') || title.endsWith('.docx')) return 'DOC';
+  if (raw.includes('presentation') || raw.includes('powerpoint') || title.endsWith('.ppt') || title.endsWith('.pptx')) return 'PPT';
+  if (raw.includes('spreadsheet') || raw.includes('excel') || title.endsWith('.xls') || title.endsWith('.xlsx')) return 'XLS';
   if (raw.includes('mpeg') || raw.includes('mp3') || title.endsWith('.mp3')) return 'MP3';
   if (raw.includes('png') || title.endsWith('.png')) return 'PNG';
   if (raw.includes('jpeg') || raw.includes('jpg') || title.endsWith('.jpg') || title.endsWith('.jpeg')) return 'JPG';
+  if (raw.includes('zip') || title.endsWith('.zip')) return 'ZIP';
+  if (title.endsWith('.gpt')) return 'GPT';
   if (raw.includes('octet-stream')) return 'FILE';
   return raw ? raw.split('/').pop().toUpperCase() : 'FILE';
 }
 
+function getFileAction(type = '') {
+  if (type === 'MP3') return 'play';
+  if (['PDF', 'DOC', 'PPT', 'XLS', 'PNG', 'JPG'].includes(type)) return 'preview';
+  return 'webOnly';
+}
+
 function buildFileItem(file = {}, index = 0, fileSource = 'library') {
   const type = normalizeFileType(file);
+  const action = getFileAction(type);
   return {
     ...file,
     id: file.id,
@@ -90,8 +102,10 @@ function buildFileItem(file = {}, index = 0, fileSource = 'library') {
     fileType: type || 'FILE',
     meta: file.sizeText || file.meta || '资料',
     fileSource,
-    canPlay: Boolean(file.canPlay || type === 'MP3'),
-    action: type === 'MP3' ? 'play' : 'preview'
+    action,
+    canPlay: action === 'play',
+    canPreview: action === 'preview',
+    canOperate: action === 'play' || action === 'preview'
   };
 }
 
@@ -199,6 +213,7 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     if (this.controlsTimer) clearTimeout(this.controlsTimer);
     if (this.fullscreenExitTimer) clearTimeout(this.fullscreenExitTimer);
     if (this.seekBubbleTimer) clearTimeout(this.seekBubbleTimer);
+    if (this.videoWaitingTimer) clearTimeout(this.videoWaitingTimer);
     this.progressTrackRect = null;
   },
 
@@ -393,11 +408,28 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     }, 500);
   },
 
+  clearVideoWaiting() {
+    if (this.videoWaitingTimer) {
+      clearTimeout(this.videoWaitingTimer);
+      this.videoWaitingTimer = null;
+    }
+    if (this.data.videoWaiting) this.setData({ videoWaiting: false });
+  },
+
+  showVideoWaiting() {
+    if (this.videoWaitingTimer) clearTimeout(this.videoWaitingTimer);
+    this.videoWaitingTimer = setTimeout(() => {
+      this.videoWaitingTimer = null;
+      if (this._isUnloaded || !this._isPageVisible || !this.data.isPlaying) return;
+      this.setData({ videoWaiting: true, controlsVisible: true });
+    }, 450);
+  },
+
   updateVideoProgress(currentTime, duration) {
     if (this.data.isSeeking) return;
     const safeDuration = Number(duration || this.data.duration || 0);
     const safeCurrent = Number(currentTime || 0);
-    this.setData({
+    const data = {
       currentTime: safeCurrent,
       duration: safeDuration,
       currentTimeText: formatVideoTime(safeCurrent),
@@ -405,11 +437,23 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
       seekTimeText: formatVideoTime(safeCurrent),
       progressPercent: safeDuration > 0 ? clampPercent((safeCurrent / safeDuration) * 100) : 0,
       progressDotPercent: safeDuration > 0 ? Math.max(2, Math.min(98, clampPercent((safeCurrent / safeDuration) * 100))) : 2
-    });
+    };
+    if (this.data.videoWaiting) data.videoWaiting = false;
+    if (this.videoWaitingTimer) {
+      clearTimeout(this.videoWaitingTimer);
+      this.videoWaitingTimer = null;
+    }
+    this.setData(data);
   },
 
   handleVideoPlay() {
-    this.setData({ isPlaying: true, videoWaiting: false, videoErrorText: '' }, () => this.showVideoControls());
+    this.clearVideoWaiting();
+    this.setData({ isPlaying: true, videoErrorText: '' }, () => this.showVideoControls());
+  },
+
+  handleVideoCanPlay() {
+    this.clearVideoWaiting();
+    if (this.data.videoErrorText) this.setData({ videoErrorText: '' });
   },
 
   handleVideoPause() {
@@ -419,6 +463,7 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
 
   handleVideoEnded() {
     if (this.controlsTimer) clearTimeout(this.controlsTimer);
+    this.clearVideoWaiting();
     const duration = Number(this.data.duration || 0);
     this.setData({
       isPlaying: false,
@@ -440,7 +485,7 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
   },
 
   handleVideoWaiting() {
-    this.setData({ videoWaiting: true, controlsVisible: true });
+    this.showVideoWaiting();
   },
 
   handleVideoError() {
@@ -583,6 +628,7 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     const isPortraitVideo = height > width;
     const videoDirection = width > height ? 90 : 0;
     if (this.data.pendingQualityRollback) this._qualityMetadataReady = true;
+    this.clearVideoWaiting();
     this.setData({
       videoDirection,
       isPortraitVideo,
@@ -597,8 +643,14 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     if (url) wx.navigateTo({ url });
   },
 
+  noop() {},
+
   async handleFileAction(event) {
     const file = event.currentTarget.dataset.file;
+    if (!file?.canOperate) {
+      wx.showToast({ title: '请前往web端用电脑下载', icon: 'none' });
+      return;
+    }
     try {
       await openLibraryFile({
         ...file,

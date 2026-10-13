@@ -21,6 +21,12 @@ function clampPercent(value = 0) {
 // 微信 video 组件仅保证支持这些档位；0.75 在 iOS 真机上会被忽略。
 const SPEEDS = [0.5, 0.8, 1, 1.25, 1.5, 2];
 
+function formatSpeedLabel(speed) {
+  return `${Number(speed).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}x`;
+}
+
+const SPEED_OPTIONS = SPEEDS.map((value) => ({ value, label: formatSpeedLabel(value) }));
+
 function normalizeRenditions(part = {}) {
   const list = Array.isArray(part.renditions) ? part.renditions : [];
   const readyList = list
@@ -167,6 +173,8 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     qualityLabel: '原画',
     speed: 1,
     speedLabel: '1.0x',
+    speedOptions: SPEED_OPTIONS,
+    speedMenuVisible: false,
     videoDirection: 0,
     videoObjectFit: 'contain',
     isPlaying: false,
@@ -256,10 +264,12 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
   showVideoControls() {
     if (this.controlsTimer) clearTimeout(this.controlsTimer);
     this.setData({ controlsVisible: true });
-    if (this.data.isPlaying) {
+    // iOS 原生全屏层在控制条隐藏后不一定把点击继续派发给页面。
+    // 全屏时保持控制条常驻，小窗播放才自动隐藏。
+    if (this.data.isPlaying && !this.data.isFullscreen && !this.data.speedMenuVisible) {
       this.controlsTimer = setTimeout(() => {
         this.setData({ controlsVisible: false });
-      }, this.data.isFullscreen ? 2600 : 2000);
+      }, 2000);
     }
   },
 
@@ -371,14 +381,30 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     this.selectQualityByValue(next.quality);
   },
 
-  cycleSpeed() {
-    const currentIndex = SPEEDS.findIndex((item) => item === this.data.speed);
-    const speed = SPEEDS[(currentIndex + 1) % SPEEDS.length];
-    const speedLabel = `${speed.toFixed(2).replace(/0$/, '')}x`;
-    this.setData({ speed, speedLabel }, () => this.getVideoContext().playbackRate(speed));
+  toggleSpeedMenu() {
+    if (this.controlsTimer) clearTimeout(this.controlsTimer);
+    this.setData({
+      controlsVisible: true,
+      speedMenuVisible: !this.data.speedMenuVisible
+    });
+  },
+
+  selectSpeed(event) {
+    const speed = Number(event.currentTarget.dataset.speed);
+    if (!SPEEDS.includes(speed)) return;
+    this.setData({
+      speed,
+      speedLabel: formatSpeedLabel(speed),
+      speedMenuVisible: false,
+      controlsVisible: true
+    }, () => {
+      this.getVideoContext().playbackRate(speed);
+      this.showVideoControls();
+    });
   },
 
   togglePlay() {
+    if (this.data.speedMenuVisible) this.setData({ speedMenuVisible: false });
     const video = this.getVideoContext();
     if (this.data.isPlaying) {
       video.pause();
@@ -388,6 +414,7 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
   },
 
   toggleFullscreen() {
+    if (this.data.speedMenuVisible) this.setData({ speedMenuVisible: false });
     if (this.data.isFullscreen) {
       this.exitFullscreenWithFallback();
       return;
@@ -532,11 +559,14 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
   handleFullscreenChange(event) {
     if (this.fullscreenExitTimer) clearTimeout(this.fullscreenExitTimer);
     const isFullscreen = Boolean(event.detail?.fullScreen);
-    const direction = isFullscreen ? (event.detail?.direction || (this.data.videoDirection === 90 ? 'horizontal' : 'vertical')) : 'none';
+    const direction = isFullscreen
+      ? (event.detail?.direction || (this.data.videoDirection === 90 ? 'horizontal' : 'vertical'))
+      : 'none';
     this.setData({
       isFullscreen,
       fullscreenDirection: direction,
-      isPortraitFullscreen: isFullscreen && (direction === 'vertical' || this.data.isPortraitVideo),
+      // 以原生 fullscreenchange 的方向为准；只有旧基础库不返回 direction 时才使用视频比例兜底。
+      isPortraitFullscreen: isFullscreen && direction !== 'horizontal',
       controlsVisible: true
     }, () => this.showVideoControls());
   },
@@ -561,13 +591,68 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     return true;
   },
 
+  previewSeekBySlider(event) {
+    const percent = Math.max(0, Math.min(100, Number(event.detail?.value || 0)));
+    const nextTime = percent / 100 * (this.data.duration || 0);
+    this.setData({
+      isSeeking: true,
+      controlsVisible: true,
+      currentTime: nextTime,
+      currentTimeText: formatVideoTime(nextTime),
+      seekTimeText: formatVideoTime(nextTime),
+      progressPercent: percent,
+      progressDotPercent: percent
+    });
+  },
+
+  commitSeekBySlider(event) {
+    const percent = Math.max(0, Math.min(100, Number(event.detail?.value || 0)));
+    this.commitSeek(percent / 100 * (this.data.duration || 0));
+  },
+
   readProgressTrackRect(callback) {
-    const query = wx.createSelectorQuery().in(this);
-    query.select('.progress-track').boundingClientRect((rect) => {
-      if (this._isUnloaded || !rect?.width) return;
-      this.progressTrackRect = rect;
-      callback?.(rect);
-    }).exec();
+    if (this._isUnloaded) return;
+    // cover-view 位于原生 video 层内部，iOS 真机的小窗和全屏都可能无法测量节点。
+    // 播放器各模式的水平内边距固定，直接按视口和安全区计算更稳定。
+    this.progressTrackRect = this.getFallbackProgressRect();
+    callback?.(this.progressTrackRect);
+  },
+
+  getFallbackProgressRect() {
+    let info = {};
+    try {
+      info = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : wx.getSystemInfoSync();
+    } catch (error) {
+      info = {};
+    }
+    const rawWidth = Number(info.windowWidth || info.screenWidth || 375);
+    const rawHeight = Number(info.windowHeight || info.screenHeight || 667);
+    const isLandscapeFullscreen = this.data.isFullscreen && !this.data.isPortraitFullscreen;
+    const viewportWidth = isLandscapeFullscreen
+      ? Math.max(rawWidth, rawHeight)
+      : Math.min(rawWidth, rawHeight);
+
+    if (!this.data.isFullscreen) {
+      const inset = (62 / 750) * viewportWidth;
+      return { left: inset, width: Math.max(1, viewportWidth - inset * 2) };
+    }
+
+    if (this.data.isPortraitFullscreen) {
+      // 与竖屏全屏控制条的 12px 内边距保持一致，避免 rpx 与原生全屏坐标混用。
+      const leftInset = 18;
+      const rightInset = 18;
+      return { left: leftInset, width: Math.max(1, viewportWidth - leftInset - rightInset) };
+    }
+
+    const safeArea = info.safeArea || {};
+    const reportedWidth = Number(info.windowWidth || viewportWidth);
+    const safeLeft = reportedWidth >= rawHeight ? Math.max(0, Number(safeArea.left || 0)) : 0;
+    const safeRight = reportedWidth >= rawHeight
+      ? Math.max(0, reportedWidth - Number(safeArea.right || reportedWidth))
+      : 0;
+    const leftInset = safeLeft + 18;
+    const rightInset = safeRight + 18;
+    return { left: leftInset, width: Math.max(1, viewportWidth - leftInset - rightInset) };
   },
 
   commitSeek(nextTime = this.data.currentTime) {
@@ -583,7 +668,7 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     if (this.controlsTimer) clearTimeout(this.controlsTimer);
     if (this.seekBubbleTimer) clearTimeout(this.seekBubbleTimer);
     this.progressTrackRect = null;
-    const touch = event.touches?.[0];
+    const touch = event.touches?.[0] || event.changedTouches?.[0];
     const gestureId = Number(this.seekGestureId || 0) + 1;
     this.seekGestureId = gestureId;
     this.latestSeekTouch = touch;
@@ -601,7 +686,8 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
   },
 
   moveSeekVideo(event) {
-    this.latestSeekTouch = event.touches?.[0];
+    // iOS cover-view 在部分基础库的 touchmove 中只填充 changedTouches。
+    this.latestSeekTouch = event.touches?.[0] || event.changedTouches?.[0] || this.latestSeekTouch;
     this.previewSeekByTouch(this.latestSeekTouch, false);
   },
 

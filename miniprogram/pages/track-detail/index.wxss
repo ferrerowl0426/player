@@ -82,6 +82,7 @@
   box-sizing: border-box;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.74));
   opacity: 1;
+  overflow: visible;
 }
 
 .video-controls.hide {
@@ -91,6 +92,13 @@
 }
 
 .video-controls.show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* 原生全屏下必须保留可操作入口，避免 iOS 隐藏后无法再次唤起 cover-view。 */
+.video-controls.full.hide {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -112,7 +120,67 @@
 }
 
 .player.portrait-fullscreen .video-controls.full {
-  bottom: 64rpx;
+  /* iOS 竖屏原生全屏已经包含 Home Indicator 安全区，避免再用 rpx 叠加偏移。 */
+  height: 132px;
+  min-height: 132px;
+  padding: 4px 12px 6px;
+  padding-bottom: calc(6px + constant(safe-area-inset-bottom));
+  padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  gap: 2px;
+}
+
+.player.portrait-fullscreen .video-controls.full .progress-zone,
+.player.portrait-fullscreen .video-controls.full .progress-touch {
+  height: 38px;
+}
+
+.player.portrait-fullscreen .video-controls.full .progress-touch {
+  padding: 0 6px;
+}
+
+.player.portrait-fullscreen .video-controls.full .progress-track,
+.player.portrait-fullscreen .video-controls.full .progress-fill {
+  height: 4px;
+}
+
+.player.portrait-fullscreen .video-controls.full .progress-dot {
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+}
+
+.player.portrait-fullscreen .video-controls.full .control-row {
+  min-height: 32px;
+  gap: 8px;
+}
+
+.player.portrait-fullscreen .video-controls.full .left-controls,
+.player.portrait-fullscreen .video-controls.full .right-controls {
+  min-width: 0;
+  gap: 16px;
+}
+
+.player.portrait-fullscreen .video-controls.full .icon-ctrl {
+  width: 32px;
+  height: 32px;
+}
+
+.player.portrait-fullscreen .video-controls.full .text-ctrl {
+  min-width: 48px;
+  height: 32px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.player.portrait-fullscreen .video-controls.full .player-icon-image {
+  width: 18px;
+  height: 18px;
+}
+
+.player.portrait-fullscreen .video-controls.full .time-label {
+  font-size: 12px;
+  line-height: 28px;
 }
 
 .control-row {
@@ -144,8 +212,24 @@
 }
 
 .video-controls.compact .right-controls {
-  width: 58rpx;
+  width: auto;
   height: 58rpx;
+  gap: 10rpx;
+}
+
+.video-controls.compact .text-ctrl {
+  min-width: 68rpx;
+  padding: 0 10rpx;
+  box-sizing: border-box;
+}
+
+.video-controls.compact .speed-menu {
+  right: 24rpx;
+  bottom: 58rpx;
+}
+
+.video-controls.compact .speed-trigger {
+  margin-left: 6px;
 }
 
 .video-controls.full .control-row {
@@ -156,7 +240,7 @@
 .video-controls.full .left-controls,
 .video-controls.full .right-controls {
   min-width: 190rpx;
-  gap: 18rpx;
+  gap: 24rpx;
 }
 
 .ctrl-btn {
@@ -190,55 +274,31 @@
   font-size: 31rpx;
 }
 
-.play-icon {
-  width: 0;
-  height: 0;
-  margin-left: 4rpx;
-  border-top: 10rpx solid transparent;
-  border-bottom: 10rpx solid transparent;
-  border-left: 16rpx solid #ffffff;
+.player-icon-image {
+  width: 28rpx;
+  height: 28rpx;
 }
 
-.pause-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  column-gap: 6rpx;
+.video-controls.full .player-icon-image {
+  width: 32rpx;
+  height: 32rpx;
 }
 
-.pause-icon > cover-view {
-  width: 5rpx;
-  height: 22rpx;
-  border-radius: 2rpx;
-  background: #ffffff;
+.player.landscape-fullscreen .video-controls.full .player-icon-image {
+  width: 18px;
+  height: 18px;
 }
-
-.fullscreen-icon {
-  position: relative;
-  width: 24rpx;
-  height: 24rpx;
-}
-
-.fullscreen-icon > cover-view {
-  position: absolute;
-  width: 8rpx;
-  height: 8rpx;
-  border-color: #ffffff;
-  border-style: solid;
-}
-
-.fullscreen-icon .corner-tl { left: 0; top: 0; border-width: 3rpx 0 0 3rpx; }
-.fullscreen-icon .corner-tr { right: 0; top: 0; border-width: 3rpx 3rpx 0 0; }
-.fullscreen-icon .corner-br { right: 0; bottom: 0; border-width: 0 3rpx 3rpx 0; }
-.fullscreen-icon .corner-bl { left: 0; bottom: 0; border-width: 0 0 3rpx 3rpx; }
-
-.fullscreen-icon.exit { transform: scale(0.72); }
 
 .part-ctrl {
   width: 32rpx;
   height: 40rpx;
   gap: 3rpx;
   opacity: 0.38;
+}
+
+.part-icon-image {
+  width: 18px;
+  height: 18px;
 }
 
 .part-ctrl .bar {
@@ -270,6 +330,82 @@
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.12);
   font-size: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 46rpx;
+  text-align: center;
+}
+
+.video-controls.full .text-ctrl {
+  height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+  align-items: center;
+  justify-content: center;
+  line-height: 32px;
+  text-align: center;
+}
+
+.video-controls.full .speed-trigger {
+  margin-left: 12px;
+}
+
+.speed-trigger.active {
+  background: rgba(217, 111, 24, 0.88);
+}
+
+.speed-menu {
+  position: absolute;
+  right: 24rpx;
+  bottom: 116rpx;
+  z-index: 12;
+  width: 300rpx;
+  padding: 14rpx 12rpx 12rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.18);
+  border-radius: 16rpx;
+  background: rgba(36, 31, 27, 0.96);
+  box-shadow: 0 12rpx 32rpx rgba(36, 25, 18, 0.32);
+  box-sizing: border-box;
+}
+
+.speed-menu-title {
+  padding: 0 4rpx 10rpx;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 18rpx;
+  font-weight: 600;
+  line-height: 28rpx;
+  text-align: left;
+}
+
+.speed-options {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.speed-option {
+  width: 84rpx;
+  height: 48rpx;
+  margin: 4rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.12);
+  border-radius: 10rpx;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 19rpx;
+  font-weight: 600;
+  line-height: 44rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.speed-option.active {
+  border-color: #d96f18;
+  color: #ffffff;
+  background: #b85f18;
+}
+
+.speed-option:active {
+  transform: scale(0.98);
 }
 
 .progress-zone {
@@ -283,6 +419,23 @@
 .video-controls.compact .progress-zone {
   height: 50rpx;
   margin: 0;
+}
+
+.progress-slider {
+  flex: 1;
+  width: 100%;
+  margin: 0 8rpx;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.video-controls.full .progress-slider {
+  margin: 0 14rpx;
+}
+
+.player.landscape-fullscreen .video-controls.full .progress-slider,
+.player.portrait-fullscreen .video-controls.full .progress-slider {
+  margin: 0 6px;
 }
 
 .video-controls.full .progress-zone {
@@ -382,6 +535,11 @@
   box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.28);
 }
 
+/* 气泡现在是控制层的直接子节点，避免 iOS cover-view 嵌套层覆盖。 */
+.video-controls.compact .progress-bubble {
+  top: 0;
+}
+
 .video-controls.full .progress-bubble {
   top: -16rpx;
   min-width: 82rpx;
@@ -389,6 +547,10 @@
   margin-left: -41rpx;
   font-size: 21rpx;
   line-height: 42rpx;
+}
+
+.video-controls.full .progress-bubble {
+  top: 0;
 }
 
 .time-label {
@@ -408,7 +570,11 @@
 
 .video-controls.full .time-label {
   font-size: 22rpx;
-  line-height: 52rpx;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 /*
@@ -418,7 +584,8 @@
  */
 .player.landscape-fullscreen .video-controls.full {
   gap: 2px;
-  min-height: 78px;
+  height: 132px;
+  min-height: 132px;
   padding: 4px 12px 6px;
   padding-left: calc(12px + constant(safe-area-inset-left));
   padding-right: calc(12px + constant(safe-area-inset-right));
@@ -472,19 +639,26 @@
 
 .player.landscape-fullscreen .video-controls.full .left-controls,
 .player.landscape-fullscreen .video-controls.full .right-controls {
-  min-width: 88px;
-  gap: 6px;
+  min-width: 0;
+  gap: 16px;
 }
 
 .player.landscape-fullscreen .video-controls.full .icon-ctrl {
   width: 32px;
   height: 32px;
+  border-radius: 999px;
   font-size: 16px;
 }
 
 .player.landscape-fullscreen .video-controls.full .part-ctrl {
   width: 32px;
   height: 32px;
+  gap: 2px;
+}
+
+.player.portrait-fullscreen .video-controls.full .part-icon-image {
+  width: 18px;
+  height: 18px;
 }
 
 .player.landscape-fullscreen .video-controls.full .part-ctrl .bar {
@@ -506,15 +680,63 @@
 }
 
 .player.landscape-fullscreen .video-controls.full .text-ctrl {
-  min-width: 38px;
+  min-width: 48px;
   height: 32px;
   padding: 0 6px;
+  border-radius: 999px;
   font-size: 12px;
+  line-height: 32px;
+}
+
+.player.landscape-fullscreen .video-controls.full .speed-trigger,
+.player.portrait-fullscreen .video-controls.full .speed-trigger {
+  margin-left: 12px;
+}
+
+.player.landscape-fullscreen .video-controls.full .progress-track,
+.player.landscape-fullscreen .video-controls.full .progress-fill,
+.player.landscape-fullscreen .video-controls.full .progress-dot,
+.player.landscape-fullscreen .video-controls.full .progress-bubble {
+  border-radius: 999px;
+}
+
+.player.landscape-fullscreen .video-controls.full .speed-menu {
+  right: calc(12px + constant(safe-area-inset-right));
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: 56px;
+  width: 332px;
+  padding: 8px 6px 6px;
+  border-width: 1px;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(36, 25, 18, 0.32);
+}
+
+.player.landscape-fullscreen .video-controls.full .speed-menu-title {
+  padding: 0 4px 5px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.player.landscape-fullscreen .video-controls.full .speed-option {
+  width: 48px;
+  height: 30px;
+  margin: 2px;
+  border-width: 1px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 28px;
+}
+
+.player.landscape-fullscreen .video-controls.full .speed-options {
+  flex-wrap: nowrap;
 }
 
 .player.landscape-fullscreen .video-controls.full .time-label {
   font-size: 12px;
-  line-height: 28px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .lesson-card {

@@ -82,10 +82,12 @@ Page({
   },
 
   onHide() {
+    this.audioProgressRect = null;
     this.destroyAudio();
   },
 
   onUnload() {
+    this.audioProgressRect = null;
     this.destroyAudio();
   },
 
@@ -267,16 +269,62 @@ Page({
     });
   },
 
-  onSeeking(event) {
-    this.updateProgress(event.detail.value, true);
+  readAudioProgressRect(callback) {
+    wx.createSelectorQuery().in(this).select('.audio-progress-track').boundingClientRect((rect) => {
+      if (!rect?.width) return;
+      this.audioProgressRect = rect;
+      callback?.();
+    }).exec();
   },
 
-  onSeekEnd(event) {
-    const progress = event.detail.value;
-    this.updateProgress(progress, false);
-    if (this.audio && this.data.duration) {
-      this.audio.seek(this.data.currentTime);
+  previewAudioSeek(touch) {
+    const rect = this.audioProgressRect;
+    if (!touch || !rect?.width) return false;
+    const clientX = Number(touch.clientX ?? touch.pageX ?? touch.x);
+    if (!Number.isFinite(clientX)) return false;
+    const progress = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    this.updateProgress(progress, true);
+    return true;
+  },
+
+  startAudioSeek(event) {
+    this.audioProgressRect = null;
+    const gestureId = Number(this.audioSeekGestureId || 0) + 1;
+    this.audioSeekGestureId = gestureId;
+    this.latestAudioSeekTouch = event.touches?.[0];
+    this.pendingAudioSeekEndTouch = null;
+    this.readAudioProgressRect(() => {
+      if (this.audioSeekGestureId !== gestureId) return;
+      if (this.pendingAudioSeekEndTouch) {
+        this.previewAudioSeek(this.pendingAudioSeekEndTouch);
+        this.pendingAudioSeekEndTouch = null;
+        this.commitAudioSeek();
+        return;
+      }
+      this.previewAudioSeek(this.latestAudioSeekTouch);
+    });
+  },
+
+  moveAudioSeek(event) {
+    this.latestAudioSeekTouch = event.touches?.[0];
+    this.previewAudioSeek(this.latestAudioSeekTouch);
+  },
+
+  endAudioSeek(event) {
+    const touch = event.changedTouches?.[0] || this.latestAudioSeekTouch;
+    if (touch && this.audioProgressRect) {
+      this.previewAudioSeek(touch);
+      this.commitAudioSeek();
+      return;
     }
+    if (touch) this.pendingAudioSeekEndTouch = touch;
+  },
+
+  commitAudioSeek() {
+    this.setData({ seeking: false });
+    if (this.audio && this.data.duration) this.audio.seek(this.data.currentTime);
+    this.audioProgressRect = null;
+    this.latestAudioSeekTouch = null;
   },
 
   rewind() {

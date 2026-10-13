@@ -7,7 +7,7 @@
 .home-greeting {
   color: #261d10;
   font-size: 36rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.35;
   letter-spacing: 1rpx;
   margin: 0 8rpx 28rpx;
@@ -29,7 +29,7 @@
 
 .disabled-strong {
   color: #b4452e;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .materials-hint {
@@ -62,7 +62,7 @@
   color: #261d10;
   font-size: 28rpx;
   line-height: 1.35;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0;
   word-break: break-word;
 }
@@ -96,7 +96,7 @@
   color: #5d4326;
   font-size: 25rpx;
   line-height: 1.35;
-  font-weight: 900;
+  font-weight: 700;
   margin-bottom: 14rpx;
 }
 
@@ -132,7 +132,7 @@
   color: #261d10;
   font-size: 28rpx;
   line-height: 1.35;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0;
   word-break: break-word;
 }
@@ -183,7 +183,7 @@
   background: rgba(93, 67, 38, 0.88);
   font-size: 20rpx;
   line-height: 32rpx;
-  font-weight: 900;
+  font-weight: 700;
   overflow: hidden;
   white-space: nowrap;
 }
@@ -197,7 +197,7 @@
   color: #261d10;
   font-size: 27rpx;
   line-height: 1.42;
-  font-weight: 900;
+  font-weight: 700;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -217,7 +217,7 @@
   color: #5d4326;
   font-size: 22rpx;
   line-height: 1.45;
-  font-weight: 900;
+  font-weight: 700;
   margin-top: 10rpx;
   white-space: nowrap;
   overflow: hidden;

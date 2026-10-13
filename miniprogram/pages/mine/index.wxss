@@ -20,13 +20,13 @@
   background: #ffffff;
   color: #5d4326;
   font-size: 40rpx;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .profile-name {
   color: #261d10;
   font-size: 34rpx;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .profile-meta {

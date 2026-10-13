@@ -28,7 +28,7 @@
   color: #3d2c19;
   font-size: 46rpx;
   line-height: 1.2;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 2rpx;
 }
 
@@ -88,7 +88,7 @@
   display: block;
   color: #5d4326;
   font-size: 22rpx;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 2rpx;
   margin-bottom: 12rpx;
 }

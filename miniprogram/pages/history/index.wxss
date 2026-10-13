@@ -42,6 +42,7 @@
   height: 78rpx;
   color: #261d10;
   font-size: 26rpx;
+  line-height: 78rpx;
 }
 
 .record-list {
@@ -87,7 +88,7 @@
   color: #261d10;
   font-size: 30rpx;
   line-height: 1.35;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: 1rpx;
 }
 
@@ -96,14 +97,14 @@
   color: #5d4326;
   font-size: 22rpx;
   line-height: 1.45;
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .rec-title {
   color: #261d10;
   font-size: 30rpx;
   line-height: 1.42;
-  font-weight: 900;
+  font-weight: 700;
   margin-bottom: 14rpx;
   overflow: hidden;
   white-space: nowrap;
@@ -135,7 +136,7 @@
 .work-no {
   color: #5d4326;
   font-size: 20rpx;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .work-title {
@@ -143,7 +144,7 @@
   color: #261d10;
   font-size: 24rpx;
   line-height: 1.45;
-  font-weight: 850;
+  font-weight: 700;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -153,7 +154,7 @@
   color: #5d4326;
   font-size: 20rpx;
   line-height: 1.45;
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .msg-box {
@@ -171,7 +172,7 @@
 .msg-title {
   color: #5d4326;
   font-size: 22rpx;
-  font-weight: 950;
+  font-weight: 700;
   margin-bottom: 6rpx;
 }
 
@@ -192,7 +193,8 @@
 .back-top {
   position: fixed;
   right: 28rpx;
-  bottom: 148rpx;
+  bottom: calc(148rpx + constant(safe-area-inset-bottom));
+  bottom: calc(148rpx + env(safe-area-inset-bottom));
   z-index: 40;
   width: 76rpx;
   height: 76rpx;
@@ -203,6 +205,6 @@
   font-size: 34rpx;
   line-height: 72rpx;
   text-align: center;
-  font-weight: 950;
+  font-weight: 700;
   box-shadow: 0 8rpx 24rpx rgba(93, 67, 38, 0.14);
 }

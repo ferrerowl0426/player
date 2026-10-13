@@ -1,9 +1,9 @@
 <view class="page lesson-page">
   <view class="player {{isFullscreen ? 'fullscreen' : ''}} {{isPortraitFullscreen ? 'portrait-fullscreen' : ''}} {{isFullscreen && !isPortraitFullscreen ? 'landscape-fullscreen' : ''}}">
-    <video wx:if="{{detail.currentPart.videoUrl}}" id="lessonVideo" class="video-player" src="{{detail.currentPart.videoUrl}}" poster="{{detail.currentPart.coverUrl || detail.coverUrl}}" controls="{{false}}" enable-progress-gesture show-fullscreen-btn="{{false}}" show-play-btn="{{false}}" show-center-play-btn="{{false}}" show-casting-button="{{false}}" object-fit="{{videoObjectFit}}" direction="{{videoDirection}}" bindloadedmetadata="handleVideoLoadedMeta" bindplay="handleVideoPlay" bindcanplay="handleVideoCanPlay" bindpause="handleVideoPause" bindtimeupdate="handleVideoTimeUpdate" bindended="handleVideoEnded" bindwaiting="handleVideoWaiting" binderror="handleVideoError" bindfullscreenchange="handleFullscreenChange" bindtap="showVideoControls" bindtouchstart="showVideoControls">
+    <video wx:if="{{detail.currentPart.videoUrl}}" id="lessonVideo" class="video-player" src="{{detail.currentPart.videoUrl}}" poster="{{detail.currentPart.coverUrl || detail.coverUrl}}" controls="{{false}}" enable-progress-gesture="{{false}}" playback-rate="{{speed}}" show-fullscreen-btn="{{false}}" show-play-btn="{{false}}" show-center-play-btn="{{false}}" show-casting-button="{{false}}" object-fit="{{videoObjectFit}}" direction="{{videoDirection}}" bindloadedmetadata="handleVideoLoadedMeta" bindplay="handleVideoPlay" bindcanplay="handleVideoCanPlay" bindpause="handleVideoPause" bindtimeupdate="handleVideoTimeUpdate" bindended="handleVideoEnded" bindwaiting="handleVideoWaiting" binderror="handleVideoError" bindfullscreenchange="handleFullscreenChange" bindtap="showVideoControls" bindtouchstart="showVideoControls">
       <cover-view class="video-controls {{controlsVisible ? 'show' : 'hide'}} {{isFullscreen ? 'full' : 'compact'}}">
         <cover-view class="progress-zone">
-          <cover-view class="progress-touch" bindtouchstart="startSeekVideo" bindtouchmove="moveSeekVideo" bindtouchend="endSeekVideo" bindtouchcancel="endSeekVideo">
+          <cover-view class="progress-touch" catchtouchstart="startSeekVideo" catchtouchmove="moveSeekVideo" catchtouchend="endSeekVideo" catchtouchcancel="endSeekVideo">
             <cover-view wx:if="{{isSeeking}}" class="progress-bubble" style="left: {{progressDotPercent}}%;">{{seekTimeText}}</cover-view>
             <cover-view class="progress-track">
               <cover-view class="progress-fill" style="width: {{progressPercent}}%;"></cover-view>
@@ -14,14 +14,14 @@
         <cover-view class="control-row">
           <cover-view class="left-controls">
             <cover-view wx:if="{{isFullscreen && !isPortraitVideo}}" class="ctrl-btn part-ctrl prev-ctrl" data-step="-1" bindtap="switchPartByStep"><cover-view class="bar"></cover-view><cover-view class="tri left"></cover-view></cover-view>
-            <cover-view class="ctrl-btn icon-ctrl" bindtap="togglePlay">{{isPlaying ? 'Ⅱ' : '▶'}}</cover-view>
+            <cover-view class="ctrl-btn icon-ctrl" bindtap="togglePlay"><cover-view wx:if="{{isPlaying}}" class="pause-icon"><cover-view></cover-view><cover-view></cover-view></cover-view><cover-view wx:else class="play-icon"></cover-view></cover-view>
             <cover-view wx:if="{{isFullscreen && !isPortraitVideo}}" class="ctrl-btn part-ctrl next-ctrl" data-step="1" bindtap="switchPartByStep"><cover-view class="tri right"></cover-view><cover-view class="bar"></cover-view></cover-view>
           </cover-view>
           <cover-view class="time-label">{{currentTimeText}} / {{durationText}}</cover-view>
           <cover-view class="right-controls">
             <cover-view wx:if="{{isFullscreen && detail.currentPart.hasQualityOptions}}" class="ctrl-btn text-ctrl" bindtap="cycleQuality">{{qualityLabel}}</cover-view>
             <cover-view wx:if="{{isFullscreen}}" class="ctrl-btn text-ctrl" bindtap="cycleSpeed">{{speedLabel}}</cover-view>
-            <cover-view class="ctrl-btn icon-ctrl" bindtap="toggleFullscreen">{{isFullscreen ? '↙' : '⛶'}}</cover-view>
+            <cover-view class="ctrl-btn icon-ctrl" bindtap="toggleFullscreen"><cover-view class="fullscreen-icon {{isFullscreen ? 'exit' : ''}}"><cover-view class="corner-tl"></cover-view><cover-view class="corner-tr"></cover-view><cover-view class="corner-br"></cover-view><cover-view class="corner-bl"></cover-view></cover-view></cover-view>
           </cover-view>
         </cover-view>
       </cover-view>

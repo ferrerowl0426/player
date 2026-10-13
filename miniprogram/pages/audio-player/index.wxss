@@ -8,6 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -21,13 +22,13 @@
   left: 28rpx;
   color: #5d4326;
   font-size: 24rpx;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .head-title {
   color: #261d10;
   font-size: 30rpx;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 2rpx;
 }
 
@@ -102,7 +103,7 @@
 .audio-title {
   color: #261d10;
   font-size: 30rpx;
-  font-weight: 950;
+  font-weight: 700;
   line-height: 1.35;
   overflow: hidden;
   display: -webkit-box;
@@ -125,7 +126,7 @@
 
 .source text {
   color: #5d4326;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .audio-state {
@@ -135,7 +136,7 @@
   color: #7a6a52;
   background: #f6f3ee;
   font-size: 22rpx;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.35;
   text-align: center;
 }
@@ -151,14 +152,14 @@
   align-items: center;
   color: #7a6a52;
   font-size: 22rpx;
-  font-weight: 800;
+  font-weight: 700;
   margin-bottom: 16rpx;
 }
 
 .time-row text:nth-child(2) {
   color: #5d4326;
   font-size: 23rpx;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .time-row text:last-child {
@@ -169,6 +170,43 @@
   position: relative;
   margin-top: 20rpx;
   padding-top: 28rpx;
+}
+
+.audio-progress-touch {
+  width: 100%;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+}
+
+.audio-progress-track {
+  position: relative;
+  width: 100%;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: #e7dac2;
+}
+
+.audio-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #d96f18;
+}
+
+.audio-progress-dot {
+  position: absolute;
+  top: 50%;
+  width: 28rpx;
+  height: 28rpx;
+  margin: -14rpx 0 0 -14rpx;
+  border: 4rpx solid #ffffff;
+  border-radius: 50%;
+  background: #5d4326;
+  box-shadow: 0 2rpx 8rpx rgba(93, 67, 38, 0.24);
+}
+
+.audio-progress-dot.active {
+  transform: scale(1.15);
 }
 
 .seek-bubble {
@@ -182,7 +220,7 @@
   color: #ffffff;
   background: #5d4326;
   font-size: 19rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 34rpx;
   text-align: center;
   z-index: 2;
@@ -224,7 +262,7 @@
   color: rgba(93, 67, 38, 0.46);
   background: transparent;
   font-size: 22rpx;
-  font-weight: 950;
+  font-weight: 700;
   line-height: 52rpx;
 }
 
@@ -286,6 +324,5 @@
 
 .speed-toggle {
   font-size: 22rpx;
-  font-weight: 950;
+  font-weight: 700;
 }
-

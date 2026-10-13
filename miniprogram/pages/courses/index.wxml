@@ -10,7 +10,7 @@
     <view class="toolbar">
       <view class="searchbar">
         <view class="search-icon"></view>
-        <input class="search-input" value="{{keyword}}" placeholder="在当前类型内搜索" bindinput="onKeywordInput" />
+        <input class="search-input" value="{{keyword}}" placeholder="在当前类型内搜索" placeholder-class="input-placeholder" confirm-type="search" cursor-spacing="16" bindinput="onKeywordInput" />
         <view wx:if="{{keyword}}" class="clear-btn" bindtap="clearKeyword">清空</view>
       </view>
     </view>
@@ -25,7 +25,7 @@
         <view class="sort-menu" wx:if="{{sortOpen}}">
           <view class="sort-option {{item.value === sort ? 'active' : ''}}" wx:for="{{sortOptions}}" wx:key="value" data-value="{{item.value}}" bindtap="selectSort">
             <text>{{item.label}}</text>
-            <view wx:if="{{item.value === sort}}" class="sort-check">✓</view>
+            <view wx:if="{{item.value === sort}}" class="sort-check"><view></view></view>
           </view>
         </view>
       </view>
@@ -50,5 +50,5 @@
     </block>
   </view>
 
-  <view class="backtop" bindtap="backToTop">↑</view>
+  <view class="backtop" bindtap="backToTop"><view class="backtop-arrow"></view></view>
 </view>

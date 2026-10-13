@@ -329,14 +329,16 @@ pages/knowledge-detail/index
 - 自定义控制条支持播放/暂停、进度拖动、当前/总时长、清晰度、倍速、全屏；
 - 清晰度来自 `part.renditions[]`，只保留有 `videoUrl` 且 `status` 为空或 `ready` 的项；
 - 默认清晰度优先级：`720p` → `source` → 第一项；
-- 倍速档位：`[0.75, 1, 1.25, 1.5, 2]`；
+- 倍速档位使用微信 `video` 真机支持的值：`[0.5, 0.8, 1, 1.25, 1.5, 2]`；
 - `bindloadedmetadata` 根据视频宽高决定全屏方向，横屏用 `direction: 90`，竖屏用 `direction: 0`；
 - 进度条是“大热区 + 视觉轨道 + 滑块 + 拖动时间气泡”；
+- 原生 `enable-progress-gesture` 已关闭，进度热区使用拦截型触摸事件，避免 iOS 原生视频手势抢占自定义拖动；
 - 拖动开始时缓存视觉轨道尺寸，拖动中不重复查询节点；释放时只 seek 一次，拖动期间 `isSeeking` 会阻止 timeupdate 覆盖 UI；
 - 全屏状态以 `bindfullscreenchange` 的 `event.detail.fullScreen` 为准，并记录 `fullscreenDirection`；
 - 退出全屏通过 `exitFullscreenWithFallback()` 执行，500ms 后仍未同步时会兜底重置本地全屏状态；
 - 控制条已拆成“进度条层 + 控制按钮层”，小窗、横屏全屏、竖屏全屏共用同一套结构；
 - 横屏全屏控制层使用固定像素尺寸并适配左右及底部安全区域，隐藏后不再接收触摸；
+- 播放、暂停和全屏图标使用 WXSS 图形绘制，不依赖 iOS / Android 字体中的符号字形；
 - 视频画面统一使用 `contain`，避免异形屏横屏全屏时拉伸；
 - 视频缓冲通过 `bindwaiting` 显示“视频加载中…”；
 - 视频失败通过 `binderror` 显示友好错误态；
@@ -355,6 +357,7 @@ pages/knowledge-detail/index
 - 播放前会调用 `wx.setInnerAudioOption({ obeyMuteSwitch: false })`，降低 iPhone 静音键导致无声的风险；
 - 会校验音频 URL：空地址、非 HTTPS、包含空格都会提示用户；
 - 倍速档位：`[0.5, 0.75, 1]`；
+- 播放进度使用自定义轨道和拖动热区，避免原生 `slider` 在 iOS / Android 上外观和触摸反馈不一致；
 - 快进/快退步长按音频长度动态计算：≤30s 为 5s，≤90s 为 10s，更长为 15~30s；
 - 循环开关直接设置 `audio.loop`；
 - 已补齐 `onCanplay`、`onPlay`、`onPause`、`onStop`、`onTimeUpdate`、`onEnded`、`onWaiting`、`onError` 状态同步；

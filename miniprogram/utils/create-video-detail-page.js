@@ -18,7 +18,8 @@ function clampPercent(value = 0) {
   return Math.max(0, Math.min(100, Number(value) || 0));
 }
 
-const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+// 微信 video 组件仅保证支持这些档位；0.75 在 iOS 真机上会被忽略。
+const SPEEDS = [0.5, 0.8, 1, 1.25, 1.5, 2];
 
 function normalizeRenditions(part = {}) {
   const list = Array.isArray(part.renditions) ? part.renditions : [];
@@ -454,6 +455,8 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
   handleVideoCanPlay() {
     this.clearVideoWaiting();
     if (this.data.videoErrorText) this.setData({ videoErrorText: '' });
+    // iOS 可能在视频就绪或进入全屏时重置倍速，重新同步当前档位。
+    this.getVideoContext().playbackRate(this.data.speed);
   },
 
   handleVideoPause() {
@@ -541,7 +544,7 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
   previewSeekByTouch(touch, shouldCommit = false) {
     const rect = this.progressTrackRect;
     if (!touch || !this.data.duration || !rect?.width) return false;
-    const clientX = Number(touch.clientX ?? touch.x ?? 0);
+    const clientX = Number(touch.clientX ?? touch.pageX ?? touch.x);
     if (!Number.isFinite(clientX)) return false;
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     const nextTime = ratio * this.data.duration;

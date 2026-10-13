@@ -1,7 +1,7 @@
 <view class="page library-page">
   <view class="searchbar">
     <view class="search-icon"></view>
-    <input class="search-input" value="{{keyword}}" placeholder="搜索 PDF 资料、曲谱、讲义" bindinput="onKeywordInput" />
+    <input class="search-input" value="{{keyword}}" placeholder="搜索 PDF 资料、曲谱、讲义" placeholder-class="input-placeholder" confirm-type="search" cursor-spacing="16" bindinput="onKeywordInput" />
   </view>
 
   <empty-state wx:if="{{!loading && items.length === 0}}" title="暂无 PDF 资料" desc="老师上传后会显示在这里。" />
@@ -27,5 +27,5 @@
     </block>
   </view>
 
-  <view class="back-top" bindtap="backToTop">↑</view>
+  <view class="back-top" bindtap="backToTop"><view class="backtop-arrow"></view></view>
 </view>

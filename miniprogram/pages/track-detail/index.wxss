@@ -32,7 +32,7 @@
   color: #ffffff;
   background: rgba(0, 0, 0, 0.58);
   font-size: 22rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.35;
   text-align: center;
 }
@@ -57,7 +57,7 @@
 .video-empty-title {
   font-size: 30rpx;
   line-height: 1.4;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .video-empty-desc {
@@ -166,7 +166,7 @@
   justify-content: center;
   color: #ffffff;
   font-size: 22rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -189,6 +189,50 @@
   height: 64rpx;
   font-size: 31rpx;
 }
+
+.play-icon {
+  width: 0;
+  height: 0;
+  margin-left: 4rpx;
+  border-top: 10rpx solid transparent;
+  border-bottom: 10rpx solid transparent;
+  border-left: 16rpx solid #ffffff;
+}
+
+.pause-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  column-gap: 6rpx;
+}
+
+.pause-icon > cover-view {
+  width: 5rpx;
+  height: 22rpx;
+  border-radius: 2rpx;
+  background: #ffffff;
+}
+
+.fullscreen-icon {
+  position: relative;
+  width: 24rpx;
+  height: 24rpx;
+}
+
+.fullscreen-icon > cover-view {
+  position: absolute;
+  width: 8rpx;
+  height: 8rpx;
+  border-color: #ffffff;
+  border-style: solid;
+}
+
+.fullscreen-icon .corner-tl { left: 0; top: 0; border-width: 3rpx 0 0 3rpx; }
+.fullscreen-icon .corner-tr { right: 0; top: 0; border-width: 3rpx 3rpx 0 0; }
+.fullscreen-icon .corner-br { right: 0; bottom: 0; border-width: 0 3rpx 3rpx 0; }
+.fullscreen-icon .corner-bl { left: 0; bottom: 0; border-width: 0 0 3rpx 3rpx; }
+
+.fullscreen-icon.exit { transform: scale(0.72); }
 
 .part-ctrl {
   width: 32rpx;
@@ -332,7 +376,7 @@
   background: rgba(255, 255, 255, 0.94);
   color: #261d10;
   font-size: 19rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 36rpx;
   text-align: center;
   box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.28);
@@ -352,7 +396,7 @@
   min-width: 0;
   color: rgba(255, 255, 255, 0.92);
   font-size: 20rpx;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 44rpx;
   text-align: center;
   white-space: nowrap;
@@ -373,24 +417,24 @@
  * 控制层采用固定像素尺寸，并为刘海屏保留安全区域。
  */
 .player.landscape-fullscreen .video-controls.full {
-  gap: 4px;
-  min-height: 102px;
-  padding: 10px 20px 12px;
-  padding-left: calc(20px + constant(safe-area-inset-left));
-  padding-right: calc(20px + constant(safe-area-inset-right));
-  padding-bottom: calc(12px + constant(safe-area-inset-bottom));
-  padding-left: calc(20px + env(safe-area-inset-left));
-  padding-right: calc(20px + env(safe-area-inset-right));
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  gap: 2px;
+  min-height: 78px;
+  padding: 4px 12px 6px;
+  padding-left: calc(12px + constant(safe-area-inset-left));
+  padding-right: calc(12px + constant(safe-area-inset-right));
+  padding-bottom: calc(6px + constant(safe-area-inset-bottom));
+  padding-left: calc(12px + env(safe-area-inset-left));
+  padding-right: calc(12px + env(safe-area-inset-right));
+  padding-bottom: calc(6px + env(safe-area-inset-bottom));
 }
 
 .player.landscape-fullscreen .video-controls.full .progress-zone {
-  height: 44px;
+  height: 38px;
 }
 
 .player.landscape-fullscreen .video-controls.full .progress-touch {
-  height: 44px;
-  padding: 0 8px;
+  height: 38px;
+  padding: 0 6px;
 }
 
 .player.landscape-fullscreen .video-controls.full .progress-track,
@@ -413,7 +457,7 @@
 }
 
 .player.landscape-fullscreen .video-controls.full .progress-bubble {
-  top: -4px;
+  top: -10px;
   min-width: 42px;
   height: 24px;
   margin-left: -21px;
@@ -422,25 +466,25 @@
 }
 
 .player.landscape-fullscreen .video-controls.full .control-row {
-  min-height: 36px;
-  gap: 12px;
+  min-height: 32px;
+  gap: 8px;
 }
 
 .player.landscape-fullscreen .video-controls.full .left-controls,
 .player.landscape-fullscreen .video-controls.full .right-controls {
-  min-width: 104px;
-  gap: 10px;
+  min-width: 88px;
+  gap: 6px;
 }
 
 .player.landscape-fullscreen .video-controls.full .icon-ctrl {
-  width: 44px;
-  height: 44px;
-  font-size: 18px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
 }
 
 .player.landscape-fullscreen .video-controls.full .part-ctrl {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
 }
 
 .player.landscape-fullscreen .video-controls.full .part-ctrl .bar {
@@ -462,15 +506,15 @@
 }
 
 .player.landscape-fullscreen .video-controls.full .text-ctrl {
-  min-width: 44px;
-  height: 44px;
-  padding: 0 8px;
-  font-size: 13px;
+  min-width: 38px;
+  height: 32px;
+  padding: 0 6px;
+  font-size: 12px;
 }
 
 .player.landscape-fullscreen .video-controls.full .time-label {
-  font-size: 13px;
-  line-height: 32px;
+  font-size: 12px;
+  line-height: 28px;
 }
 
 .lesson-card {
@@ -496,7 +540,7 @@
   color: #261d10;
   font-size: 34rpx;
   line-height: 1.35;
-  font-weight: 950;
+  font-weight: 700;
   word-break: break-word;
 }
 
@@ -504,7 +548,7 @@
   flex: none;
   color: #7a6a52;
   font-size: 21rpx;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .lesson-summary {
@@ -517,7 +561,7 @@
 .mini-title {
   color: #5d4326;
   font-size: 28rpx;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: 1rpx;
 }
 
@@ -553,7 +597,7 @@
   background: #f7f1e6;
   color: #5d4326;
   font-size: 19rpx;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .type-inline {
@@ -570,7 +614,7 @@
   color: #261d10;
   font-size: 24rpx;
   line-height: 1.35;
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
   margin: 12rpx 0 8rpx;
   overflow: hidden;
@@ -626,7 +670,7 @@
 .file-no {
   color: #5d4326;
   font-size: 22rpx;
-  font-weight: 950;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -639,7 +683,7 @@
   color: #261d10;
   font-size: 24rpx;
   line-height: 1.45;
-  font-weight: 900;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -652,7 +696,7 @@
   border: 2rpx solid #c9b795;
   color: #5d4326;
   font-size: 20rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 40rpx;
   background: #ffffff;
 }
@@ -677,7 +721,7 @@
   color: #5d4326;
   background: #ffffff;
   font-size: 20rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 42rpx;
   white-space: nowrap;
 }

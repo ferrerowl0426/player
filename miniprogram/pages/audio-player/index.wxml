@@ -27,7 +27,12 @@
     <view class="time-row"><text>{{currentTimeText}}</text><text>{{audioFormat}}</text><text>{{durationText}}</text></view>
     <view class="progress-wrap">
       <view wx:if="{{seeking}}" class="seek-bubble" style="left: {{progress}}%;">{{currentTimeText}}</view>
-      <slider value="{{progress}}" bindchanging="onSeeking" bindchange="onSeekEnd" activeColor="#ff7f00" backgroundColor="#e7dac2" block-color="#5d4326" block-size="14" />
+      <view class="audio-progress-touch" catchtouchstart="startAudioSeek" catchtouchmove="moveAudioSeek" catchtouchend="endAudioSeek" catchtouchcancel="endAudioSeek">
+        <view class="audio-progress-track">
+          <view class="audio-progress-fill" style="width: {{progress}}%;"></view>
+          <view class="audio-progress-dot {{seeking ? 'active' : ''}}" style="left: {{progress}}%;"></view>
+        </view>
+      </view>
     </view>
     <view class="transport">
       <view class="transport-icon loop-toggle {{loop ? 'active' : ''}}" bindtap="toggleLoop">循环</view>

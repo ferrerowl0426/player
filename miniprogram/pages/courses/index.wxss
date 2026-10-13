@@ -4,6 +4,7 @@
 }
 
 .course-sticky {
+  position: relative;
   position: sticky;
   top: 0;
   z-index: 18;
@@ -29,7 +30,7 @@
   color: #5d4326;
   font-size: 22rpx;
   line-height: 72rpx;
-  font-weight: 900;
+  font-weight: 700;
   text-align: center;
   box-shadow: 0 2rpx 8rpx rgba(93, 67, 38, 0.05);
   overflow: hidden;
@@ -87,6 +88,7 @@
   height: 80rpx;
   color: #261d10;
   font-size: 25rpx;
+  line-height: 80rpx;
 }
 
 .clear-btn {
@@ -98,7 +100,7 @@
   color: #5d4326;
   background: #ffffff;
   font-size: 20rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 40rpx;
 }
 
@@ -114,7 +116,7 @@
   color: #5d4326;
   font-size: 30rpx;
   line-height: 1.35;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 2rpx;
   display: flex;
   align-items: center;
@@ -138,7 +140,7 @@
   color: #5d4326;
   background: #ffffff;
   font-size: 21rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 56rpx;
   position: relative;
 }
@@ -168,7 +170,7 @@
   color: #5d4326;
   background: #ffffff;
   font-size: 21rpx;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 56rpx;
   display: flex;
   align-items: center;
@@ -214,7 +216,7 @@
   gap: 16rpx;
   color: #5d4326;
   font-size: 22rpx;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .sort-option:active {
@@ -229,7 +231,15 @@
 .sort-check {
   color: #5d4326;
   font-size: 24rpx;
-  font-weight: 900;
+  font-weight: 700;
+}
+
+.sort-check view {
+  width: 12rpx;
+  height: 22rpx;
+  border-right: 4rpx solid #5d4326;
+  border-bottom: 4rpx solid #5d4326;
+  transform: rotate(45deg);
 }
 
 .course-list {
@@ -298,7 +308,7 @@
   color: #ffffff;
   font-size: 19rpx;
   line-height: 32rpx;
-  font-weight: 900;
+  font-weight: 700;
   overflow: hidden;
   white-space: nowrap;
 }
@@ -311,7 +321,7 @@
   color: #261d10;
   font-size: 27rpx;
   line-height: 1.42;
-  font-weight: 900;
+  font-weight: 700;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -332,7 +342,8 @@
 .backtop {
   position: fixed;
   right: 28rpx;
-  bottom: 148rpx;
+  bottom: calc(148rpx + constant(safe-area-inset-bottom));
+  bottom: calc(148rpx + env(safe-area-inset-bottom));
   z-index: 40;
   width: 76rpx;
   height: 76rpx;
@@ -343,6 +354,6 @@
   font-size: 34rpx;
   line-height: 72rpx;
   text-align: center;
-  font-weight: 950;
+  font-weight: 700;
   box-shadow: 0 8rpx 24rpx rgba(93, 67, 38, 0.14);
 }

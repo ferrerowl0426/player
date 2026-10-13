@@ -60,7 +60,7 @@ button::after {
 .section-title__text {
   color: #5d4326;
   font-size: 30rpx;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 1rpx;
   position: relative;
   padding-left: 18rpx;
@@ -89,7 +89,7 @@ button::after {
   background: #5d4326;
   color: #ffffff;
   font-size: 26rpx;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 1rpx;
   display: flex;
   align-items: center;
@@ -106,7 +106,7 @@ button::after {
   color: #5d4326;
   background: rgba(255,255,255,0.96);
   font-size: 24rpx;
-  font-weight: 800;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -123,7 +123,7 @@ button::after {
   color: #ffffff;
   background: #ff7f00;
   font-size: 20rpx;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .input {
@@ -135,6 +135,21 @@ button::after {
   background: #ffffff;
   color: #261d10;
   font-size: 26rpx;
+  line-height: 80rpx;
+}
+
+.input-placeholder {
+  color: #9a876f;
+  font-weight: 400;
+}
+
+.backtop-arrow {
+  width: 18rpx;
+  height: 18rpx;
+  margin: 10rpx auto 0;
+  border-top: 4rpx solid #5d4326;
+  border-left: 4rpx solid #5d4326;
+  transform: rotate(45deg);
 }
 
 .search {

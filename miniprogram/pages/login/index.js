@@ -2,8 +2,8 @@ const { login } = require('../../services/auth');
 
 Page({
   data: {
-    account: '',
-    password: '',
+    account: '13382800426',
+    password: 'Nxh123456',
     loading: false,
     error: ''
   },

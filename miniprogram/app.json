@@ -13,6 +13,7 @@
     "pages/library-detail/index",
     "pages/audio-player/index"
   ],
+  "enablePassiveEvent": false,
   "window": {
     "navigationBarTitleText": "能学慧吉他教室",
     "navigationBarBackgroundColor": "#ffffff",

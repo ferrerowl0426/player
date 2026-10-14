@@ -1,0 +1,560 @@
+.player-shell {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 16rpx;
+  background: #000;
+  box-sizing: border-box;
+}
+
+.video {
+  display: block;
+  width: 100%;
+  height: 390rpx;
+  background: #000;
+}
+
+.safe-area-probe {
+  position: absolute;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  padding: constant(safe-area-inset-top) constant(safe-area-inset-right) constant(safe-area-inset-bottom) constant(safe-area-inset-left);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.control-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  overflow: hidden;
+  /* 隐藏按钮后仍保留原生触摸入口，不依赖 video 的 tap 回传。 */
+  background: rgba(0, 0, 0, 0.001);
+}
+
+.control-content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 136rpx;
+  padding: 18rpx 22rpx 16rpx;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.82));
+}
+
+.progress-zone {
+  position: relative;
+  width: 100%;
+  height: 44rpx;
+  box-sizing: border-box;
+}
+
+.progress-touch {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  /* A barely visible fill keeps iOS cover-view hit testing enabled. */
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.progress-track {
+  position: absolute;
+  top: 50%;
+  margin-top: -3rpx;
+  width: 100%;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #ffffff;
+}
+
+.progress-dot {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  width: 16rpx;
+  height: 16rpx;
+  margin-left: -8rpx;
+  margin-top: -8rpx;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.3);
+}
+
+.progress-dot.active {
+  transform: scale(1.25);
+}
+
+/* Keep the knob inside the track at both endpoints. */
+.progress-dot.start {
+  margin-left: 0;
+}
+
+.progress-dot.end {
+  margin-left: -16rpx;
+}
+
+.progress-dot.start.active {
+  transform-origin: left center;
+}
+
+.progress-dot.end.active {
+  transform-origin: right center;
+}
+
+.seek-bubble {
+  position: absolute;
+  box-sizing: border-box;
+  height: 42rpx;
+  padding: 0 8rpx;
+  border-radius: 8rpx;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.78);
+  font-size: 20rpx;
+  line-height: 42rpx;
+  text-align: center;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 58rpx;
+}
+
+.transport-controls,
+.option-controls {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.transport-button,
+.option-button {
+  margin-left: 10rpx;
+}
+
+.transport-first,
+.option-first {
+  margin-left: 0;
+}
+
+.option-controls {
+  justify-content: flex-end;
+}
+
+.time-label {
+  flex: 1;
+  min-width: 0;
+  margin: 0 14rpx;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 20rpx;
+  line-height: 42rpx;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.control-button,
+.text-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  color: #ffffff;
+  background: transparent;
+}
+
+.control-button {
+  width: 52rpx;
+  height: 52rpx;
+}
+
+.control-button.disabled {
+  opacity: 0.38;
+}
+
+.play-button {
+  width: 60rpx;
+  height: 60rpx;
+}
+
+.control-icon {
+  width: 34rpx;
+  height: 34rpx;
+}
+
+.play-button .control-icon {
+  width: 42rpx;
+  height: 42rpx;
+}
+
+.text-button {
+  min-width: 72rpx;
+  height: 48rpx;
+  padding: 0 10rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.55);
+  border-radius: 8rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  line-height: 44rpx;
+  white-space: nowrap;
+}
+
+/* iOS cover-view does not consistently center a direct text node in a flex
+   button. Keep the label in its own native layer so both axes stay centered. */
+.text-button-label {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  line-height: inherit;
+}
+
+.text-button.active {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.player-popup {
+  position: absolute;
+  z-index: 8;
+  box-sizing: border-box;
+  padding: 16rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.22);
+  border-radius: 12rpx;
+  color: #ffffff;
+  background: rgba(20, 17, 13, 0.95);
+  box-shadow: 0 8rpx 28rpx rgba(0, 0, 0, 0.34);
+}
+
+.popup-title {
+  height: 34rpx;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 20rpx;
+  line-height: 34rpx;
+}
+
+.popup-options {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 10rpx;
+}
+
+.popup-option {
+  margin: 0 10rpx 10rpx 0;
+  min-width: 76rpx;
+  height: 48rpx;
+  padding: 0 12rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.25);
+  border-radius: 8rpx;
+  box-sizing: border-box;
+  color: #ffffff;
+  font-size: 20rpx;
+  line-height: 44rpx;
+  text-align: center;
+}
+
+.popup-option.active {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.video-state {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  max-width: 72%;
+  padding: 16rpx 24rpx;
+  border-radius: 999rpx;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.62);
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.video-state.error {
+  color: #fff3f1;
+  background: rgba(116, 32, 24, 0.84);
+}
+
+.video-state.fullscreen-state {
+  max-width: 72%;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+/* 全屏控制树统一使用 px，避免横屏时 rpx 按旧窗口宽度换算。 */
+.control-layer.fullscreen .control-content {
+  min-height: 92px;
+  padding: 10px 18px calc(10px + constant(safe-area-inset-bottom));
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+.control-layer.fullscreen .progress-zone {
+  height: 34px;
+}
+
+.control-layer.fullscreen .progress-track {
+  height: 4px;
+  margin-top: -2px;
+}
+
+.control-layer.fullscreen .progress-dot {
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.control-layer.fullscreen .control-row {
+  min-height: 38px;
+}
+
+.control-layer.fullscreen .transport-button,
+.control-layer.fullscreen .option-button {
+  margin-left: 8px;
+}
+
+.control-layer.fullscreen .transport-first,
+.control-layer.fullscreen .option-first {
+  margin-left: 0;
+}
+
+.control-layer.fullscreen .control-button {
+  width: 34px;
+  height: 34px;
+}
+
+.control-layer.fullscreen .play-button {
+  width: 38px;
+  height: 38px;
+}
+
+.control-layer.fullscreen .control-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.control-layer.fullscreen .play-button .control-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.control-layer.fullscreen .text-button {
+  min-width: 48px;
+  height: 30px;
+  padding: 0 6px;
+  border-width: 1px;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 28px;
+}
+
+.control-layer.fullscreen .time-label {
+  margin-left: 10px;
+  margin-right: 10px;
+  font-size: 12px;
+  line-height: 30px;
+}
+
+.control-layer.fullscreen .seek-bubble {
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 28px;
+}
+
+/* Fullscreen menus are direct children of the native control layer.  Landscape
+   uses the wide bottom cards from the player design; portrait keeps a compact
+   three-column fallback so the popup remains inside the native overlay. */
+.control-layer.fullscreen.landscape .player-popup {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.control-layer.fullscreen.landscape .popup-title {
+  height: 28px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
+}
+
+.control-layer.fullscreen.landscape .popup-options {
+  display: flex;
+  flex-wrap: nowrap;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.control-layer.fullscreen.landscape .popup-option {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 86px;
+  margin: 0 8px 0 0;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 4px solid transparent;
+  border-radius: 8px 8px 0 0;
+  box-sizing: border-box;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(18, 18, 18, 0.78);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.control-layer.fullscreen.landscape .popup-option.active {
+  border-bottom-color: #ffffff;
+  color: #ffffff;
+  background: rgba(28, 28, 28, 0.92);
+}
+
+.control-layer.fullscreen.landscape .popup-option-main {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-layer.fullscreen.portrait .player-popup {
+  padding: 8px 6px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(36, 31, 27, 0.96);
+  box-shadow: 0 8px 20px rgba(36, 25, 18, 0.32);
+}
+
+.control-layer.fullscreen.portrait .popup-title {
+  height: 18px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.control-layer.fullscreen.portrait .popup-options {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  margin-top: 5px;
+}
+
+.control-layer.fullscreen.portrait .popup-option {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 56px;
+  height: 48px;
+  margin: 2px;
+  padding: 0 2px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 3px solid transparent;
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.control-layer.fullscreen.portrait .popup-option.active {
+  border-bottom-color: #ffffff;
+  border-left-color: transparent;
+  border-right-color: transparent;
+  border-top-color: transparent;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.control-layer.fullscreen.portrait .popup-option-main {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-layer.fullscreen.portrait .control-content {
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-bottom: calc(10px + constant(safe-area-inset-bottom));
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+.control-layer.fullscreen.portrait .transport-button,
+.control-layer.fullscreen.portrait .option-button {
+  margin-left: 5px;
+}
+
+.control-layer.fullscreen.portrait .transport-first,
+.control-layer.fullscreen.portrait .option-first {
+  margin-left: 0;
+}
+
+.control-layer.fullscreen.portrait .option-button.option-first {
+  margin-left: 0;
+}
+
+.control-layer.fullscreen.portrait .text-button {
+  min-width: 44px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+
+.control-layer.fullscreen.portrait .time-label {
+  margin-left: 6px;
+  margin-right: 6px;
+  font-size: 11px;
+}
+
+.control-layer.fullscreen .progress-dot.start {
+  margin-left: 0;
+}
+
+.control-layer.fullscreen .progress-dot.end {
+  margin-left: -12px;
+}

@@ -1,46 +1,34 @@
 <view class="page lesson-page">
-  <view class="player {{isFullscreen ? 'fullscreen' : ''}} {{isPortraitFullscreen ? 'portrait-fullscreen' : ''}} {{isFullscreen && !isPortraitFullscreen ? 'landscape-fullscreen' : ''}}">
-    <video wx:if="{{detail.currentPart.videoUrl}}" id="lessonVideo" class="video-player" src="{{detail.currentPart.videoUrl}}" poster="{{detail.currentPart.coverUrl || detail.coverUrl}}" controls="{{false}}" enable-progress-gesture="{{false}}" playback-rate="{{speed}}" show-fullscreen-btn="{{false}}" show-play-btn="{{false}}" show-center-play-btn="{{false}}" show-casting-button="{{false}}" object-fit="{{videoObjectFit}}" direction="{{videoDirection}}" bindloadedmetadata="handleVideoLoadedMeta" bindplay="handleVideoPlay" bindcanplay="handleVideoCanPlay" bindpause="handleVideoPause" bindtimeupdate="handleVideoTimeUpdate" bindended="handleVideoEnded" bindwaiting="handleVideoWaiting" binderror="handleVideoError" bindfullscreenchange="handleFullscreenChange" bindtap="showVideoControls" bindtouchstart="showVideoControls">
-      <cover-view class="video-controls {{controlsVisible ? 'show' : 'hide'}} {{isFullscreen ? 'full' : 'compact'}}">
-        <cover-view class="progress-zone" catchtouchstart="startSeekVideo" catchtouchmove="moveSeekVideo" catchtouchend="endSeekVideo" catchtouchcancel="endSeekVideo">
-          <cover-view class="progress-touch">
-            <cover-view class="progress-track" catchtouchstart="startSeekVideo" catchtouchmove="moveSeekVideo" catchtouchend="endSeekVideo" catchtouchcancel="endSeekVideo">
-              <cover-view class="progress-fill" style="width: {{progressPercent}}%;"></cover-view>
-              <cover-view class="progress-dot {{isSeeking ? 'active' : ''}}" style="left: {{progressPercent}}%;" catchtouchstart="startSeekVideo" catchtouchmove="moveSeekVideo" catchtouchend="endSeekVideo" catchtouchcancel="endSeekVideo"></cover-view>
-            </cover-view>
-          </cover-view>
-        </cover-view>
-        <cover-view wx:if="{{isSeeking}}" class="progress-bubble" style="left: {{progressDotPercent}}%;">{{seekTimeText}}</cover-view>
-        <cover-view class="control-row">
-          <cover-view class="left-controls">
-            <cover-view wx:if="{{isFullscreen && !isPortraitVideo}}" class="ctrl-btn part-ctrl" data-step="-1" bindtap="switchPartByStep"><cover-image class="part-icon-image" src="/assets/icons/player-prev.png"></cover-image></cover-view>
-            <cover-view class="ctrl-btn icon-ctrl" bindtap="togglePlay"><cover-image class="player-icon-image" src="{{isPlaying ? '/assets/icons/player-pause.png' : '/assets/icons/player-play.png'}}"></cover-image></cover-view>
-            <cover-view wx:if="{{isFullscreen && !isPortraitVideo}}" class="ctrl-btn part-ctrl" data-step="1" bindtap="switchPartByStep"><cover-image class="part-icon-image" src="/assets/icons/player-next.png"></cover-image></cover-view>
-          </cover-view>
-          <cover-view class="time-label">{{currentTimeText}} / {{durationText}}</cover-view>
-          <cover-view class="right-controls">
-            <cover-view wx:if="{{detail.currentPart.hasQualityOptions}}" class="ctrl-btn text-ctrl" bindtap="cycleQuality">{{qualityLabel}}</cover-view>
-            <cover-view class="ctrl-btn text-ctrl speed-trigger {{speedMenuVisible ? 'active' : ''}}" bindtap="toggleSpeedMenu">{{speedLabel}}</cover-view>
-            <cover-view class="ctrl-btn icon-ctrl" bindtap="toggleFullscreen"><cover-image class="player-icon-image" src="{{isFullscreen ? '/assets/icons/player-exit-fullscreen.png' : '/assets/icons/player-fullscreen.png'}}"></cover-image></cover-view>
-          </cover-view>
-        </cover-view>
-        <cover-view wx:if="{{speedMenuVisible}}" class="speed-menu" bindtap="noop">
-          <cover-view class="speed-menu-title">播放速度</cover-view>
-          <cover-view class="speed-options">
-            <cover-view wx:for="{{speedOptions}}" wx:key="value" class="speed-option {{speed === item.value ? 'active' : ''}}" data-speed="{{item.value}}" bindtap="selectSpeed">{{item.label}}</cover-view>
-          </cover-view>
-        </cover-view>
-      </cover-view>
-    </video>
-    <cover-view wx:if="{{detail.currentPart.videoUrl && (videoWaiting || videoErrorText)}}" class="video-state {{videoErrorText ? 'error' : ''}}">
-      {{videoErrorText || '视频加载中…'}}
-    </cover-view>
+  <view class="player">
+    <course-video-player wx:if="{{detail.currentPart.videoUrl}}"
+      id="courseVideoPlayer"
+      media="{{videoMedia}}"
+      active="{{videoActive}}"
+      poster="{{detail.currentPart.coverUrl || detail.coverUrl}}"
+      speed="{{speed}}"
+      speed-options="{{speedOptions}}"
+      quality="{{quality}}"
+      quality-options="{{detail.currentPart.renditions}}"
+      has-previous="{{detail.currentPart.hasPrevious}}"
+      has-next="{{detail.currentPart.hasNext}}"
+      bindplay="handleVideoPlay"
+      bindpause="handleVideoPause"
+      bindsourceconfirmed="handleVideoSourceConfirmed"
+      bindtimeupdate="handleVideoTimeUpdate"
+      bindended="handleVideoEnded"
+      bindwaiting="handleVideoWaiting"
+      binderror="handleVideoError"
+      bindretry="handleVideoRetry"
+      bindprevious="handlePrevious"
+      bindnext="handleNext"
+      bindqualitychange="handleQualityChange"
+      bindspeedchange="handleSpeedChange"
+    ></course-video-player>
     <view wx:if="{{!detail.currentPart.videoUrl}}" class="video-empty">
       <view class="video-empty-title">当前分 P 暂无视频</view>
       <view class="video-empty-desc">请切换其他分 P 或等待老师上传视频。</view>
     </view>
   </view>
-
   <view class="lesson-card intro-card">
     <view class="lesson-title-row">
       <view class="lesson-title">{{detail.title}}</view>

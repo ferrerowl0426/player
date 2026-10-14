@@ -3,7 +3,8 @@ const { openLibraryFile } = require('../services/files');
 
 function qualityLabel(quality = '') {
   const value = String(quality || 'source').toLowerCase();
-  if (value === 'source') return '原画';
+  if (value === 'source' || value === 'original') return '原画';
+  if (value === 'auto') return '自动';
   return value.toUpperCase();
 }
 
@@ -14,18 +15,12 @@ function formatVideoTime(value = 0) {
   return `${minutes}:${seconds}`;
 }
 
-function clampPercent(value = 0) {
-  return Math.max(0, Math.min(100, Number(value) || 0));
-}
-
-// 微信 video 组件仅保证支持这些档位；0.75 在 iOS 真机上会被忽略。
+// 微信 video playbackRate 在真机上较稳定的档位。
 const SPEEDS = [0.5, 0.8, 1, 1.25, 1.5, 2];
-
-function formatSpeedLabel(speed) {
-  return `${Number(speed).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}x`;
-}
-
-const SPEED_OPTIONS = SPEEDS.map((value) => ({ value, label: formatSpeedLabel(value) }));
+const SPEED_OPTIONS = SPEEDS.map((value) => ({
+  value,
+  label: `${Number(value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}x`
+}));
 
 function normalizeRenditions(part = {}) {
   const list = Array.isArray(part.renditions) ? part.renditions : [];
@@ -34,12 +29,22 @@ function normalizeRenditions(part = {}) {
       quality: String(item.quality || 'source').toLowerCase(),
       label: item.label || qualityLabel(item.quality),
       videoUrl: item.videoUrl || item.video_url || '',
-      status: item.status || ''
+      status: String(item.status || '').toLowerCase()
     }))
     .filter((item) => item.videoUrl && (!item.status || item.status === 'ready'));
 
-  if ((part.videoUrl || part.video_url) && !readyList.some((item) => item.quality === 'source')) {
-    readyList.unshift({ quality: 'source', label: '原画', videoUrl: part.videoUrl || part.video_url, status: 'ready' });
+  // buildDetail 会再次处理已经归一化的 detail（例如切换清晰度时）。
+  // 这时 videoUrl 已经是当前档位，不能把它误当成另一份“原画”源。
+  const isNormalizedPart = Object.prototype.hasOwnProperty.call(part, 'selectedQuality');
+  if ((part.videoUrl || part.video_url)
+    && !isNormalizedPart
+    && !readyList.some((item) => item.quality === 'source')) {
+    readyList.unshift({
+      quality: 'source',
+      label: '原画',
+      videoUrl: part.videoUrl || part.video_url,
+      status: 'ready'
+    });
   }
 
   return readyList;
@@ -52,7 +57,7 @@ function pickDefaultQuality(renditions = []) {
     || '';
 }
 
-function formatPart(part = {}, activePartId = '', activeQuality = '') {
+function formatPart(part = {}, activePartId = '', activeQuality = '', index = 0, total = 0) {
   const id = String(part.id || '');
   const no = part.partNo || part.part_no || part.no || '';
   const active = id === String(activePartId || '');
@@ -72,7 +77,9 @@ function formatPart(part = {}, activePartId = '', activeQuality = '') {
     selectedQuality,
     videoUrl: selectedRendition?.videoUrl || part.videoUrl || part.video_url || '',
     renditions: renditions.map((item) => ({ ...item, active: item.quality === selectedQuality })),
-    hasQualityOptions: renditions.length > 1
+    hasQualityOptions: renditions.length > 1,
+    hasPrevious: index > 0,
+    hasNext: index < total - 1
   };
 }
 
@@ -138,17 +145,17 @@ function buildPrerequisite(item = {}) {
 }
 
 function buildDetail(raw = {}, activePartId = '', activeQuality = '', defaultTitle = '课程详情') {
-  const partsSource = raw.parts || [];
+  const partsSource = Array.isArray(raw.parts) ? raw.parts : [];
   const defaultPartId = activePartId || partsSource[0]?.id || '';
-  const parts = partsSource.map((part) => formatPart(part, defaultPartId, activeQuality));
+  const parts = partsSource.map((part, index) => (
+    formatPart(part, defaultPartId, activeQuality, index, partsSource.length)
+  ));
   const currentPart = parts.find((part) => part.active) || parts[0] || {};
 
   return {
     ...raw,
     title: raw.title || defaultTitle,
     coverUrl: raw.coverUrl || raw.cover_url || raw.cover || '',
-    quality: raw.quality || '720P',
-    progressText: raw.progressText || '',
     summary: raw.description || raw.summary || '',
     parts,
     currentPart,
@@ -166,590 +173,330 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
   );
 
   return {
-  data: {
-    id: '',
-    part: '',
-    quality: '',
-    qualityLabel: '原画',
-    speed: 1,
-    speedLabel: '1.0x',
-    speedOptions: SPEED_OPTIONS,
-    speedMenuVisible: false,
-    videoDirection: 0,
-    videoObjectFit: 'contain',
-    isPlaying: false,
-    isFullscreen: false,
-    fullscreenDirection: 'none',
-    isPortraitFullscreen: false,
-    isPortraitVideo: false,
-    controlsVisible: true,
-    isSeeking: false,
-    currentTime: 0,
-    duration: 0,
-    currentTimeText: '0:00',
-    durationText: '0:00',
-    seekTimeText: '0:00',
-    progressPercent: 0,
-    progressDotPercent: 2,
-    loading: false,
-    videoWaiting: false,
-    videoErrorText: '',
-    pendingQualityRollback: null,
-    detail: formatDetail({})
-  },
-
-  onLoad(options) {
-    this._isUnloaded = false;
-    this._isPageVisible = false;
-    this.setData({ id: options.id || '', part: options.part || '' });
-  },
-
-  onShow() {
-    if (!requireLogin()) return;
-    this._isPageVisible = true;
-    if (!this._detailLoaded && !this._detailLoading) this.loadDetail();
-  },
-
-  onHide() {
-    this._isPageVisible = false;
-    this.pauseCurrentVideo();
-  },
-
-  onUnload() {
-    this._isPageVisible = false;
-    this._isUnloaded = true;
-    this.pauseCurrentVideo();
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-    if (this.fullscreenExitTimer) clearTimeout(this.fullscreenExitTimer);
-    if (this.seekBubbleTimer) clearTimeout(this.seekBubbleTimer);
-    if (this.videoWaitingTimer) clearTimeout(this.videoWaitingTimer);
-    this.progressTrackRect = null;
-  },
-
-  async loadDetail() {
-    if (!this.data.id || this._detailLoading) return;
-    this._detailLoading = true;
-    this.setData({ loading: true });
-    try {
-      const detail = await loadDetailRequest(this.data.id);
-      if (this._isUnloaded) return;
-      const viewDetail = formatDetail(detail, this.data.part, this.data.quality);
-      this._detailLoaded = true;
-      this.setData({
-        detail: viewDetail,
-        quality: viewDetail.currentPart.selectedQuality || '',
-        qualityLabel: qualityLabel(viewDetail.currentPart.selectedQuality || 'source'),
-        videoWaiting: false,
-        videoErrorText: '',
-        pendingQualityRollback: null
-      }, () => {
-        if (this._isPageVisible) this.playCurrentVideo();
-      });
-    } catch (error) {
-      if (!this._isUnloaded) wx.showToast({ title: error.userMessage || loadErrorMessage, icon: 'none' });
-    } finally {
-      this._detailLoading = false;
-      if (!this._isUnloaded) this.setData({ loading: false });
-    }
-  },
-
-  goBack() {
-    wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/courses/index' }) });
-  },
-
-  getVideoContext() {
-    return wx.createVideoContext('lessonVideo', this);
-  },
-
-  showVideoControls() {
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-    this.setData({ controlsVisible: true });
-    // iOS 原生全屏层在控制条隐藏后不一定把点击继续派发给页面。
-    // 全屏时保持控制条常驻，小窗播放才自动隐藏。
-    if (this.data.isPlaying && !this.data.isFullscreen && !this.data.speedMenuVisible) {
-      this.controlsTimer = setTimeout(() => {
-        this.setData({ controlsVisible: false });
-      }, 2000);
-    }
-  },
-
-  playCurrentVideo() {
-    if (!this._isPageVisible || !this.data.detail.currentPart.videoUrl) return;
-    wx.nextTick(() => {
-      if (!this._isPageVisible || this._isUnloaded) return;
-      const video = this.getVideoContext();
-      video.play();
-      video.playbackRate(this.data.speed);
-    });
-  },
-
-  pauseCurrentVideo() {
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-    if (this.seekBubbleTimer) clearTimeout(this.seekBubbleTimer);
-    this.progressTrackRect = null;
-    if (!this.data.detail.currentPart.videoUrl) return;
-    this.getVideoContext().pause();
-    if (!this._isUnloaded) this.setData({ isPlaying: false, controlsVisible: true, isSeeking: false });
-  },
-
-  selectPartById(part, shouldScroll = true) {
-    if (!part) return;
-    const detail = formatDetail(this.data.detail, part, '');
-    const quality = detail.currentPart.selectedQuality || '';
-    this.setData({
-      part,
-      quality,
-      qualityLabel: qualityLabel(quality || 'source'),
-      videoDirection: 0,
-      videoObjectFit: 'contain',
-      isPortraitFullscreen: false,
+    data: {
+      id: '',
+      part: '',
+      quality: '',
+      qualityLabel: '原画',
+      speed: 1,
+      speedOptions: SPEED_OPTIONS,
+      isPlaying: false,
       currentTime: 0,
       duration: 0,
       currentTimeText: '0:00',
       durationText: '0:00',
-      seekTimeText: '0:00',
-      progressPercent: 0,
-      progressDotPercent: 2,
+      loading: false,
       videoWaiting: false,
       videoErrorText: '',
       pendingQualityRollback: null,
-      detail
-    }, () => this.playCurrentVideo());
-    if (shouldScroll && !this.data.isFullscreen) wx.pageScrollTo({ scrollTop: 0, duration: 180 });
-  },
+      videoMedia: null,
+      videoActive: false,
+      detail: formatDetail({})
+    },
 
-  selectPart(event) {
-    this.selectPartById(event.currentTarget.dataset.part);
-  },
+    onLoad(options) {
+      this._isUnloaded = false;
+      this._isPageVisible = false;
+      this.setData({ id: options.id || '', part: options.part || '' });
+    },
 
-  switchPartByStep(event) {
-    const step = Number(event.currentTarget.dataset.step || 0);
-    const parts = this.data.detail.parts || [];
-    const currentIndex = parts.findIndex((item) => item.id === this.data.detail.currentPart.id);
-    const next = parts[currentIndex + step];
-    if (!next) {
-      wx.showToast({ title: step < 0 ? '已经是第一P' : '已经是最后一P', icon: 'none' });
-      return;
-    }
-    this.selectPartById(next.id, false);
-  },
+    onShow() {
+      if (!requireLogin()) return;
+      this._isPageVisible = true;
+      if (this._detailLoaded && this.data.detail.currentPart.videoUrl) {
+        const shouldResume = Boolean(this._resumeOnShow);
+        this._resumeOnShow = false;
+        this.setData({ videoActive: true }, () => {
+          if (shouldResume) this.getVideoPlayer()?.play();
+        });
+      }
+      if (!this._detailLoaded && !this._detailLoading) this.loadDetail();
+    },
 
-  selectQualityByValue(nextQuality) {
-    const quality = String(nextQuality || '');
-    if (!quality || quality === this.data.quality) return;
-    const currentTime = this.data.currentTime;
-    const rollback = {
-      quality: this.data.quality,
-      currentTime,
-      detail: this.data.detail
-    };
-    const detail = formatDetail(this.data.detail, this.data.part, quality);
-    if (!detail.currentPart.videoUrl) {
-      wx.showToast({ title: '当前清晰度暂无视频', icon: 'none' });
-      return;
-    }
-    this._qualityMetadataReady = false;
-    this.setData({
-      quality,
-      qualityLabel: qualityLabel(quality),
-      videoDirection: 0,
-      videoObjectFit: 'contain',
-      videoWaiting: true,
-      videoErrorText: '',
-      pendingQualityRollback: rollback,
-      detail
-    }, () => {
+    onHide() {
+      this._resumeOnShow = Boolean(this.data.isPlaying);
+      this._isPageVisible = false;
+      this.pauseCurrentVideo();
+    },
+
+    onUnload() {
+      this._isPageVisible = false;
+      this._isUnloaded = true;
+      this.pauseCurrentVideo();
+    },
+
+    buildVideoMedia(detail, position = 0, shouldPlay = true) {
+      const part = detail?.currentPart || {};
+      const quality = part.selectedQuality || this.data.quality || 'source';
+      this._videoSourceToken = (this._videoSourceToken || 0) + 1;
+      return {
+        id: `${part.id || 'part'}:${quality}:${part.videoUrl || ''}`,
+        sourceToken: this._videoSourceToken,
+        src: part.videoUrl || '',
+        position: Math.max(0, Number(position) || 0),
+        play: Boolean(shouldPlay)
+      };
+    },
+
+    async loadDetail() {
+      if (!this.data.id || this._detailLoading) return;
+      this._detailLoading = true;
+      this.setData({ loading: true });
+      try {
+        const detail = await loadDetailRequest(this.data.id);
+        if (this._isUnloaded) return;
+        const viewDetail = formatDetail(detail, this.data.part, this.data.quality);
+        this._detailLoaded = true;
+        this.setData({
+          detail: viewDetail,
+          quality: viewDetail.currentPart.selectedQuality || '',
+          qualityLabel: qualityLabel(viewDetail.currentPart.selectedQuality || 'source'),
+          videoWaiting: false,
+          videoErrorText: '',
+          videoMedia: this.buildVideoMedia(viewDetail, 0, this._isPageVisible),
+          videoActive: Boolean(this._isPageVisible && viewDetail.currentPart.videoUrl)
+        }, () => {
+          if (this._isPageVisible) this.playCurrentVideo();
+        });
+      } catch (error) {
+        if (!this._isUnloaded) wx.showToast({ title: error.userMessage || loadErrorMessage, icon: 'none' });
+      } finally {
+        this._detailLoading = false;
+        if (!this._isUnloaded) this.setData({ loading: false });
+      }
+    },
+
+    goBack() {
+      wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/courses/index' }) });
+    },
+
+    getVideoPlayer() {
+      return this.selectComponent('#courseVideoPlayer');
+    },
+
+    isCurrentVideoEvent(event) {
+      const sourceId = event?.detail?.sourceId;
+      const sourceToken = event?.detail?.sourceToken;
+      return Boolean(sourceId && sourceToken)
+        && String(sourceId) === String(this.data.videoMedia?.id || '')
+        && String(sourceToken) === String(this._videoSourceToken || '');
+    },
+
+    playCurrentVideo() {
+      if (!this._isPageVisible || !this.data.detail.currentPart.videoUrl) return;
+      this.setData({ videoActive: true });
       wx.nextTick(() => {
         if (!this._isPageVisible || this._isUnloaded) return;
-        const video = this.getVideoContext();
-        if (currentTime > 0) video.seek(currentTime);
-        video.play();
-        video.playbackRate(this.data.speed);
+        this.getVideoPlayer()?.play();
       });
-    });
-  },
+    },
 
-  selectQuality(event) {
-    this.selectQualityByValue(event.currentTarget.dataset.quality);
-  },
+    pauseCurrentVideo() {
+      if (!this._isUnloaded) this.setData({ videoActive: false });
+      this.getVideoPlayer()?.pause();
+      if (!this._isUnloaded) this.setData({ isPlaying: false });
+    },
 
-  cycleQuality() {
-    const renditions = this.data.detail.currentPart.renditions || [];
-    if (!renditions.length) return;
-    const index = renditions.findIndex((item) => item.quality === this.data.quality);
-    const next = renditions[(index + 1) % renditions.length];
-    this.selectQualityByValue(next.quality);
-  },
-
-  toggleSpeedMenu() {
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-    this.setData({
-      controlsVisible: true,
-      speedMenuVisible: !this.data.speedMenuVisible
-    });
-  },
-
-  selectSpeed(event) {
-    const speed = Number(event.currentTarget.dataset.speed);
-    if (!SPEEDS.includes(speed)) return;
-    this.setData({
-      speed,
-      speedLabel: formatSpeedLabel(speed),
-      speedMenuVisible: false,
-      controlsVisible: true
-    }, () => {
-      this.getVideoContext().playbackRate(speed);
-      this.showVideoControls();
-    });
-  },
-
-  togglePlay() {
-    if (this.data.speedMenuVisible) this.setData({ speedMenuVisible: false });
-    const video = this.getVideoContext();
-    if (this.data.isPlaying) {
-      video.pause();
-    } else {
-      video.play();
-    }
-  },
-
-  toggleFullscreen() {
-    if (this.data.speedMenuVisible) this.setData({ speedMenuVisible: false });
-    if (this.data.isFullscreen) {
-      this.exitFullscreenWithFallback();
-      return;
-    }
-    this.getVideoContext().requestFullScreen({ direction: this.data.videoDirection });
-  },
-
-  exitFullscreenWithFallback() {
-    if (this.fullscreenExitTimer) clearTimeout(this.fullscreenExitTimer);
-    this.getVideoContext().exitFullScreen();
-    this.fullscreenExitTimer = setTimeout(() => {
-      if (!this.data.isFullscreen) return;
+    selectPartById(part, shouldScroll = true) {
+      if (!part) return;
+      const detail = formatDetail(this.data.detail, part, '');
+      const quality = detail.currentPart.selectedQuality || '';
+      const shouldPlay = Boolean(this._isPageVisible && detail.currentPart.videoUrl);
       this.setData({
-        isFullscreen: false,
-        fullscreenDirection: 'none',
-        isPortraitFullscreen: false,
-        controlsVisible: true
-      });
-    }, 500);
-  },
+        part,
+        quality,
+        qualityLabel: qualityLabel(quality || 'source'),
+        currentTime: 0,
+        duration: 0,
+        currentTimeText: '0:00',
+        videoWaiting: false,
+        videoErrorText: '',
+        pendingQualityRollback: null,
+        videoMedia: this.buildVideoMedia(detail, 0, shouldPlay),
+        videoActive: shouldPlay,
+        detail
+      }, () => this.playCurrentVideo());
+      if (shouldScroll) wx.pageScrollTo({ scrollTop: 0, duration: 180 });
+    },
 
-  clearVideoWaiting() {
-    if (this.videoWaitingTimer) {
-      clearTimeout(this.videoWaitingTimer);
-      this.videoWaitingTimer = null;
-    }
-    if (this.data.videoWaiting) this.setData({ videoWaiting: false });
-  },
+    selectPart(event) {
+      this.selectPartById(event.currentTarget.dataset.part);
+    },
 
-  showVideoWaiting() {
-    if (this.videoWaitingTimer) clearTimeout(this.videoWaitingTimer);
-    this.videoWaitingTimer = setTimeout(() => {
-      this.videoWaitingTimer = null;
-      if (this._isUnloaded || !this._isPageVisible || !this.data.isPlaying) return;
-      this.setData({ videoWaiting: true, controlsVisible: true });
-    }, 450);
-  },
-
-  updateVideoProgress(currentTime, duration) {
-    if (this.data.isSeeking) return;
-    const safeDuration = Number(duration || this.data.duration || 0);
-    const safeCurrent = Number(currentTime || 0);
-    const data = {
-      currentTime: safeCurrent,
-      duration: safeDuration,
-      currentTimeText: formatVideoTime(safeCurrent),
-      durationText: formatVideoTime(safeDuration),
-      seekTimeText: formatVideoTime(safeCurrent),
-      progressPercent: safeDuration > 0 ? clampPercent((safeCurrent / safeDuration) * 100) : 0,
-      progressDotPercent: safeDuration > 0 ? Math.max(2, Math.min(98, clampPercent((safeCurrent / safeDuration) * 100))) : 2
-    };
-    if (this.data.videoWaiting) data.videoWaiting = false;
-    if (this.videoWaitingTimer) {
-      clearTimeout(this.videoWaitingTimer);
-      this.videoWaitingTimer = null;
-    }
-    this.setData(data);
-  },
-
-  handleVideoPlay() {
-    this.clearVideoWaiting();
-    this.setData({ isPlaying: true, videoErrorText: '' }, () => this.showVideoControls());
-  },
-
-  handleVideoCanPlay() {
-    this.clearVideoWaiting();
-    if (this.data.videoErrorText) this.setData({ videoErrorText: '' });
-    // iOS 可能在视频就绪或进入全屏时重置倍速，重新同步当前档位。
-    this.getVideoContext().playbackRate(this.data.speed);
-  },
-
-  handleVideoPause() {
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-    this.setData({ isPlaying: false, controlsVisible: true });
-  },
-
-  handleVideoEnded() {
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-    this.clearVideoWaiting();
-    const duration = Number(this.data.duration || 0);
-    this.setData({
-      isPlaying: false,
-      controlsVisible: true,
-      currentTime: duration,
-      currentTimeText: formatVideoTime(duration),
-      progressPercent: 100,
-      progressDotPercent: 98
-    });
-  },
-
-  handleVideoTimeUpdate(event) {
-    const { currentTime, duration } = event.detail || {};
-    this.updateVideoProgress(currentTime, duration);
-    if (this.data.pendingQualityRollback && this._qualityMetadataReady) {
-      this._qualityMetadataReady = false;
-      this.setData({ pendingQualityRollback: null });
-    }
-  },
-
-  handleVideoWaiting() {
-    this.showVideoWaiting();
-  },
-
-  handleVideoError() {
-    this._qualityMetadataReady = false;
-    const rollback = this.data.pendingQualityRollback;
-    if (rollback?.quality && rollback.quality !== this.data.quality) {
-      this.rollbackQuality(rollback);
-      return;
-    }
-    this.setData({
-      isPlaying: false,
-      videoWaiting: false,
-      videoErrorText: '视频加载失败，请稍后重试',
-      controlsVisible: true,
-      pendingQualityRollback: null
-    });
-  },
-
-  rollbackQuality(rollback) {
-    this._qualityMetadataReady = false;
-    wx.showToast({ title: '清晰度切换失败，已恢复原画面', icon: 'none' });
-    this.setData({
-      quality: rollback.quality,
-      qualityLabel: qualityLabel(rollback.quality || 'source'),
-      detail: rollback.detail,
-      currentTime: rollback.currentTime || 0,
-      videoWaiting: false,
-      videoErrorText: '',
-      pendingQualityRollback: null
-    }, () => {
-      wx.nextTick(() => {
-        if (!this._isPageVisible || this._isUnloaded) return;
-        const video = this.getVideoContext();
-        if (rollback.currentTime > 0) video.seek(rollback.currentTime);
-        video.play();
-        video.playbackRate(this.data.speed);
-      });
-    });
-  },
-
-  handleFullscreenChange(event) {
-    if (this.fullscreenExitTimer) clearTimeout(this.fullscreenExitTimer);
-    const isFullscreen = Boolean(event.detail?.fullScreen);
-    const direction = isFullscreen
-      ? (event.detail?.direction || (this.data.videoDirection === 90 ? 'horizontal' : 'vertical'))
-      : 'none';
-    this.setData({
-      isFullscreen,
-      fullscreenDirection: direction,
-      // 以原生 fullscreenchange 的方向为准；只有旧基础库不返回 direction 时才使用视频比例兜底。
-      isPortraitFullscreen: isFullscreen && direction !== 'horizontal',
-      controlsVisible: true
-    }, () => this.showVideoControls());
-  },
-
-  previewSeekByTouch(touch, shouldCommit = false) {
-    const rect = this.progressTrackRect;
-    if (!touch || !this.data.duration || !rect?.width) return false;
-    const clientX = Number(touch.clientX ?? touch.pageX ?? touch.x);
-    if (!Number.isFinite(clientX)) return false;
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const nextTime = ratio * this.data.duration;
-    this.setData({
-      isSeeking: true,
-      controlsVisible: true,
-      currentTime: nextTime,
-      currentTimeText: formatVideoTime(nextTime),
-      seekTimeText: formatVideoTime(nextTime),
-      progressPercent: clampPercent(ratio * 100),
-      progressDotPercent: Math.max(2, Math.min(98, clampPercent(ratio * 100)))
-    });
-    if (shouldCommit) this.commitSeek(nextTime);
-    return true;
-  },
-
-  previewSeekBySlider(event) {
-    const percent = Math.max(0, Math.min(100, Number(event.detail?.value || 0)));
-    const nextTime = percent / 100 * (this.data.duration || 0);
-    this.setData({
-      isSeeking: true,
-      controlsVisible: true,
-      currentTime: nextTime,
-      currentTimeText: formatVideoTime(nextTime),
-      seekTimeText: formatVideoTime(nextTime),
-      progressPercent: percent,
-      progressDotPercent: percent
-    });
-  },
-
-  commitSeekBySlider(event) {
-    const percent = Math.max(0, Math.min(100, Number(event.detail?.value || 0)));
-    this.commitSeek(percent / 100 * (this.data.duration || 0));
-  },
-
-  readProgressTrackRect(callback) {
-    if (this._isUnloaded) return;
-    // cover-view 位于原生 video 层内部，iOS 真机的小窗和全屏都可能无法测量节点。
-    // 播放器各模式的水平内边距固定，直接按视口和安全区计算更稳定。
-    this.progressTrackRect = this.getFallbackProgressRect();
-    callback?.(this.progressTrackRect);
-  },
-
-  getFallbackProgressRect() {
-    let info = {};
-    try {
-      info = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : wx.getSystemInfoSync();
-    } catch (error) {
-      info = {};
-    }
-    const rawWidth = Number(info.windowWidth || info.screenWidth || 375);
-    const rawHeight = Number(info.windowHeight || info.screenHeight || 667);
-    const isLandscapeFullscreen = this.data.isFullscreen && !this.data.isPortraitFullscreen;
-    const viewportWidth = isLandscapeFullscreen
-      ? Math.max(rawWidth, rawHeight)
-      : Math.min(rawWidth, rawHeight);
-
-    if (!this.data.isFullscreen) {
-      const inset = (62 / 750) * viewportWidth;
-      return { left: inset, width: Math.max(1, viewportWidth - inset * 2) };
-    }
-
-    if (this.data.isPortraitFullscreen) {
-      // 与竖屏全屏控制条的 12px 内边距保持一致，避免 rpx 与原生全屏坐标混用。
-      const leftInset = 18;
-      const rightInset = 18;
-      return { left: leftInset, width: Math.max(1, viewportWidth - leftInset - rightInset) };
-    }
-
-    const safeArea = info.safeArea || {};
-    const reportedWidth = Number(info.windowWidth || viewportWidth);
-    const safeLeft = reportedWidth >= rawHeight ? Math.max(0, Number(safeArea.left || 0)) : 0;
-    const safeRight = reportedWidth >= rawHeight
-      ? Math.max(0, reportedWidth - Number(safeArea.right || reportedWidth))
-      : 0;
-    const leftInset = safeLeft + 18;
-    const rightInset = safeRight + 18;
-    return { left: leftInset, width: Math.max(1, viewportWidth - leftInset - rightInset) };
-  },
-
-  commitSeek(nextTime = this.data.currentTime) {
-    this.getVideoContext().seek(nextTime);
-    if (this.seekBubbleTimer) clearTimeout(this.seekBubbleTimer);
-    this.seekBubbleTimer = setTimeout(() => {
-      if (this._isUnloaded) return;
-      this.setData({ isSeeking: false }, () => this.showVideoControls());
-    }, 180);
-  },
-
-  startSeekVideo(event) {
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-    if (this.seekBubbleTimer) clearTimeout(this.seekBubbleTimer);
-    this.progressTrackRect = null;
-    const touch = event.touches?.[0] || event.changedTouches?.[0];
-    const gestureId = Number(this.seekGestureId || 0) + 1;
-    this.seekGestureId = gestureId;
-    this.latestSeekTouch = touch;
-    this.pendingSeekEndTouch = null;
-    this.readProgressTrackRect(() => {
-      if (this.seekGestureId !== gestureId) return;
-      if (this.pendingSeekEndTouch) {
-        this.previewSeekByTouch(this.pendingSeekEndTouch, true);
-        this.pendingSeekEndTouch = null;
-        this.progressTrackRect = null;
+    switchPartByStep(step) {
+      const parts = this.data.detail.parts || [];
+      const currentIndex = parts.findIndex((item) => item.id === this.data.detail.currentPart.id);
+      const next = parts[currentIndex + Number(step || 0)];
+      if (!next) {
+        wx.showToast({
+          title: Number(step) < 0 ? '已经是第一P' : '已经是最后一P',
+          icon: 'none'
+        });
         return;
       }
-      this.previewSeekByTouch(this.latestSeekTouch, false);
-    });
-  },
+      this.selectPartById(next.id, false);
+    },
 
-  moveSeekVideo(event) {
-    // iOS cover-view 在部分基础库的 touchmove 中只填充 changedTouches。
-    this.latestSeekTouch = event.touches?.[0] || event.changedTouches?.[0] || this.latestSeekTouch;
-    this.previewSeekByTouch(this.latestSeekTouch, false);
-  },
+    handlePrevious(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      this.switchPartByStep(-1);
+    },
 
-  endSeekVideo(event) {
-    const touch = event.changedTouches?.[0] || this.latestSeekTouch;
-    if (touch && this.progressTrackRect) {
-      this.previewSeekByTouch(touch, true);
-      this.progressTrackRect = null;
-      this.latestSeekTouch = null;
-      return;
-    }
-    if (touch) {
-      this.pendingSeekEndTouch = touch;
-      return;
-    }
-    this.commitSeek();
-    this.progressTrackRect = null;
-    this.latestSeekTouch = null;
-  },
+    handleNext(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      this.switchPartByStep(1);
+    },
 
-  handleVideoLoadedMeta(event) {
-    const width = Number(event.detail?.width || 0);
-    const height = Number(event.detail?.height || 0);
-    const duration = Number(event.detail?.duration || this.data.duration || 0);
-    // 微信 video direction：0 正常竖屏方向；90 横屏方向。
-    // 横屏视频全屏横屏，竖屏/正方形视频全屏竖屏并保留必要黑边。
-    const isPortraitVideo = height > width;
-    const videoDirection = width > height ? 90 : 0;
-    if (this.data.pendingQualityRollback) this._qualityMetadataReady = true;
-    this.clearVideoWaiting();
-    this.setData({
-      videoDirection,
-      isPortraitVideo,
-      videoObjectFit: 'contain',
-      duration,
-      durationText: formatVideoTime(duration)
-    }, () => this.getVideoContext().playbackRate(this.data.speed));
-  },
-
-  openPrerequisite(event) {
-    const url = event.currentTarget.dataset.url;
-    if (url) wx.navigateTo({ url });
-  },
-
-  noop() {},
-
-  async handleFileAction(event) {
-    const file = event.currentTarget.dataset.file;
-    if (!file?.canOperate) {
-      wx.showToast({ title: '请前往web端用电脑下载', icon: 'none' });
-      return;
-    }
-    try {
-      await openLibraryFile({
-        ...file,
-        sourceTitle: this.data.detail.title,
-        coverUrl: this.data.detail.coverUrl || this.data.detail.currentPart.coverUrl || ''
+    selectQualityByValue(nextQuality, position = this.data.currentTime, shouldPlay = this.data.isPlaying) {
+      const quality = String(nextQuality || '');
+      if (!quality || quality === this.data.quality) return;
+      const currentTime = Math.max(0, Number(position) || 0);
+      const detail = formatDetail(this.data.detail, this.data.part, quality);
+      if (!detail.currentPart.videoUrl) {
+        wx.showToast({ title: '当前清晰度暂无视频', icon: 'none' });
+        return;
+      }
+      this.setData({
+        quality,
+        qualityLabel: qualityLabel(quality),
+        videoWaiting: true,
+        videoErrorText: '',
+        pendingQualityRollback: {
+          quality: this.data.quality,
+          currentTime,
+          detail: this.data.detail,
+          shouldPlay: Boolean(shouldPlay)
+        },
+        videoMedia: this.buildVideoMedia(detail, currentTime, shouldPlay),
+        videoActive: true,
+        detail
       });
-    } catch (error) {
-      wx.showToast({ title: error.userMessage || '文件打开失败', icon: 'none' });
+    },
+
+    handleQualityChange(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      this.selectQualityByValue(event.detail?.quality, event.detail?.currentTime, event.detail?.playing);
+    },
+
+    handleSpeedChange(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      const speed = Number(event.detail?.speed);
+      if (!SPEEDS.includes(speed)) return;
+      this.setData({ speed }, () => this.getVideoPlayer()?.applyPlaybackRate(speed));
+    },
+
+    handleVideoPlay(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      this.setData({ isPlaying: true, videoWaiting: false, videoErrorText: '', pendingQualityRollback: null });
+    },
+
+    handleVideoPause(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      this.setData({ isPlaying: false });
+    },
+
+    handleVideoSourceConfirmed(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      // metadata 已证明新地址可读，先解除加载态；保留回滚快照，
+      // 直到首次播放/进度事件后再提交，覆盖暂停切换后随后发生的错误。
+      this.setData({ videoWaiting: false });
+    },
+
+    handleVideoTimeUpdate(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      const currentTime = Number(event.detail?.currentTime || 0);
+      const duration = Number(event.detail?.duration || this.data.duration || 0);
+      this.setData({
+        currentTime,
+        duration,
+        currentTimeText: formatVideoTime(currentTime),
+        videoWaiting: false,
+        pendingQualityRollback: null
+      });
+    },
+
+    handleVideoWaiting(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      this.setData({ videoWaiting: true });
+    },
+
+    handleVideoError(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      const rollback = this.data.pendingQualityRollback;
+      if (rollback?.quality && rollback.quality !== this.data.quality) {
+        wx.showToast({ title: '清晰度切换失败，已恢复原画面', icon: 'none' });
+        this.setData({
+          quality: rollback.quality,
+          qualityLabel: qualityLabel(rollback.quality),
+          detail: rollback.detail,
+          currentTime: rollback.currentTime || 0,
+          videoWaiting: false,
+          videoErrorText: '',
+          pendingQualityRollback: null,
+          videoMedia: this.buildVideoMedia(
+            rollback.detail,
+            rollback.currentTime,
+            rollback.shouldPlay && this._isPageVisible
+          ),
+          videoActive: Boolean(this._isPageVisible)
+        });
+        return;
+      }
+      this.setData({ isPlaying: false, videoWaiting: false, videoErrorText: '视频加载失败，请稍后重试' });
+    },
+
+    handleVideoEnded(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      const next = this.data.detail.parts?.find((item, index) => (
+        index > this.data.detail.parts.findIndex((part) => part.id === this.data.detail.currentPart.id)
+      ));
+      if (next) {
+        this.selectPartById(next.id, false);
+        return;
+      }
+      this.setData({
+        isPlaying: false,
+        currentTime: this.data.duration,
+        currentTimeText: formatVideoTime(this.data.duration)
+      });
+    },
+
+    handleVideoRetry(event) {
+      if (!this.isCurrentVideoEvent(event)) return;
+      if (!this.data.detail.currentPart.videoUrl) return;
+      this.setData({
+        videoMedia: {
+          ...this.buildVideoMedia(this.data.detail, this.data.currentTime, true),
+          id: `${this.data.detail.currentPart.id}:${Date.now()}`
+        },
+        videoActive: true,
+        videoErrorText: ''
+      });
+    },
+
+    openPrerequisite(event) {
+      const url = event.currentTarget.dataset.url;
+      if (url) wx.navigateTo({ url });
+    },
+
+    noop() {},
+
+    async handleFileAction(event) {
+      const file = event.currentTarget.dataset.file;
+      if (!file?.canOperate) {
+        wx.showToast({ title: '请前往web端用电脑下载', icon: 'none' });
+        return;
+      }
+      try {
+        await openLibraryFile({
+          ...file,
+          sourceTitle: this.data.detail.title,
+          coverUrl: this.data.detail.coverUrl || this.data.detail.currentPart.coverUrl || ''
+        });
+      } catch (error) {
+        wx.showToast({ title: error.userMessage || '文件打开失败', icon: 'none' });
+      }
     }
-  }
   };
 }
 

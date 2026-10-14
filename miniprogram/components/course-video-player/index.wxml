@@ -1,0 +1,96 @@
+<view class="player-shell">
+  <view class="safe-area-probe"></view>
+  <video
+    id="courseVideo"
+    class="video"
+    data-source-id="{{sourceId}}"
+    data-source-token="{{sourceToken}}"
+    src="{{videoSrc}}"
+    poster="{{poster}}"
+    initial-time="{{initialTime}}"
+    controls="{{false}}"
+    enable-progress-gesture="{{false}}"
+    enable-play-gesture="{{false}}"
+    show-fullscreen-btn="{{false}}"
+    show-play-btn="{{false}}"
+    show-center-play-btn="{{false}}"
+    show-casting-button="{{false}}"
+    object-fit="contain"
+    direction="{{videoDirection}}"
+    playback-rate="{{speed}}"
+    bindloadedmetadata="handleLoadedMetadata"
+    bindplay="handlePlay"
+    bindpause="handlePause"
+    bindtimeupdate="handleTimeUpdate"
+    bindseekcomplete="handleSeekComplete"
+    bindended="handleEnded"
+    bindwaiting="handleWaiting"
+    binderror="handleError"
+    bindfullscreenchange="handleFullscreenChange"
+    bindtap="toggleControls"
+  >
+    <cover-view wx:if="{{videoSrc}}" class="control-layer {{isFullscreen ? 'fullscreen' : 'windowed'}} {{isFullscreen && fullscreenDirection === 'horizontal' ? 'landscape' : 'portrait'}}" catchtap="toggleControls">
+      <cover-view wx:if="{{controlsVisible}}" class="control-content" style="{{insetStyle}}" catchtap="closeMenu">
+        <cover-view class="progress-zone">
+          <cover-view class="progress-track">
+            <cover-view class="progress-fill" style="width: {{progressPercent}}%;"></cover-view>
+          </cover-view>
+          <!-- Keep the endpoint geometry for the first tiny progress update so
+               the knob does not jump left when playback leaves exactly 0s. -->
+          <cover-view class="progress-dot {{isSeeking ? 'active' : ''}} {{progressPercent < 3 ? 'start' : ''}} {{progressPercent >= 100 ? 'end' : ''}}" style="left: {{progressPercent}}%;"></cover-view>
+          <!-- The fixed touch surface must be above the moving knob so native
+               target-relative coordinates always use the full track. -->
+          <cover-view class="progress-touch" catchtap="tapSeek" catchtouchstart="startSeek" catchtouchmove="moveSeek" catchtouchend="endSeek" catchtouchcancel="endSeek"></cover-view>
+        </cover-view>
+        <cover-view class="control-row">
+          <cover-view class="transport-controls">
+            <cover-view wx:if="{{!isFullscreen || fullscreenDirection === 'horizontal'}}" class="control-button part-button transport-button transport-first {{hasPrevious ? '' : 'disabled'}}" catchtap="handlePrevious">
+              <cover-image class="control-icon" src="/assets/icons/player-prev.png"></cover-image>
+            </cover-view>
+            <cover-view class="control-button play-button transport-button" catchtap="togglePlay">
+              <cover-image class="control-icon" src="{{isPlaying ? '/assets/icons/player-pause.png' : '/assets/icons/player-play.png'}}"></cover-image>
+            </cover-view>
+            <cover-view wx:if="{{!isFullscreen || fullscreenDirection === 'horizontal'}}" class="control-button part-button transport-button {{hasNext ? '' : 'disabled'}}" catchtap="handleNext">
+              <cover-image class="control-icon" src="/assets/icons/player-next.png"></cover-image>
+            </cover-view>
+          </cover-view>
+
+          <cover-view class="time-label">{{currentTimeText}} / {{durationText}}</cover-view>
+
+          <cover-view class="option-controls">
+            <cover-view wx:if="{{isFullscreen && qualityOptions.length > 1}}" class="text-button option-button option-first {{menu === 'quality' ? 'active' : ''}}" data-menu="quality" catchtap="toggleMenu"><cover-view class="text-button-label">{{qualityLabel}}</cover-view></cover-view>
+            <cover-view wx:if="{{isFullscreen}}" class="text-button option-button {{qualityOptions.length > 1 ? '' : 'option-first'}} {{menu === 'speed' ? 'active' : ''}}" data-menu="speed" catchtap="toggleMenu"><cover-view class="text-button-label">{{speedLabel}}</cover-view></cover-view>
+            <cover-view class="control-button fullscreen-button option-button {{metadataReady && !fullscreenTransition ? '' : 'disabled'}}" catchtap="toggleFullscreen">
+              <cover-image class="control-icon" src="{{isFullscreen ? '/assets/icons/player-exit-fullscreen.png' : '/assets/icons/player-fullscreen.png'}}"></cover-image>
+            </cover-view>
+          </cover-view>
+        </cover-view>
+      </cover-view>
+
+      <cover-view wx:if="{{isSeeking}}" class="seek-bubble" style="{{bubbleStyle}}">{{currentTimeText}}</cover-view>
+
+      <cover-view wx:if="{{isFullscreen && menu === 'speed'}}" class="player-popup speed-popup" style="{{popupStyle}}" catchtap="noop">
+        <cover-view class="popup-title">播放速度</cover-view>
+        <cover-view class="popup-options">
+          <cover-view wx:for="{{speedOptions}}" wx:key="value" class="popup-option {{speed === item.value ? 'active' : ''}}" data-speed="{{item.value}}" catchtap="selectSpeed">
+            <cover-view class="popup-option-main">{{item.label}}</cover-view>
+          </cover-view>
+        </cover-view>
+      </cover-view>
+
+      <cover-view wx:if="{{isFullscreen && menu === 'quality'}}" class="player-popup quality-popup" style="{{popupStyle}}" catchtap="noop">
+        <cover-view class="popup-title">清晰度</cover-view>
+        <cover-view class="popup-options">
+          <cover-view wx:for="{{qualityOptions}}" wx:key="quality" class="popup-option {{quality === item.quality ? 'active' : ''}}" data-quality="{{item.quality}}" catchtap="selectQuality">
+            <cover-view class="popup-option-main">{{item.label}}</cover-view>
+          </cover-view>
+        </cover-view>
+      </cover-view>
+    </cover-view>
+
+    <cover-view wx:if="{{waiting || errorText}}" class="video-state {{errorText ? 'error' : ''}} {{isFullscreen ? 'fullscreen-state' : ''}}" style="{{statusStyle}}" catchtap="retry">
+      {{errorText || '视频加载中…'}}
+    </cover-view>
+  </video>
+
+</view>

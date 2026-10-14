@@ -48,7 +48,10 @@ function getPlayerLayout(info = {}, full = false, horizontal = false, rect = nul
   const origin = full ? 0 : (rect?.left ?? windowWidth * (28 / 750));
   const left = full ? (horizontal ? 18 : 12) + insets.left : windowWidth * (22 / 750);
   const right = full ? (horizontal ? 18 : 12) + insets.right : windowWidth * (22 / 750);
-  const bottom = full ? 10 + insets.bottom : windowWidth * (16 / 750);
+  // Landscape native FS: keep dock metrics flush; portrait keeps home-indicator room.
+  const bottom = full
+    ? (horizontal ? 4 : 10 + Math.min(insets.bottom, 34))
+    : windowWidth * (16 / 750);
   const scale = windowWidth / 750;
   // 与 WXSS 的 padding、progress-zone 和 control-row 高度保持一致。
   const controlsHeight = full ? 10 + 34 + 38 + bottom : scale * 138;
@@ -112,13 +115,20 @@ function getSeekBubbleStyle(layout, percent, full) {
   return `left:${left}px;bottom:${bottom}px;width:${width}px;`;
 }
 
-function seekTime(touch, rect, duration) {
+function seekTime(touch, rect, duration, options = {}) {
   if (!touch || !rect?.width || !duration) return null;
   const absolute = touch.clientX ?? touch.pageX;
   const relative = touch.x ?? touch.relativeX;
-  // The fixed touch surface starts at the track's left edge. Local x is
-  // already an offset; only viewport/page coordinates need the inset removed.
-  const offset = absolute !== undefined ? Number(absolute) - rect.left : Number(relative);
+  // relativeOnly is kept for callers that only trust target-local X.
+  let offset;
+  if (options.relativeOnly) {
+    if (relative === undefined || relative === null) return null;
+    offset = Number(relative);
+  } else {
+    // The fixed touch surface starts at the track's left edge. Local x is
+    // already an offset; only viewport/page coordinates need the inset removed.
+    offset = absolute !== undefined ? Number(absolute) - rect.left : Number(relative);
+  }
   if (!Number.isFinite(offset)) return null;
   return Math.max(0, Math.min(1, offset / rect.width)) * duration;
 }

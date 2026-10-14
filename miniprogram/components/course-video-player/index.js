@@ -121,7 +121,7 @@ Component({
     },
 
     clearTimers() {
-      ['hideTimer', 'seekTimer', 'waitingTimer', 'fullscreenTimer', 'layoutTimer'].forEach((name) => this.clearTimer(name));
+      ['hideTimer', 'seekTimer', 'waitingTimer', 'fullscreenTimer', 'layoutTimer', 'dragUiTimer'].forEach((name) => this.clearTimer(name));
     },
 
     emit(name, detail = {}) {
@@ -430,6 +430,9 @@ Component({
     },
 
     noop() {},
+    // Windowed same-layer catchtouchmove: claim the gesture so page scroll
+    // cannot cancel progress dragging on iOS.
+    holdLayerTouch() {},
     closeMenu() {
       if (this.data.menu) this.setData({ menu: '' }, () => this.scheduleHide());
     },
@@ -584,15 +587,19 @@ Component({
       const rightInset = layout.safeAreaAvailable
         ? `${layout.right}px`
         : `calc(${baseSide}px + env(safe-area-inset-right))`;
-      const bottomInset = layout.safeAreaAvailable
-        ? `${layout.bottom}px`
-        : 'calc(10px + env(safe-area-inset-bottom))';
       const fallbackSideStyle = layout.safeAreaAvailable ? ''
         : `padding-left:calc(${baseSide}px + constant(safe-area-inset-left));padding-left:${leftInset};padding-right:calc(${baseSide}px + constant(safe-area-inset-right));padding-right:${rightInset};`;
-      const fallbackBottomStyle = layout.safeAreaAvailable ? `padding-bottom:${bottomInset};`
-        : `padding-bottom:calc(10px + constant(safe-area-inset-bottom));padding-bottom:${bottomInset};`;
+      // Native landscape fullscreen often keeps a portrait page metrics object, so
+      // JS bottom insets get inflated and float the dock. Pin with bottom:0 and
+      // only trust CSS env for portrait home-indicator padding.
+      const sidePads = layout.safeAreaAvailable
+        ? `padding-left:${leftInset};padding-right:${rightInset};`
+        : fallbackSideStyle;
+      const bottomPad = layout.horizontal
+        ? 'padding-bottom:0;'
+        : 'padding-bottom:constant(safe-area-inset-bottom);padding-bottom:env(safe-area-inset-bottom);';
       const inset = this.data.isFullscreen
-        ? `left:0;right:0;bottom:0;${layout.safeAreaAvailable ? `padding-left:${leftInset};padding-right:${rightInset};` : fallbackSideStyle}${fallbackBottomStyle}`
+        ? `position:absolute;left:0;right:0;bottom:0;width:100%;${sidePads}${bottomPad}`
         : 'left:0;right:0;bottom:0;';
       const menu = getMenuLayout(layout, this.data.menu === 'quality' ? this.data.qualityOptions.length : this.data.speedOptions.length);
       const popupRight = layout.safeAreaAvailable
@@ -614,13 +621,23 @@ Component({
       if (this._drag || !this._metadataReady || !this._duration || this.data.errorText || this.data.fullscreenTransition || this._pendingMedia) return;
       this.clearTimer('hideTimer');
       this.clearTimer('seekTimer');
+      this.clearTimer('dragUiTimer');
       // Ignore completion from the previous seek once a new drag begins.
       this._seekTarget = null;
       if (!this._layout) this.updateLayout();
       this._lastDragText = 0;
       this._drag = { rect: this._layout.track, time: this._position, rendering: false };
-      this.setData({ isSeeking: true, controlsVisible: true, menu: '' });
-      this.moveSeek(event);
+      const point = getSeekPoint(event);
+      const time = seekTime(point, this._drag.rect, this._duration);
+      if (time !== null) this._drag.time = time;
+      // iOS cover-view inside video drops touchmove if setData runs in the
+      // same turn as touchstart (tap still works). Defer all UI patches.
+      this.dragUiTimer = setTimeout(() => {
+        this.dragUiTimer = null;
+        if (!this._drag || this._detached) return;
+        this.setData({ isSeeking: true, controlsVisible: true, menu: '' });
+        this.flushSeekPreview();
+      }, 0);
     },
 
     moveSeek(event) {
@@ -648,6 +665,7 @@ Component({
 
     endSeek(event) {
       if (!this._drag) return;
+      this.clearTimer('dragUiTimer');
       const point = getSeekPoint(event);
       const time = seekTime(point, this._drag.rect, this._duration) ?? this._drag.time;
       // If this platform sends a touchend without coordinates, leave the tap
@@ -671,8 +689,6 @@ Component({
       // A tap may arrive before the asynchronous geometry query finishes.
       // The deterministic fallback layout still gives us a usable track.
       if (!this._layout) this.updateLayout();
-      // tap.detail.x and cover-view Touch.x are target-relative.  Prefer a
-      // real page coordinate when the platform supplies one on the touch.
       const time = seekTime(point, this._layout?.track, this._duration);
       if (time === null) return;
       this.clearTimer('hideTimer');
@@ -684,6 +700,7 @@ Component({
       this._drag = null;
       this._seekTarget = null;
       this.clearTimer('seekTimer');
+      this.clearTimer('dragUiTimer');
       this.setData({ isSeeking: false });
       this.renderProgress(this._position || 0);
       this.scheduleHide();

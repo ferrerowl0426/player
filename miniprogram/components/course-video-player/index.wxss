@@ -33,6 +33,31 @@
   overflow: hidden;
   /* 隐藏按钮后仍保留原生触摸入口，不依赖 video 的 tap 回传。 */
   background: rgba(0, 0, 0, 0.001);
+  box-sizing: border-box;
+}
+
+.control-layer.windowed {
+  /* Same-layer view above video; must sit above the native video hit target. */
+  z-index: 8;
+}
+
+/* Bottom-only dock: pin to the physical bottom, leave the video surface free. */
+.control-layer.control-dock {
+  top: auto;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.control-layer.control-dock.fullscreen {
+  /* cover-view ignores some class positioning; inline bottom:0 is also set. */
+  top: auto;
+  bottom: 0;
 }
 
 .control-content {
@@ -44,6 +69,14 @@
   padding: 18rpx 22rpx 16rpx;
   box-sizing: border-box;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.82));
+}
+
+.control-content.control-content-dock {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  width: 100%;
 }
 
 .progress-zone {
@@ -196,6 +229,7 @@
 }
 
 .control-icon {
+  display: block;
   width: 34rpx;
   height: 34rpx;
 }
@@ -308,9 +342,8 @@
 
 /* 全屏控制树统一使用 px，避免横屏时 rpx 按旧窗口宽度换算。 */
 .control-layer.fullscreen .control-content {
-  min-height: 92px;
-  padding: 10px 18px calc(10px + constant(safe-area-inset-bottom));
-  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  min-height: 84px;
+  padding: 8px 16px 6px;
 }
 
 .control-layer.fullscreen .progress-zone {
@@ -389,10 +422,9 @@
   line-height: 28px;
 }
 
-/* Fullscreen menus are direct children of the native control layer.  Landscape
-   uses the wide bottom cards from the player design; portrait keeps a compact
-   three-column fallback so the popup remains inside the native overlay. */
-.control-layer.fullscreen.landscape .player-popup {
+/* Fullscreen menus are siblings of the bottom dock. Landscape uses wide cards;
+   portrait keeps a compact three-column fallback. */
+.player-popup.landscape {
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -400,7 +432,7 @@
   box-shadow: none;
 }
 
-.control-layer.fullscreen.landscape .popup-title {
+.player-popup.landscape .popup-title {
   height: 28px;
   color: rgba(255, 255, 255, 0.78);
   font-size: 18px;
@@ -408,14 +440,14 @@
   line-height: 28px;
 }
 
-.control-layer.fullscreen.landscape .popup-options {
+.player-popup.landscape .popup-options {
   display: flex;
   flex-wrap: nowrap;
   width: 100%;
   margin-top: 6px;
 }
 
-.control-layer.fullscreen.landscape .popup-option {
+.player-popup.landscape .popup-option {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
@@ -440,20 +472,20 @@
   text-overflow: ellipsis;
 }
 
-.control-layer.fullscreen.landscape .popup-option.active {
+.player-popup.landscape .popup-option.active {
   border-bottom-color: #ffffff;
   color: #ffffff;
   background: rgba(28, 28, 28, 0.92);
 }
 
-.control-layer.fullscreen.landscape .popup-option-main {
+.player-popup.landscape .popup-option-main {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.control-layer.fullscreen.portrait .player-popup {
+.player-popup.portrait {
   padding: 8px 6px 6px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
@@ -461,7 +493,7 @@
   box-shadow: 0 8px 20px rgba(36, 25, 18, 0.32);
 }
 
-.control-layer.fullscreen.portrait .popup-title {
+.player-popup.portrait .popup-title {
   height: 18px;
   color: rgba(255, 255, 255, 0.72);
   font-size: 11px;
@@ -469,14 +501,14 @@
   line-height: 18px;
 }
 
-.control-layer.fullscreen.portrait .popup-options {
+.player-popup.portrait .popup-options {
   display: flex;
   flex-wrap: wrap;
   width: 100%;
   margin-top: 5px;
 }
 
-.control-layer.fullscreen.portrait .popup-option {
+.player-popup.portrait .popup-option {
   display: flex;
   flex: none;
   flex-direction: column;
@@ -502,7 +534,7 @@
   text-overflow: ellipsis;
 }
 
-.control-layer.fullscreen.portrait .popup-option.active {
+.player-popup.portrait .popup-option.active {
   border-bottom-color: #ffffff;
   border-left-color: transparent;
   border-right-color: transparent;
@@ -511,7 +543,7 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
-.control-layer.fullscreen.portrait .popup-option-main {
+.player-popup.portrait .popup-option-main {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -521,8 +553,7 @@
 .control-layer.fullscreen.portrait .control-content {
   padding-left: 12px;
   padding-right: 12px;
-  padding-bottom: calc(10px + constant(safe-area-inset-bottom));
-  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  padding-bottom: 8px;
 }
 
 .control-layer.fullscreen.portrait .transport-button,

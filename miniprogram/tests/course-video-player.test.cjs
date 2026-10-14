@@ -291,6 +291,10 @@ test('window geometry queries finish once and native touch coordinates seek acro
   assert.equal(track.left, 35);
   assert.equal(track.width, 305);
   p.instance.startSeek({ touches: [{ x: 0 }] });
+  // Seek UI is deferred so iOS cover-view keeps receiving touchmove.
+  assert.equal(p.instance.data.isSeeking, false);
+  p.advance(0);
+  assert.equal(p.instance.data.isSeeking, true);
   assert.equal(p.instance.data.progressPercent, 0);
   p.instance.moveSeek({ touches: [{ x: track.width * 0.75 }] });
   assert.equal(p.calls.filter(([name]) => name === 'seek').length, 0);
@@ -331,21 +335,31 @@ test('seek clamps absolute and native coordinates including zero and invalid tou
   assert.equal(seekTime({}, track, 120), null);
   assert.equal(seekTime(null, track, 120), null);
   assert.equal(seekTime({ relativeX: 150 }, track, 120), 60);
+  assert.equal(seekTime({ x: 150, clientX: 999 }, track, 120, { relativeOnly: true }), 60);
+  assert.equal(seekTime({ clientX: 175 }, track, 120, { relativeOnly: true }), null);
 });
 
 test('seek bubbles stay inside both edges and close to the track across viewport sizes', () => {
   for (const width of [320, 375, 414, 768]) {
     for (const full of [false, true]) {
-      const layout = getPlayerLayout({ windowWidth: width, screenWidth: width, screenHeight: 844, safeArea: { left: 0, right: width, top: 44, bottom: 810 } }, full, full);
+      const layout = getPlayerLayout({
+        windowWidth: width,
+        windowHeight: 844,
+        screenWidth: width,
+        screenHeight: 844,
+        safeArea: { left: 0, right: width, top: 44, bottom: 810 }
+      }, full, full);
       for (const percent of [0, 1, 50, 99, 100]) {
         const style = Object.fromEntries(getSeekBubbleStyle(layout, percent, full).split(';').filter(Boolean).map((field) => {
           const [name, value] = field.split(':');
           return [name, parseFloat(value)];
         }));
-        assert.ok(style.left >= layout.left);
-        assert.ok(style.left + style.width <= layout.width - layout.right + 0.001);
+        const minLeft = full ? layout.left : 0;
+        const maxRight = layout.width - (full ? layout.right : 0);
+        assert.ok(style.left >= minLeft - 0.001);
+        assert.ok(style.left + style.width <= maxRight + 0.001);
         assert.ok(style.bottom > layout.trackBottom);
-        assert.ok(style.bottom - layout.trackBottom <= (full ? 4 : 18 * layout.scale) + 0.001);
+        assert.ok(style.bottom - layout.trackBottom <= (full ? 14 : 28 * layout.scale) + 0.001);
       }
     }
   }

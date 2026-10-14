@@ -41,6 +41,8 @@ Component({
     controlsVisible: true,
     isPlaying: false,
     isFullscreen: false,
+    // 窗口铺满去黑边；全屏 contain 保完整画面。
+    objectFit: 'cover',
     fullscreenTransition: '',
     switchingSource: false,
     menu: '',
@@ -517,6 +519,7 @@ Component({
       const pendingMedia = this._pendingMedia || null;
       this.setData({
         isFullscreen: full,
+        objectFit: full ? 'contain' : 'cover',
         fullscreenTransition: '',
         fullscreenDirection: full ? (this._horizontal ? 'horizontal' : 'portrait') : 'none',
         controlsVisible: true,

@@ -64,6 +64,12 @@ Page({
 
   onLoad(options) {
     this.audio = null;
+    this.reapplyingSpeed = false;
+    this.lastAppliedRate = null;
+    this.pendingSpeedRate = null;
+    this.speedApplyTimer = null;
+    this.speedSeekTimer = null;
+    this.reapplySafetyTimer = null;
     this.setData({
       fileId: options.fileId || '',
       fileSource: options.fileSource || options.sourceType || 'library',
@@ -118,12 +124,12 @@ Page({
     this.audio = audio;
     audio.src = url;
     audio.loop = this.data.loop;
-    this.applyAudioSpeed();
+    this.setPlaybackRate();
 
     audio.onCanplay(() => {
       const duration = Number(audio.duration || this.data.duration || 0);
       if (duration > 0) this.updateDuration(duration);
-      this.applyAudioSpeed();
+      this.setPlaybackRate();
       this.setData({ audioReady: true, audioWaiting: false, audioErrorText: '' });
     });
 
@@ -136,24 +142,74 @@ Page({
     });
 
     audio.onPlay(() => {
-      this.applyAudioSpeed();
+      this.setPlaybackRate();
       this.setData({ playing: true, audioWaiting: false, audioErrorText: '' });
+      this.finishSpeedReapply();
     });
-    audio.onPause(() => this.setData({ playing: false, audioWaiting: false }));
-    audio.onStop(() => this.setData({ playing: false, audioWaiting: false }));
+    audio.onPause(() => {
+      if (this.reapplyingSpeed) return;
+      this.setData({ playing: false, audioWaiting: false });
+    });
+    audio.onStop(() => {
+      if (this.reapplyingSpeed) return;
+      this.setData({ playing: false, audioWaiting: false });
+    });
+    audio.onSeeked(() => {
+      // iOS 上 seek 后倍速偶发被重置，补写一次属性。
+      this.setPlaybackRate();
+    });
     audio.onWaiting(() => this.setData({ audioWaiting: true }));
     audio.onEnded(() => {
       if (this.data.loop) return;
       this.setData({ playing: false, audioWaiting: false, currentTime: 0, progress: 0, currentTimeText: '00:00' });
     });
     audio.onError((error) => {
+      this.clearSpeedTimers();
+      this.reapplyingSpeed = false;
+      this.pendingSpeedRate = null;
       const errorText = this.getAudioErrorMessage(error);
       this.setData({ playing: false, audioWaiting: false, audioErrorText: errorText });
       wx.showToast({ title: errorText, icon: 'none' });
     });
   },
 
+  clearSpeedTimers() {
+    if (this.speedApplyTimer) {
+      clearTimeout(this.speedApplyTimer);
+      this.speedApplyTimer = null;
+    }
+    if (this.speedSeekTimer) {
+      clearTimeout(this.speedSeekTimer);
+      this.speedSeekTimer = null;
+    }
+    if (this.reapplySafetyTimer) {
+      clearTimeout(this.reapplySafetyTimer);
+      this.reapplySafetyTimer = null;
+    }
+  },
+
+  finishSpeedReapply() {
+    if (!this.reapplyingSpeed) return;
+    this.reapplyingSpeed = false;
+    if (this.reapplySafetyTimer) {
+      clearTimeout(this.reapplySafetyTimer);
+      this.reapplySafetyTimer = null;
+    }
+    const pending = this.pendingSpeedRate;
+    this.pendingSpeedRate = null;
+    if (pending == null) return;
+    if (pending === this.getCurrentSpeed() && pending === this.lastAppliedRate) {
+      this.setPlaybackRate(pending);
+      return;
+    }
+    this.applyAudioSpeed(pending, { restartIfPlaying: true });
+  },
+
   destroyAudio() {
+    this.clearSpeedTimers();
+    this.reapplyingSpeed = false;
+    this.pendingSpeedRate = null;
+    this.lastAppliedRate = null;
     if (!this.audio) return;
     try {
       this.audio.stop();
@@ -163,6 +219,12 @@ Page({
     }
     this.audio = null;
     this.setData({ playing: false, audioReady: false, audioWaiting: false });
+  },
+
+  isAudioPlaying() {
+    if (!this.audio) return false;
+    if (this.data.playing) return true;
+    return this.audio.paused === false;
   },
 
   getAudioErrorMessage(error = {}) {
@@ -187,22 +249,104 @@ Page({
   async playAudio() {
     if (!this.audio) return;
     await this.ensureInnerAudioOption();
-    this.applyAudioSpeed();
+    const speed = this.getCurrentSpeed();
+    this.setPlaybackRate(speed);
     this.audio.play();
+    // iOS：播放前设倍速常无效；若目标倍速与上次强制生效的不一致，开播后再 restart 一次。
+    // 覆盖「暂停时从 0.75 切回 1.0 再播放」这类场景。
+    if (speed !== (this.lastAppliedRate ?? 1)) {
+      if (this.speedApplyTimer) clearTimeout(this.speedApplyTimer);
+      this.speedApplyTimer = setTimeout(() => {
+        this.speedApplyTimer = null;
+        this.applyAudioSpeed(speed, { restartIfPlaying: true });
+      }, 120);
+    }
   },
 
-  applyAudioSpeed(speed = SPEED_OPTIONS[this.data.speedIndex] || 1) {
+  getCurrentSpeed() {
+    return SPEED_OPTIONS[this.data.speedIndex] || 1;
+  },
+
+  setPlaybackRate(speed = this.getCurrentSpeed()) {
     if (!this.audio) return false;
+    const rate = Number(speed);
+    if (!Number.isFinite(rate) || rate < 0.5 || rate > 2) return false;
     try {
-      if (typeof this.audio.playbackRate === 'function') {
-        this.audio.playbackRate(speed);
-      } else {
-        this.audio.playbackRate = speed;
-      }
+      // InnerAudioContext.playbackRate 是 number 属性，不是 VideoContext 那种方法。
+      this.audio.playbackRate = rate;
       return true;
     } catch (error) {
       return false;
     }
+  },
+
+  applyAudioSpeed(speed = this.getCurrentSpeed(), options = {}) {
+    if (!this.audio) return false;
+    const rate = Number(speed);
+    if (!Number.isFinite(rate) || rate < 0.5 || rate > 2) return false;
+
+    const assigned = this.setPlaybackRate(rate);
+    if (!assigned) return false;
+
+    const shouldRestart = options.restartIfPlaying === true && this.isAudioPlaying();
+    if (!shouldRestart) return true;
+
+    // 快速连点倍速时合并为一次 restart，避免 pause/play 重入把进度打乱。
+    if (this.reapplyingSpeed) {
+      this.pendingSpeedRate = rate;
+      return true;
+    }
+
+    const currentTime = Number(this.audio.currentTime || this.data.currentTime || 0);
+    this.reapplyingSpeed = true;
+    this.pendingSpeedRate = null;
+    try {
+      this.audio.pause();
+      this.audio.playbackRate = rate;
+    } catch (error) {
+      this.reapplyingSpeed = false;
+      return false;
+    }
+
+    if (this.speedApplyTimer) clearTimeout(this.speedApplyTimer);
+    if (this.speedSeekTimer) clearTimeout(this.speedSeekTimer);
+    if (this.reapplySafetyTimer) clearTimeout(this.reapplySafetyTimer);
+
+    this.speedApplyTimer = setTimeout(() => {
+      this.speedApplyTimer = null;
+      if (!this.audio) {
+        this.reapplyingSpeed = false;
+        return;
+      }
+      try {
+        this.audio.playbackRate = rate;
+        this.audio.play();
+        this.lastAppliedRate = rate;
+        // iOS 首次改倍速常会从头播；先 play 再 seek，比 pause 后立刻 seek 更稳。
+        if (currentTime > 0) {
+          this.speedSeekTimer = setTimeout(() => {
+            this.speedSeekTimer = null;
+            if (!this.audio) return;
+            try {
+              this.audio.playbackRate = rate;
+              this.audio.seek(currentTime);
+            } catch (error) {
+              // ignore seek restore errors
+            }
+          }, 50);
+        }
+      } catch (error) {
+        this.reapplyingSpeed = false;
+      }
+    }, 80);
+
+    // onPlay 未触发时的兜底，避免 reapplyingSpeed 卡死导致暂停按钮失效。
+    this.reapplySafetyTimer = setTimeout(() => {
+      this.reapplySafetyTimer = null;
+      this.finishSpeedReapply();
+    }, 800);
+
+    return true;
   },
 
   updateDuration(duration) {
@@ -247,10 +391,14 @@ Page({
   toggleSpeed() {
     const speedIndex = (this.data.speedIndex + 1) % SPEED_OPTIONS.length;
     const speed = SPEED_OPTIONS[speedIndex];
+    const playing = this.isAudioPlaying();
     this.setData({ speedIndex, speedText: speedText(speed) }, () => {
-      const applied = this.applyAudioSpeed(speed);
-      if (this.audio) {
-        setTimeout(() => this.applyAudioSpeed(speed), 120);
+      // 播放中：iOS 必须 pause → 设倍速 → play → seek 才会真正变声速。
+      // 暂停中：先写入属性；下次 playAudio 若与 lastAppliedRate 不一致会再强制生效。
+      const applied = this.applyAudioSpeed(speed, { restartIfPlaying: playing });
+      if (!playing && applied) {
+        // 暂停态只改了属性，尚未经过 restart，标记为待同步。
+        this.lastAppliedRate = null;
       }
       if (!applied && this.audio) {
         wx.showToast({ title: '当前环境暂不支持倍速', icon: 'none' });
@@ -322,7 +470,10 @@ Page({
 
   commitAudioSeek() {
     this.setData({ seeking: false });
-    if (this.audio && this.data.duration) this.audio.seek(this.data.currentTime);
+    if (this.audio && this.data.duration) {
+      this.audio.seek(this.data.currentTime);
+      this.setPlaybackRate();
+    }
     this.audioProgressRect = null;
     this.latestAudioSeekTouch = null;
   },
@@ -339,7 +490,10 @@ Page({
     const duration = this.data.duration || 0;
     const currentTime = Math.min(duration, Math.max(0, this.data.currentTime + offset));
     this.updateCurrentTime(currentTime, duration);
-    if (this.audio) this.audio.seek(currentTime);
+    if (this.audio) {
+      this.audio.seek(currentTime);
+      this.setPlaybackRate();
+    }
   },
 
   goBack() {

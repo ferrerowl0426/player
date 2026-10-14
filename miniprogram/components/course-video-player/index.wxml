@@ -15,7 +15,7 @@
     show-play-btn="{{false}}"
     show-center-play-btn="{{false}}"
     show-casting-button="{{false}}"
-    object-fit="contain"
+    object-fit="{{objectFit}}"
     direction="{{videoDirection}}"
     playback-rate="{{speed}}"
     bindloadedmetadata="handleLoadedMetadata"

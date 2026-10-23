@@ -1,5 +1,6 @@
 import { pool } from './db.js';
 import { getKeyFromPublicUrl, normalizePublicUrl } from './storage.js';
+import { toPlaybackUrl } from './playback-url.js';
 
 function toInt(value, fallback = 1) {
   const number = Number(value);
@@ -294,10 +295,13 @@ export async function listKnowledge(query) {
 
 function formatRendition(row = {}) {
   const quality = String(row.quality || 'source');
+  const videoUrl = normalizePublicUrl(row.video_url || '');
   return {
     quality,
     label: quality === 'source' ? '原画' : quality.toUpperCase(),
-    videoUrl: normalizePublicUrl(row.video_url || ''),
+    videoUrl,
+    // 兼容式新增：CDN 播放地址；原 videoUrl 仍保留 COS 原值。
+    playUrl: toPlaybackUrl(videoUrl),
     fileSize: Number(row.file_size || 0),
     status: row.status || '',
     updatedAt: row.updated_at || ''
@@ -339,7 +343,8 @@ async function getParts(table, parentColumn, parentId) {
     const sourceUrl = normalizePublicUrl(row.video_url || '');
     const renditions = renditionsByVideoId.get(row.video_id) || [];
     if (sourceUrl && !renditions.some((item) => item.quality === 'source')) {
-      renditions.unshift({ quality: 'source', label: '原画', videoUrl: sourceUrl, fileSize: 0, status: 'ready', updatedAt: '' });
+      // 兼容式新增：source 补项也提供 CDN 播放地址；原 videoUrl 保留 COS 原值。
+      renditions.unshift({ quality: 'source', label: '原画', videoUrl: sourceUrl, playUrl: toPlaybackUrl(sourceUrl), fileSize: 0, status: 'ready', updatedAt: '' });
     }
 
     return {
@@ -350,6 +355,8 @@ async function getParts(table, parentColumn, parentId) {
       durationText: durationText(row.duration),
       videoId: row.video_id ? String(row.video_id) : '',
       videoUrl: sourceUrl,
+      // 兼容式新增：CDN 播放地址；原 videoUrl 保留 COS 原值。
+      playUrl: toPlaybackUrl(sourceUrl),
       coverUrl: normalizePublicUrl(row.cover_url || ''),
       renditions
     };

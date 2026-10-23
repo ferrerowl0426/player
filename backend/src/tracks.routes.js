@@ -15,6 +15,7 @@ import {
   normalizePublicUrl
 } from './storage.js';
 import { createInitialRenditions, deleteVideoObjects } from './transcode.js';
+import { toPlaybackUrl } from './playback-url.js';
 import { deleteWithReferences } from './deletion.js';
 
 function normalizeKeyword(value) {
@@ -88,10 +89,13 @@ function mapTrack(row) {
 }
 
 function mapPart(row) {
+  const videoUrl = normalizePublicUrl(row.video_url);
   return {
     ...row,
-    video_url: normalizePublicUrl(row.video_url),
-    video_cover_url: normalizePublicUrl(row.video_cover_url)
+    video_url: videoUrl,
+    video_cover_url: normalizePublicUrl(row.video_cover_url),
+    // 兼容式新增：CDN 播放地址；原 video_url 仍保留 COS 原值。
+    play_url: toPlaybackUrl(videoUrl)
   };
 }
 
@@ -138,8 +142,10 @@ async function getTrackParts(trackId) {
     );
 
     for (const rendition of renditions.rows) {
+      const videoUrl = normalizePublicUrl(rendition.video_url);
       const list = renditionsByVideoId.get(rendition.video_id) || [];
-      list.push({ ...rendition, video_url: normalizePublicUrl(rendition.video_url) });
+      // 兼容式新增：CDN 播放地址 play_url；原 video_url 仍保留 COS 原值。
+      list.push({ ...rendition, video_url: videoUrl, play_url: toPlaybackUrl(videoUrl) });
       renditionsByVideoId.set(rendition.video_id, list);
     }
   }

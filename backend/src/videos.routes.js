@@ -16,6 +16,7 @@ import {
   getPublicUrl,
   normalizePublicUrl
 } from './storage.js';
+import { toPlaybackUrl } from './playback-url.js';
 import {
   createInitialRenditions,
   deleteObjectKeys,
@@ -265,17 +266,23 @@ function normalizeMultipartParts(parts) {
 }
 
 function formatVideoResponse(video) {
+  const videoUrl = normalizePublicUrl(video.video_url);
   return {
     ...video,
-    video_url: normalizePublicUrl(video.video_url),
-    cover_url: normalizePublicUrl(video.cover_url)
+    video_url: videoUrl,
+    cover_url: normalizePublicUrl(video.cover_url),
+    // 兼容式新增：CDN 播放地址；原 video_url 仍保留 COS 原值。
+    play_url: toPlaybackUrl(videoUrl)
   };
 }
 
 function formatRenditionResponse(rendition) {
+  const videoUrl = normalizePublicUrl(rendition.video_url);
   return {
     ...rendition,
-    video_url: normalizePublicUrl(rendition.video_url)
+    video_url: videoUrl,
+    // 兼容式新增：CDN 播放地址 play_url；原 video_url 仍保留 COS 原值。
+    play_url: toPlaybackUrl(videoUrl)
   };
 }
 

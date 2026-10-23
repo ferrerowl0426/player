@@ -25,12 +25,21 @@ const SPEED_OPTIONS = SPEEDS.map((value) => ({
 function normalizeRenditions(part = {}) {
   const list = Array.isArray(part.renditions) ? part.renditions : [];
   const readyList = list
-    .map((item) => ({
-      quality: String(item.quality || 'source').toLowerCase(),
-      label: item.label || qualityLabel(item.quality),
-      videoUrl: item.videoUrl || item.video_url || '',
-      status: String(item.status || '').toLowerCase()
-    }))
+    .map((item) => {
+      // 后端新增 renditions[].playUrl 作为 CDN 源，原 videoUrl 仍指向 COS。
+      // originVideoUrl 固定保留 COS 源，playUrl 保留 CDN 源；旧响应无 playUrl 时
+      // 两者退化为原 videoUrl，保证向后兼容。
+      const cosUrl = item.videoUrl || item.video_url || '';
+      const cdnUrl = item.playUrl || item.play_url || '';
+      return {
+        quality: String(item.quality || 'source').toLowerCase(),
+        label: item.label || qualityLabel(item.quality),
+        videoUrl: cosUrl,
+        originVideoUrl: cosUrl,
+        playUrl: cdnUrl,
+        status: String(item.status || '').toLowerCase()
+      };
+    })
     .filter((item) => item.videoUrl && (!item.status || item.status === 'ready'));
 
   // buildDetail 会再次处理已经归一化的 detail（例如切换清晰度时）。
@@ -43,6 +52,8 @@ function normalizeRenditions(part = {}) {
       quality: 'source',
       label: '原画',
       videoUrl: part.videoUrl || part.video_url,
+      originVideoUrl: part.videoUrl || part.video_url,
+      playUrl: part.playUrl || part.play_url || '',
       status: 'ready'
     });
   }
@@ -75,7 +86,11 @@ function formatPart(part = {}, activePartId = '', activeQuality = '', index = 0,
     active,
     statusText: active ? '播放中' : '播放',
     selectedQuality,
-    videoUrl: selectedRendition?.videoUrl || part.videoUrl || part.video_url || '',
+    // 优先用 CDN 源(playUrl)，无则回退到 COS 源(videoUrl 本身已是 COS)。
+    videoUrl: selectedRendition?.playUrl || selectedRendition?.videoUrl || part.videoUrl || part.video_url || '',
+    // 始终保留 COS 源与 CDN 源，供 CDN 失败回退使用。
+    originVideoUrl: selectedRendition?.originVideoUrl || selectedRendition?.videoUrl || part.videoUrl || part.video_url || '',
+    playUrl: selectedRendition?.playUrl || '',
     renditions: renditions.map((item) => ({ ...item, active: item.quality === selectedQuality })),
     hasQualityOptions: renditions.length > 1,
     hasPrevious: index > 0,
@@ -197,6 +212,8 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     onLoad(options) {
       this._isUnloaded = false;
       this._isPageVisible = false;
+      // 回源状态随页面(即课程)实例存在，换课即新建页面→自动重置。
+      this._fallbackKeys = new Set();
       this.setData({ id: options.id || '', part: options.part || '' });
     },
 
@@ -228,14 +245,34 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
     buildVideoMedia(detail, position = 0, shouldPlay = true) {
       const part = detail?.currentPart || {};
       const quality = part.selectedQuality || this.data.quality || 'source';
+      const src = this.resolveCurrentSrc(detail);
       this._videoSourceToken = (this._videoSourceToken || 0) + 1;
       return {
-        id: `${part.id || 'part'}:${quality}:${part.videoUrl || ''}`,
+        id: `${part.id || 'part'}:${quality}:${src}`,
         sourceToken: this._videoSourceToken,
-        src: part.videoUrl || '',
+        src,
         position: Math.max(0, Number(position) || 0),
         play: Boolean(shouldPlay)
       };
+    },
+
+    // 回退状态键：每个 (part + quality + CDN 地址) 仅回退一次。
+    // 必须用 part 自身的 selectedQuality，因为 buildVideoMedia 在 selectQualityByValue/
+    // selectPartById 中先于 setData 提交新 quality 时就被调用，this.data.quality 尚为旧值。
+    fallbackKey(part = {}) {
+      const quality = part.selectedQuality || this.data.quality || '';
+      return `${part.id || ''}|${quality}|${part.playUrl || ''}`;
+    },
+
+    // 计算当前 part+quality 实际播放地址：已回源则直接用 COS，否则优先 CDN。
+    resolveCurrentSrc(detail = this.data.detail) {
+      const part = detail?.currentPart || {};
+      const cdnUrl = part.playUrl || '';
+      const cosUrl = part.originVideoUrl || part.videoUrl || '';
+      if (cdnUrl && cdnUrl !== cosUrl && (this._fallbackKeys || (this._fallbackKeys = new Set())).has(this.fallbackKey(part))) {
+        return cosUrl;
+      }
+      return part.videoUrl || cosUrl || cdnUrl || '';
     },
 
     async loadDetail() {
@@ -247,6 +284,8 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
         if (this._isUnloaded) return;
         const viewDetail = formatDetail(detail, this.data.part, this.data.quality);
         this._detailLoaded = true;
+        // 换课加载新详情时重置回源状态（同一课程内切 P 不触发此处）。
+        this._fallbackKeys = new Set();
         this.setData({
           detail: viewDetail,
           quality: viewDetail.currentPart.selectedQuality || '',
@@ -422,6 +461,24 @@ function createVideoDetailPage({ loadDetailRequest, defaultTitle = '课程详情
 
     handleVideoError(event) {
       if (!this.isCurrentVideoEvent(event)) return;
+      const part = this.data.detail.currentPart || {};
+      const cdnUrl = part.playUrl || '';
+      const cosUrl = part.originVideoUrl || part.videoUrl || '';
+      const usingCdn = Boolean(cdnUrl && this.data.videoMedia?.src === cdnUrl);
+      // 错误先同档回 COS：仅对“当前 part+quality+CDN 地址”回退一次，
+      // 保留进度/倍速/播放意图。已回源或已无 CDN 时跳过，交由后续逻辑。
+      if (usingCdn && cosUrl && cosUrl !== cdnUrl && !this._fallbackKeys.has(this.fallbackKey(part))) {
+        this._fallbackKeys.add(this.fallbackKey(part));
+        const position = Number(event.detail?.position ?? this.data.currentTime) || 0;
+        const shouldPlay = Boolean(event.detail?.play ?? this.data.isPlaying);
+        this.setData({
+          videoWaiting: true,
+          videoErrorText: '',
+          videoActive: true,
+          videoMedia: this.buildVideoMedia(this.data.detail, position, shouldPlay)
+        }, () => this.playCurrentVideo());
+        return;
+      }
       const rollback = this.data.pendingQualityRollback;
       if (rollback?.quality && rollback.quality !== this.data.quality) {
         wx.showToast({ title: '清晰度切换失败，已恢复原画面', icon: 'none' });

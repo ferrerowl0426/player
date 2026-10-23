@@ -383,6 +383,9 @@ Component({
     handleError(event) {
       // 加载失败可能发生在 metadata 前，不能被 _loadingSource 门禁吞掉。
       if (this._pendingMedia || !this.isCurrentNode(event)) return;
+      // 必须在清除 _wantPlay 前捕获进度与播放意图，供上层做同档 COS 回退。
+      const fallbackPosition = this._position || 0;
+      const fallbackPlay = Boolean(this._wantPlay);
       this._loadingSource = false;
       this._sourceMounting = false;
       ['hideTimer', 'seekTimer', 'waitingTimer'].forEach((name) => this.clearTimer(name));
@@ -391,7 +394,8 @@ Component({
       this._drag = null;
       this._seekTarget = null;
       this.setData({ metadataReady: false, isPlaying: false, isSeeking: false, waiting: false, controlsVisible: true, menu: '', errorText: '视频加载失败，点击重试' });
-      this.emit('error', event.detail);
+      // 透出 position/play，旧字段(event.detail)原样保留以兼容历史监听。
+      this.emit('error', { ...event.detail, position: fallbackPosition, play: fallbackPlay });
     },
 
     retry() { if (this.data.active && this.data.errorText) this.emit('retry'); },

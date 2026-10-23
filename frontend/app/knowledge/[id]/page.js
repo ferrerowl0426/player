@@ -142,7 +142,7 @@ export default function KnowledgePointPage() {
           <div className="video-wrap">
             <div className="video">
               {activePart?.video_url ? (
-                <VideoPlayer src={activePart.video_url} poster={point.cover || activePart.video_cover_url} renditions={activePart.renditions || []} onPrev={prevPart ? () => setActivePartId(prevPart.id) : null} onNext={nextPart ? () => setActivePartId(nextPart.id) : null} />
+                <VideoPlayer src={activePart.video_url} playSrc={activePart.play_url} poster={point.cover || activePart.video_cover_url} renditions={activePart.renditions || []} onPrev={prevPart ? () => setActivePartId(prevPart.id) : null} onNext={nextPart ? () => setActivePartId(nextPart.id) : null} />
               ) : (
                 <div className="video-cover"><span className="vlabel"><i /></span></div>
               )}

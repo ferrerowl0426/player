@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AppNav from '../../../../components/ui/AppNav.js';
+import CoverCropperModal from '../../../../components/CoverCropperModal.js';
 import {
   createTrackCollection,
   fetchAdminMe,
@@ -76,6 +77,7 @@ function AdminTrackCollectionsContent() {
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const coverInputRef = useRef(null);
+  const [pendingCoverFile, setPendingCoverFile] = useState(null);
   const [draftAvailable, setDraftAvailable] = useState(false);
 
   useEffect(() => {
@@ -186,21 +188,29 @@ function AdminTrackCollectionsContent() {
     }
   }
 
-  async function handleCoverFile(file) {
+  function handleCoverFile(file) {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       setStatus('请上传图片文件');
       return;
     }
+    setErrors((current) => ({ ...current, cover: undefined }));
+    setPendingCoverFile(file);
+  }
+
+  async function uploadCroppedCover(file) {
     setStatus('正在上传封面...');
     try {
       const result = await createLibraryUploadUrl(file, 'cover');
       await uploadLibraryFileToBucket({ uploadUrl: result.data.uploadUrl, file });
       setCollection((current) => ({ ...current, cover: result.data.publicUrl }));
+      setPendingCoverFile(null);
       setErrors((current) => ({ ...current, cover: undefined }));
       setStatus('封面上传成功');
     } catch (error) {
+      setErrors((current) => ({ ...current, cover: error.message || '封面上传失败' }));
       setStatus(error.message || '封面上传失败');
+      throw error;
     }
   }
 
@@ -323,7 +333,7 @@ function AdminTrackCollectionsContent() {
               <section className="fsec">
                   <div className="fsec-title">封面 <span className="note req">支持任意比例 · 上传后裁切为 1:1</span></div>
                   <div className={`cover-flex${errors.cover ? ' error' : ''}`}>
-                    <input ref={coverInputRef} type="file" accept="image/*" hidden onChange={(event) => handleCoverFile(event.target.files?.[0]).finally(() => { event.target.value = ''; })} />
+                    <input ref={coverInputRef} type="file" accept="image/*" hidden onChange={(event) => { handleCoverFile(event.target.files?.[0]); event.target.value = ''; }} />
                     <div className={`cover-box${collection.cover ? ' has' : ''}`} role="button" tabIndex={0} onClick={() => coverInputRef.current?.click()} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); coverInputRef.current?.click(); } }}>
                       {collection.cover ? <><img src={collection.cover} alt="合集封面" /><button type="button" className="cov-rm" aria-label="移除封面" onClick={(event) => { event.stopPropagation(); setCollection((current) => ({ ...current, cover: '' })); }}>×</button></> : <><span className="t1">＋ 上传封面</span><span className="t2">任意比例 · 自动裁切 1:1</span><div className="vinyl"><i /></div></>}
                     </div>
@@ -447,6 +457,14 @@ function AdminTrackCollectionsContent() {
           </div>
         </div>
       </main>
+      {pendingCoverFile && (
+        <CoverCropperModal
+          file={pendingCoverFile}
+          title="裁切曲目合集封面"
+          onCancel={() => setPendingCoverFile(null)}
+          onConfirm={uploadCroppedCover}
+        />
+      )}
     </>
   );
 }

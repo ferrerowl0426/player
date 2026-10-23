@@ -1053,15 +1053,15 @@ function AdminKnowledgeContent() {
               </div>
             </form>
           </div>
-              {pendingCover?.file && (
+        </main>
+      )}
+      {pendingCover?.file && (
         <CoverCropperModal
           file={pendingCover.file}
           title={pendingCover.target === 'collection' ? '裁切知识点集封面' : '裁切知识点封面'}
           onCancel={() => setPendingCover(null)}
           onConfirm={pendingCover.target === 'collection' ? uploadCroppedCollectionCover : uploadCroppedPointCover}
         />
-      )}
-</main>
       )}
     </>
   );

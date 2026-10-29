@@ -88,6 +88,7 @@ test('filterPubliclyReadableVideos：空输入返回空集', async () => {
 test('filterPubliclyReadableVideos：全部公开宿主的视频被保留', async () => {
   const client = {
     async query(sql) {
+      assert.match(sql, /SELECT DISTINCT s\.video_id FROM\s*\(/, '外层必须使用派生表别名 s，不能引用内层 x');
       assert.ok(/UNION ALL/.test(sql), '应拼接 track_parts 与 knowledge_parts 两类宿主');
       assert.ok(/track_parts/.test(sql) && /knowledge_parts/.test(sql));
       return { rows: [], rowCount: 0 };

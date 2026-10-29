@@ -26,7 +26,7 @@ export async function filterPubliclyReadableVideos(client, videoIds) {
   const readable = new Set();
   if (ids.length === 0) return readable;
   const result = await client.query(`
-    SELECT DISTINCT x.video_id FROM (
+    SELECT DISTINCT s.video_id FROM (
       SELECT video_id FROM track_parts x JOIN track_points c ON c.id = x.track_id
        WHERE x.video_id = ANY($1::int[]) AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(c.visibility, ''), 'public') <> 'public')
       UNION ALL

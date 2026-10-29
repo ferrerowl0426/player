@@ -21,7 +21,13 @@ test('staff must have existing host; orphan attachment denied', async () => {
   let calls = 0;
   assert.equal(await authorizeAttachment({ query: async () => ({ rows: calls++ ? [] : [privateRow] }) }, { id: 1, viewer: { role: 'teacher', status: 'active' } }), null);
 });
-test('valid teacher can authorize private attachment with real parent', async () => {
-  let calls = 0;
-  assert.equal((await authorizeAttachment({ query: async () => ({ rows: calls++ ? [{ id: 7 }] : [privateRow] }) }, { id: 1, viewer: { role: 'teacher', status: 'active' } })).id, 1);
+test('active teacher and super_admin can authorize private attachment with real parent', async () => {
+  for (const role of ['teacher', 'super_admin']) {
+    let calls = 0;
+    const viewer = { role, status: 'active' };
+    assert.equal((await authorizeAttachment({ query: async () => ({ rows: calls++ ? [{ id: 7 }] : [privateRow] }) }, { id: 1, viewer })).id, 1);
+    const [serialized] = serializeAttachments([privateRow], viewer);
+    assert.match(serialized.download_endpoint, /1\/download-url/);
+    assert.equal(serialized.file_url, undefined);
+  }
 });

@@ -7,6 +7,7 @@ import AppNav from '../../../components/ui/AppNav.js';
 import ListRow from '../../../components/ui/ListRow.js';
 import PanelBox from '../../../components/ui/PanelBox.js';
 import VideoPlayer from '../../../components/VideoPlayer.js';
+import AttachmentDownload from '../../../components/AttachmentDownload.js';
 import { fetchCurrentViewer, fetchPrerequisites, fetchTrackById } from '../../../lib/api.js';
 
 function formatDate(value) {
@@ -43,9 +44,7 @@ function fileLabel(fileName = '', fileType = '') {
 }
 
 function resourceActions(resource) {
-  const url = resource?.file_url;
-  if (!url) return null;
-  return <a className="fbtn solid" href={url} download={resource?.file_name || true}>下载</a>;
+  return <AttachmentDownload resource={resource} />;
 }
 
 function prerequisiteHref(item) {

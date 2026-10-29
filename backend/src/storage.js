@@ -101,10 +101,14 @@ export async function finalizePdfInlineMetadata(key) {
   );
 }
 
-export async function createDownloadUrl({ key, expiresIn = 10 * 60 }) {
+export async function createDownloadUrl({ key, expiresIn = 10 * 60, fileName }) {
+  const disposition = fileName
+    ? `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(fileName).replace(/['()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)}`
+    : undefined;
   const command = new GetObjectCommand({
     Bucket: config.s3.bucket,
-    Key: key
+    Key: key,
+    ...(disposition ? { ResponseContentDisposition: disposition } : {})
   });
 
   return getSignedUrl(presignClient, command, { expiresIn });

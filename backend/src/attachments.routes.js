@@ -30,7 +30,7 @@ async function handleDownloadUrl(req, res, next) {
   }
 
   try {
-    const url = await createDownloadUrl({ key: row.file_key, expiresIn: 300 });
+    const url = await createDownloadUrl({ key: row.file_key, expiresIn: 300, fileName: row.file_name });
     if (req.method === 'HEAD') {
       res.status(200).end();
       return;

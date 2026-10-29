@@ -144,7 +144,7 @@
 .studentManage:global(.student-manage) :global(.msg-box:focus){ border-color: var(--coffee); }
 .studentManage:global(.student-manage) :global(.msg-box::placeholder){ color: #b3a58c; }
 .studentManage:global(.student-manage) :global(.push-foot){ flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; min-width: 0; }
-.studentManage:global(.student-manage) :global(.push-foot .tip){ flex: 1 1 auto; min-width: 0; white-space: normal; }
+.studentManage:global(.student-manage) :global(.push-foot .tip){ flex: 1 1 auto; min-width: 0; white-space: pre-line; }
 .studentManage:global(.student-manage) :global(.btn-main){ flex: 0 0 auto; min-width: 118px; white-space: nowrap; background: var(--coffee); color: #f7f1e6; border: 1px solid #47331d; border-radius: 4px; font-size: 12px; font-weight: 600; letter-spacing: 3px; text-indent: 3px; padding: 7px 24px; transition: filter .25s var(--ease), transform .15s var(--ease); }
 .studentManage:global(.student-manage) :global(.btn-main:hover){ filter: brightness(1.15); }
 .studentManage:global(.student-manage) :global(.btn-main:disabled){ filter: grayscale(.5); cursor: not-allowed; transform: none; }

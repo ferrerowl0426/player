@@ -821,3 +821,60 @@ psql -U postgres -d video_player -c "SELECT video_id, quality, status, video_url
 | 2026-10-01 | 新增腾讯云数据万象转码接入操作指南 |
 | 2026-10-03 | 播放器控制栏改为 上一P / 播放 / 下一P 布局；默认超管仅在无超管时创建且禁止删除；`prerequisites` 视频封面字段改用 `cover_url` 修复详情页 500；实现数据万象转码回调（真实报文解析 + 回调密钥校验 + `transcoded/` 公开地址） |
 | 2026-10-04 | 数据万象转码产物改为输出到源目录同级（`${InputPath}` + `${InputName}-720p/-1080p.${ext}`），修复工作流完成回调真实结构 `WorkflowExecution.Tasks[].ResultInfo.ObjectInfo[]` 解析，解决 COS 已生成转码文件但前端只显示原画的问题 |
+| 2026-10-28 | 分 P 公开/私密权限（后端 A–E 阶段）：`visibility` 字段与 `CONTENT_PRIVACY_MODE` 开关、课程公开性派生、前置/作业的私密资格校验、视频短期签名授权、`visibility_revocations` 撤销审计表。详见第 19 节 |
+| 2026-10-29 | 分 P 公开/私密权限（前端 F 阶段）：管理端曲目/知识点编辑页新增「公开/私密」切换按钮（分 P + 附件），报错提示带内容标题，修复合集封面叠层装饰误叠加、开关双重线框与高饱和配色问题 |
+
+---
+
+## 19. 分 P 公开 / 私密权限
+
+这是 M0–M9 之后新增的一套权限能力，围绕「单个 P（曲目 P / 知识点 P）可设为公开或私密」展开。核心口径：
+
+- **公开 / 私密作用于 P 级**，课程（单曲目 / 单知识点）的可见性由「是否存在公开 P」派生，不单独存储课程开关。
+- 合集（曲谱集 / 知识点集）本身无 `visibility` 字段，其可见性由「是否包含至少一个公开子项」派生。
+- 游客、学员只能看到公开内容；老师、教导主任可查看私密内容，但**不能把私密内容布置为作业或设为前置项**。
+
+### 19.1 数据模型与字段
+
+| 表 | 字段 | 说明 |
+|---|---|---|
+| `track_parts` / `knowledge_parts` | `visibility` | `public` / `private`，P 级开关 |
+| `track_points` / `knowledge_points` | `visibility` | 派生可见性（由公开 P 刷新），非独立开关 |
+| `attachments` | `visibility` | 附件级公开/私密 |
+| `visibility_revocations` | — | 审计表，记录某内容改私密时需撤销的对象存储 key 清单 |
+
+合集、前置关系、作业不新增独立 `visibility`，沿用派生口径。
+
+### 19.2 部署模式开关
+
+环境变量 `CONTENT_PRIVACY_MODE` 控制「新的私密写入」是否放行：
+
+| 值 | 行为 |
+|---|---|
+| `off`（默认） | 任何新的私密写入被拒绝；生产部署保持此值 |
+| `local-preview` | 仅非生产环境允许私密写入，用于本地联调 |
+| `enforced` | 强制模式，暂未开放 |
+
+本地 Docker 调试时 `.env` 设 `CONTENT_PRIVACY_MODE=local-preview` 且 `NODE_ENV=development`；生产 `/root/player/.env` **必须保持 `off` 且不设 `NODE_ENV=development`**，否则私密保护失效。
+
+### 19.3 关键后端实现
+
+| 文件 | 职责 |
+|---|---|
+| `content-visibility.js` | `normalizeStoredVisibility` / `refreshCourseVisibility`（派生刷新）、`lockCourse`（课程行锁） |
+| `content-object-access.js` | `canReadContentObject` / `canAssignContentObject`（后者用访客视角判定目标是否可布置/可作前置） |
+| `content-privacy-config.js` | `validatePrivacyConfiguration` / `assertPrivateWriteAllowed` / `findPrivatePartPrerequisiteConflicts` |
+| `playback-access.js` / `playback.routes.js` | `GET /api/playback/videos/:id/play-url`，私密视频签发 300s 短期签名 URL，fail-closed |
+| `revocation.js` | `recordVisibilityRevocations` 记录改私密需撤销的对象 key |
+| `prerequisites.routes.js` / `admin.routes.js` | 前置 / 作业布置的私密资格校验（409 回滚，报错带内容标题） |
+
+### 19.4 前端管理端入口
+
+- 曲目编辑页 `/admin/tracks`、知识点编辑页 `/admin/knowledge`：每个分 P 行、每个附件行右侧有「公开/私密」切换按钮；分 P 顶部有「全部公开 / 全部私密」批量操作，并实时提示课程派生状态。
+- 通用开关组件：`frontend/components/VisibilityToggle.js`。
+
+### 19.5 边界与待办
+
+- 云端桶（COS）目前仍是公开读，真正的匿名不可读需账号所有者在腾讯云控制台执行桶策略 / CDN 鉴权，见 `outputs/阶段E-云端访问控制落地方案.md`。
+- 已签发的短期 URL 在其 300s 有效期内、以及已下载到客户端的内容无法追回。
+- 无归属独立旧视频的布置策略尚未收紧（沿用「无宿主按公开」），正式发布前需审计。

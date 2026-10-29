@@ -1,3 +1,4 @@
+import { canReadContentObject } from './content-object-access.js';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { pool } from './db.js';
@@ -5,7 +6,8 @@ import { createDownloadUrl } from './storage.js';
 import { clearUserCookie, getUserCookieOptions, signUserToken } from './auth.js';
 
 const MINI_TOKEN_EXPIRES_IN_SECONDS = 15 * 24 * 60 * 60;
-import { requireMiniStudent, sendMiniError, sendMiniSuccess, serializeStudent } from './miniprogram.auth.js';
+import { requireMiniStudent, sendMiniError, sendMiniSuccess, serializeStudent, studentToViewer } from './miniprogram.auth.js';
+import { normalizeStoredVisibility, PRIVATE } from './content-visibility.js';
 import { issueMiniSts } from './miniprogram.sts.js';
 import {
   getHomeworkHistory,
@@ -100,11 +102,11 @@ miniprogramRouter.get('/homework/history', requireMiniStudent, asyncHandler(asyn
 }));
 
 miniprogramRouter.get('/tracks', requireMiniStudent, asyncHandler(async (req, res) => {
-  sendMiniSuccess(res, await listTracks(req.query));
+  sendMiniSuccess(res, await listTracks(req.query, studentToViewer(req.student)));
 }));
 
 miniprogramRouter.get('/tracks/collections/:id', requireMiniStudent, asyncHandler(async (req, res) => {
-  const detail = await getTrackCollectionDetail(req.params.id);
+  const detail = await getTrackCollectionDetail(req.params.id, studentToViewer(req.student));
   if (!detail) {
     sendMiniError(res, 404, 'NOT_FOUND', '曲谱集不存在或已删除');
     return;
@@ -113,7 +115,7 @@ miniprogramRouter.get('/tracks/collections/:id', requireMiniStudent, asyncHandle
 }));
 
 miniprogramRouter.get('/tracks/:id', requireMiniStudent, asyncHandler(async (req, res) => {
-  const detail = await getTrackDetail(req.params.id);
+  const detail = await getTrackDetail(req.params.id, studentToViewer(req.student));
   if (!detail) {
     sendMiniError(res, 404, 'NOT_FOUND', '曲目不存在或已删除');
     return;
@@ -122,11 +124,11 @@ miniprogramRouter.get('/tracks/:id', requireMiniStudent, asyncHandler(async (req
 }));
 
 miniprogramRouter.get('/knowledge', requireMiniStudent, asyncHandler(async (req, res) => {
-  sendMiniSuccess(res, await listKnowledge(req.query));
+  sendMiniSuccess(res, await listKnowledge(req.query, studentToViewer(req.student)));
 }));
 
 miniprogramRouter.get('/knowledge/collections/:id', requireMiniStudent, asyncHandler(async (req, res) => {
-  const detail = await getKnowledgeCollectionDetail(req.params.id);
+  const detail = await getKnowledgeCollectionDetail(req.params.id, studentToViewer(req.student));
   if (!detail) {
     sendMiniError(res, 404, 'NOT_FOUND', '知识点集不存在或已删除');
     return;
@@ -135,7 +137,7 @@ miniprogramRouter.get('/knowledge/collections/:id', requireMiniStudent, asyncHan
 }));
 
 miniprogramRouter.get('/knowledge/:id', requireMiniStudent, asyncHandler(async (req, res) => {
-  const detail = await getKnowledgeDetail(req.params.id);
+  const detail = await getKnowledgeDetail(req.params.id, studentToViewer(req.student));
   if (!detail) {
     sendMiniError(res, 404, 'NOT_FOUND', '知识点不存在或已删除');
     return;
@@ -148,7 +150,7 @@ miniprogramRouter.get('/library', requireMiniStudent, asyncHandler(async (req, r
 }));
 
 miniprogramRouter.get('/library/:id', requireMiniStudent, asyncHandler(async (req, res) => {
-  const detail = await getLibraryDetail(req.params.id);
+  const detail = await getLibraryDetail(req.params.id, studentToViewer(req.student));
   if (!detail) {
     sendMiniError(res, 404, 'NOT_FOUND', '资料不存在或已删除');
     return;
@@ -178,16 +180,34 @@ miniprogramRouter.get('/files/:fileId/signed-url', requireMiniStudent, asyncHand
 
   if (source === 'attachment') {
     const result = await pool.query(
-      'SELECT id, file_key, file_url FROM content_attachments WHERE id = $1',
+      'SELECT id, object_type, object_id, visibility, file_key, file_url FROM content_attachments WHERE id = $1',
       [fileId]
     );
     const row = result.rows[0];
+    if (row && (normalizeStoredVisibility(row.visibility) === PRIVATE || !(await canReadContentObject(pool, row.object_type, row.object_id, studentToViewer(req.student))))) {
+      sendMiniError(res, 404, 'NOT_FOUND', '文件不存在或已删除');
+      return;
+    }
     objectKey = row?.file_key || '';
     fileId = row?.id ? String(row.id) : fileId;
-  } else {
-    const detail = await getLibraryDetail(fileId);
+    // 附件入口原本只按 ID 查附件、不查父课程，存在“私密父课程附件可被签名下载”的旁路。
+    // 这里补上最小阻断：父课程为私密（或已删除）时拒绝签名，完整附件独立下载留待后续阶段。
+    if (row && (row.object_type === 'track_point' || row.object_type === 'knowledge_point')) {
+      const table = row.object_type === 'track_point' ? 'track_points' : 'knowledge_points';
+      const parent = await pool.query(`SELECT visibility FROM ${table} WHERE id = $1`, [row.object_id]);
+      if (!parent.rowCount || normalizeStoredVisibility(parent.rows[0].visibility) === PRIVATE) {
+        sendMiniError(res, 404, 'NOT_FOUND', '文件不存在或已删除');
+        return;
+      }
+    }
+  } else if (source === 'library') {
+    const detail = await getLibraryDetail(fileId, studentToViewer(req.student));
     objectKey = detail?.objectKey || '';
     fileId = detail?.id || fileId;
+  } else {
+    // 未知来源一律拒绝，严禁回退到 library（避免把本应失败/无权请求伪装成图书馆文件签名）。
+    sendMiniError(res, 400, 'INVALID_SOURCE', '不支持的文件来源');
+    return;
   }
 
   if (!objectKey) {

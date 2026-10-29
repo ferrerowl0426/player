@@ -35,12 +35,13 @@ import {
 } from '../../../lib/api.js';
 import { uploadVideoByMultipart } from '../../../components/uploadVideo.js';
 import CoverCropperModal from '../../../components/CoverCropperModal.js';
+import VisibilityToggle from '../../../components/VisibilityToggle.js';
 
 const PAGE_SIZE = 16;
 const DRAFT_KEY = 'admin:create:knowledge:draft';
 
 function makePart(partNo = '') {
-  return { id: null, part_no: partNo, title: '', duration: '', video: null, video_url: '' };
+  return { id: null, part_no: partNo, title: '', duration: '', video: null, video_url: '', visibility: 'public' };
 }
 
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv']);
@@ -102,6 +103,7 @@ function normalizeAttachment(item) {
     file_key: item.file_key || item.fileKey || '',
     file_type: item.file_type || item.fileType || item.file?.type || '',
     file_size: item.file_size || item.fileSize || item.file?.size || 0,
+    visibility: item.visibility || 'public',
     file: item.file || null
   };
 }
@@ -237,7 +239,7 @@ function AdminKnowledgeContent() {
       fetchPrerequisites({ objectType: 'knowledge_point', objectId: id }).catch(() => ({ data: [] }))
     ]);
     setEditingId(id);
-    setPoint({ ...result.data, parts: result.data.parts.map((part) => ({ ...part, video: null })), attachments: (result.data.attachments || []).map(normalizeAttachment) });
+    setPoint({ ...result.data, parts: result.data.parts.map((part) => ({ ...part, video: null, visibility: part.visibility || 'public' })), attachments: (result.data.attachments || []).map(normalizeAttachment) });
     setPrerequisites(prerequisiteResult.data || []);
     setLinkedResources(result.data.library_resources || []);
     setOriginalLinkedResourceIds((result.data.library_resources || []).filter(isDirectLibraryResource).map((item) => item.id));
@@ -547,7 +549,7 @@ function AdminKnowledgeContent() {
         attachments.push(attachment);
       }
     }
-    await saveKnowledgeAttachments({ pointId, attachments: attachments.map((item, index) => ({ fileName: item.file_name, fileUrl: item.file_url, fileKey: item.file_key, fileType: item.file_type, fileSize: item.file_size, sortOrder: index })) });
+    await saveKnowledgeAttachments({ pointId, attachments: attachments.map((item, index) => ({ fileName: item.file_name, fileUrl: item.file_url, fileKey: item.file_key, fileType: item.file_type, fileSize: item.file_size, sortOrder: index, visibility: item.visibility || 'public' })) });
   }
 
   function saveDraft() {
@@ -598,7 +600,7 @@ function AdminKnowledgeContent() {
       throw new Error(`请填写 P${index + 1} 的序号、标题并选择视频`);
     }
 
-    const created = await createKnowledgePartUpload({ pointId, partNo: Number(part.part_no), title: part.title, video: part.video });
+    const created = await createKnowledgePartUpload({ pointId, partNo: Number(part.part_no), title: part.title, visibility: part.visibility || 'public', video: part.video });
     const uploadInfo = created.data.video;
     let uploadedParts;
 
@@ -620,7 +622,7 @@ function AdminKnowledgeContent() {
     }
 
     await completeKnowledgePartUpload({ pointId, key: uploadInfo.key, uploadId: uploadInfo.uploadId, parts: uploadedParts });
-    await saveKnowledgePart({ pointId, partNo: Number(part.part_no), title: part.title, duration: Number(part.duration) || 0, videoKey: uploadInfo.key });
+    await saveKnowledgePart({ pointId, partNo: Number(part.part_no), title: part.title, duration: Number(part.duration) || 0, videoKey: uploadInfo.key, visibility: part.visibility || 'public' });
     updatePart(index, { video: null, video_url: uploadInfo.publicUrl, id: `uploaded-${Date.now()}` });
   }
 
@@ -652,7 +654,7 @@ function AdminKnowledgeContent() {
       await persistAttachments(pointId);
       await saveLinkedResources(pointId);
       for (const part of point.parts.filter((item) => item.id && !String(item.id).startsWith('uploaded-') && item.title)) {
-        await updateKnowledgePart({ pointId, partId: part.id, partNo: Number(part.part_no), title: part.title, duration: Number(part.duration) || 0 });
+        await updateKnowledgePart({ pointId, partId: part.id, partNo: Number(part.part_no), title: part.title, duration: Number(part.duration) || 0, visibility: part.visibility });
       }
 
       localStorage.removeItem(DRAFT_KEY);
@@ -952,11 +954,22 @@ function AdminKnowledgeContent() {
 
                 <section className="fsec full">
                   <div className="fsec-title">P 分段管理 <span className="note">逐个上传 P 视频 · 可增删 / 调顺序 · P 无需封面</span></div>
+                  <p className="vis-derive-hint">
+                    {(() => {
+                      const publicCount = point.parts.filter((p) => (p.visibility || 'public') !== 'private').length;
+                      if (point.parts.length === 0) return '尚无分 P，保存后知识点为私密，仅教导主任与老师可见。';
+                      if (publicCount === 0) return '所有分 P 均为私密，保存后知识点为私密，仅教导主任与老师可见。';
+                      return `当前 ${publicCount}/${point.parts.length} 个分 P 公开，知识点保存后为公开。`;
+                    })()}
+                  </p>
                   <div className="pmanage">
                     <div className="pmanage-head">
                       <span className="pm-t">P 分段</span>
                       <span className="pm-note">已添加 {point.parts.length} 段</span>
-                      <div className="pm-action-group"><label className="pm-add batch-video-btn">+批量导入视频<input type="file" accept="video/*" multiple hidden onChange={(event) => { handleBatchVideoFiles(event.target.files); event.target.value = ''; }} /></label>
+                      <div className="pm-action-group">
+                      <button type="button" className="pm-add pm-batch-vis" onClick={() => patchPoint({ parts: point.parts.map((p) => ({ ...p, visibility: 'public' })) })}>全部公开</button>
+                      <button type="button" className="pm-add pm-batch-vis" onClick={() => patchPoint({ parts: point.parts.map((p) => ({ ...p, visibility: 'private' })) })}>全部私密</button>
+                      <label className="pm-add batch-video-btn">+批量导入视频<input type="file" accept="video/*" multiple hidden onChange={(event) => { handleBatchVideoFiles(event.target.files); event.target.value = ''; }} /></label>
                     <button type="button" className="pm-add" onClick={() => setPoint({ ...point, parts: [...point.parts, makePart(nextPartNo)] })}>＋ 添加分段</button>
                     </div>
                   </div>
@@ -970,6 +983,7 @@ function AdminKnowledgeContent() {
                           </div>
                           <PartFileLabel part={part} onChange={(event) => updatePart(index, { video: event.target.files?.[0] || null })} />
                           <div className="pops">
+                            <VisibilityToggle visibility={part.visibility || 'public'} onChange={(next) => updatePart(index, { visibility: next })} />
                             <button type="button" data-op disabled={index === 0} onClick={() => movePart(index, -1)}>↑</button>
                             <button type="button" data-op disabled={index === point.parts.length - 1} onClick={() => movePart(index, 1)}>↓</button>
                             <button type="button" data-op onClick={() => removePart(part, index)}>×</button>
@@ -997,6 +1011,7 @@ function AdminKnowledgeContent() {
                           <span className="fico">{attachmentBadge(item.file_name)}</span>
                           <span><span className="fname">{item.file_name}</span><span className="fmeta">{formatSize(item.file_size)} · {item.file ? '待上传' : '已上传'}</span></span>
                           <div className="pops">
+                            <VisibilityToggle visibility={item.visibility || 'public'} onChange={(next) => setPoint((current) => ({ ...current, attachments: current.attachments.map((a, i) => i === index ? { ...a, visibility: next } : a) }))} />
                             <button type="button" data-op disabled={index === 0} onClick={() => updateAttachmentOrder(index, -1)}>↑</button>
                             <button type="button" data-op disabled={index === (point.attachments || []).length - 1} onClick={() => updateAttachmentOrder(index, 1)}>↓</button>
                             <button type="button" data-op onClick={() => removeAttachment(index)}>×</button>

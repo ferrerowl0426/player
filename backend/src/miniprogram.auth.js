@@ -96,9 +96,25 @@ export async function requireMiniStudent(req, res, next) {
       return;
     }
 
-    req.student = serializeStudent(student);
+    const serialized = serializeStudent(student);
+    // 停用学生一律拒绝访问：小程序只服务在读学员，停用账号视为无效会话。
+    if (serialized.status !== 'active') {
+      clearUserCookie(res);
+      sendMiniError(res, 403, 'ACCOUNT_DISABLED', '该账号已停用，无法使用小程序');
+      return;
+    }
+
+    req.student = serialized;
     next();
   } catch (error) {
     next(error);
   }
+}
+
+// 把已登录（且经 requireMiniStudent 校验为 active）的学生映射为一个内容 viewer。
+// 小程序不承载教师登录，viewer 永远只是“active 学生”，因此永远看不到私密内容；
+// 透传给各 service 仅用于一致地走内容可见性判断逻辑，绝不凭空提升权限。
+export function studentToViewer(student) {
+  if (!student) return undefined;
+  return { role: 'user', status: student.status === 'active' ? 'active' : 'disabled' };
 }

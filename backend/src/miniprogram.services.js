@@ -1,6 +1,65 @@
 import { pool } from './db.js';
 import { getKeyFromPublicUrl, normalizePublicUrl } from './storage.js';
 import { toPlaybackUrl } from './playback-url.js';
+import {
+  canViewPrivate,
+  normalizeStoredVisibility,
+  PUBLIC,
+  PRIVATE,
+  publicCoursePredicate
+} from './content-visibility.js';
+
+// 两类课程的表名/列名映射，用于复用“父课程公开且存在公开 P”的判定。
+const CONTENT_TYPES = {
+  track_point: {
+    courseTable: 'track_points',
+    partsTable: 'track_parts',
+    partParentCol: 'track_id',
+    collectionTable: 'track_collection_items',
+    collectionItemCol: 'track_id'
+  },
+  knowledge_point: {
+    courseTable: 'knowledge_points',
+    partsTable: 'knowledge_parts',
+    partParentCol: 'knowledge_point_id',
+    collectionTable: 'knowledge_collection_items',
+    collectionItemCol: 'knowledge_point_id'
+  }
+};
+
+// 曲谱集/知识点集本身无 visibility 字段：集合可见当且仅当“包含至少一个可见子项”。
+// 子项可见 = 子项本身 public 且存在至少一个公开 P（与父课程派生可见性口径一致）。
+function publicCollectionPredicate(contentType) {
+  const cfg = CONTENT_TYPES[contentType];
+  return `EXISTS (
+    SELECT 1 FROM ${cfg.collectionTable} ci
+    JOIN ${cfg.courseTable} i ON i.id = ci.${cfg.collectionItemCol}
+    WHERE ci.collection_id = c.id
+      AND COALESCE(NULLIF(i.visibility, ''), 'public') = 'public'
+      AND EXISTS (SELECT 1 FROM ${cfg.partsTable} pp WHERE pp.${cfg.partParentCol} = i.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')
+  )`;
+}
+
+// 单个关联课程（前置/相关课程）是否对“非私密查看者”可见：
+// 课程点需 public 且存在公开 P；集合需包含至少一个可见子项。
+function relatedCourseVisibleConditions() {
+  return `(
+    (l.object_type = 'track_point' AND tp.id IS NOT NULL
+       AND COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public'
+       AND EXISTS (SELECT 1 FROM track_parts pp WHERE pp.track_id = tp.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public'))
+    OR (l.object_type = 'knowledge_point' AND kp.id IS NOT NULL
+       AND COALESCE(NULLIF(kp.visibility, ''), 'public') = 'public'
+       AND EXISTS (SELECT 1 FROM knowledge_parts pp WHERE pp.knowledge_point_id = kp.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public'))
+    OR (l.object_type = 'track_collection' AND tc.id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM track_collection_items ci JOIN track_points ti ON ti.id = ci.track_id WHERE ci.collection_id = tc.id
+                   AND COALESCE(NULLIF(ti.visibility, ''), 'public') = 'public'
+                   AND EXISTS (SELECT 1 FROM track_parts pp WHERE pp.track_id = ti.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')))
+    OR (l.object_type = 'knowledge_collection' AND kc.id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM knowledge_collection_items ci JOIN knowledge_points ki ON ki.id = ci.knowledge_point_id WHERE ci.collection_id = kc.id
+                   AND COALESCE(NULLIF(ki.visibility, ''), 'public') = 'public'
+                   AND EXISTS (SELECT 1 FROM knowledge_parts pp WHERE pp.knowledge_point_id = ki.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')))
+  )`;
+}
 
 function toInt(value, fallback = 1) {
   const number = Number(value);
@@ -68,11 +127,12 @@ function assignmentTarget(row) {
 }
 
 function serializeAssignment(row) {
+  const targetPrivate = Boolean(row.target_private);
   return {
     id: String(row.id),
     type: row.object_type || 'video',
-    title: row.title || row.assigned_object_title || row.assigned_video_title || '已删除内容',
-    coverUrl: normalizePublicUrl(row.cover_url || ''),
+    title: targetPrivate ? ADJUSTED_TITLE : (row.title || row.assigned_object_title || row.assigned_video_title || '已删除内容'),
+    coverUrl: targetPrivate ? '' : normalizePublicUrl(row.cover_url || ''),
     partId: row.part_id ? String(row.part_id) : '',
     partNo: row.part_no || null,
     teacherName: row.teacher_name || '',
@@ -80,7 +140,7 @@ function serializeAssignment(row) {
     dateText: formatDateText(row.created_at),
     deleted: Boolean(row.is_deleted),
     deleteReason: row.delete_reason || '',
-    target: assignmentTarget(row)
+    target: targetPrivate ? { type: row.object_type || 'video', id: '', partId: '', page: '' } : assignmentTarget(row)
   };
 }
 
@@ -105,14 +165,37 @@ function assignmentJoinsSql() {
           LEFT JOIN admins a ON a.id = ua.assigned_by_admin_id`;
 }
 
+// 作业目标当前是否“私密不可见”。私密目标对学生脱敏（标题“教学内容已调整”，
+// 不下发封面/可播放 target）。语义与 content-object-access.js 一致。
+function assignmentTargetPrivateSql() {
+  const coursePublic = (table, parts, parent) =>
+    `(COALESCE(NULLIF(${table}.visibility, ''), 'public') = 'public' AND EXISTS (SELECT 1 FROM ${parts} WHERE ${parts}.${parent} = ${table}.id AND COALESCE(NULLIF(${parts}.visibility, ''), 'public') = 'public'))`;
+  return `CASE COALESCE(ua.object_type, 'video')
+    WHEN 'message' THEN FALSE
+    WHEN 'video' THEN NOT (v.id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM track_parts x JOIN track_points xc ON xc.id = x.track_id WHERE x.video_id = v.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')
+        UNION ALL SELECT 1 FROM knowledge_parts x JOIN knowledge_points xc ON xc.id = x.knowledge_point_id WHERE x.video_id = v.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')))
+    WHEN 'track_point' THEN NOT (tp.id IS NOT NULL AND ${coursePublic('tp', 'track_parts', 'track_id')})
+    WHEN 'knowledge_point' THEN NOT (kp.id IS NOT NULL AND ${coursePublic('kp', 'knowledge_parts', 'knowledge_point_id')})
+    WHEN 'track_collection' THEN NOT (tc.id IS NOT NULL AND EXISTS (SELECT 1 FROM track_collection_items ci JOIN track_points cc ON cc.id = ci.track_id WHERE ci.collection_id = tc.id AND ${coursePublic('cc', 'track_parts', 'track_id')}))
+    WHEN 'knowledge_collection' THEN NOT (kc.id IS NOT NULL AND EXISTS (SELECT 1 FROM knowledge_collection_items ci JOIN knowledge_points cc ON cc.id = ci.knowledge_point_id WHERE ci.collection_id = kc.id AND ${coursePublic('cc', 'knowledge_parts', 'knowledge_point_id')}))
+    WHEN 'track_part' THEN NOT (tpart.id IS NOT NULL AND COALESCE(NULLIF(tpart.visibility, ''), 'public') = 'public' AND ${coursePublic('parent_tp', 'track_parts', 'track_id')})
+    WHEN 'knowledge_part' THEN NOT (kpart.id IS NOT NULL AND COALESCE(NULLIF(kpart.visibility, ''), 'public') = 'public' AND ${coursePublic('parent_kp', 'knowledge_parts', 'knowledge_point_id')})
+    ELSE TRUE
+  END`;
+}
+
+const ADJUSTED_TITLE = '教学内容已调整，请联系老师';
+
 export async function getTodayHomework(student) {
   const result = await pool.query(
     `SELECT ua.*,
-            ${assignmentTitleSql()} AS title,
-            ${assignmentCoverSql()} AS cover_url,
+            CASE WHEN ${assignmentTargetPrivateSql()} THEN '${ADJUSTED_TITLE}' ELSE ${assignmentTitleSql()} END AS title,
+            CASE WHEN ${assignmentTargetPrivateSql()} THEN '' ELSE ${assignmentCoverSql()} END AS cover_url,
             COALESCE(tpart.part_no, kpart.part_no) AS part_no,
             parent_tp.id AS parent_track_id,
             parent_kp.id AS parent_knowledge_id,
+            ${assignmentTargetPrivateSql()} AS target_private,
             COALESCE(a.nickname, a.username, a.account, '') AS teacher_name
        FROM user_assignments ua
        ${assignmentJoinsSql()}
@@ -175,11 +258,12 @@ export async function getHomeworkHistory(student, { page = 1, pageSize = 20 } = 
   const operationIds = operations.rows.map((row) => row.operation_id);
   const rowsResult = await pool.query(
     `SELECT ua.*,
-            ${assignmentTitleSql()} AS title,
-            ${assignmentCoverSql()} AS cover_url,
+            CASE WHEN ${assignmentTargetPrivateSql()} THEN '${ADJUSTED_TITLE}' ELSE ${assignmentTitleSql()} END AS title,
+            CASE WHEN ${assignmentTargetPrivateSql()} THEN '' ELSE ${assignmentCoverSql()} END AS cover_url,
             COALESCE(tpart.part_no, kpart.part_no) AS part_no,
             parent_tp.id AS parent_track_id,
             parent_kp.id AS parent_knowledge_id,
+            ${assignmentTargetPrivateSql()} AS target_private,
             COALESCE(a.nickname, a.username, a.account, '') AS teacher_name
        FROM user_assignments ua
        ${assignmentJoinsSql()}
@@ -227,35 +311,45 @@ function resolveSort(sort = '') {
   }
 }
 
-async function listContent({ table, collectionTable, kind, keyword = '', page = 1, pageSize = 20, sort = 'updated_desc' }) {
+async function listContent({ table, collectionTable, kind, contentType, keyword = '', page = 1, pageSize = 20, sort = 'updated_desc', canView = true }) {
   const safePage = toInt(page, 1);
   const safePageSize = Math.min(toInt(pageSize, 20), 50);
   const offset = (safePage - 1) * safePageSize;
   const order = resolveSort(sort);
   const params = [];
-  let where = '';
+  const conditions = [];
   if (keyword) {
     params.push(`%${keyword}%`);
-    where = `WHERE name ILIKE $${params.length}`;
+    conditions.push(`c.name ILIKE $${params.length}`);
   }
+  // 非私密查看者（学生/游客）：课程点需父 public 且存在公开 P；集合需含至少一个可见子项。
+  if (!canView) {
+    conditions.push(collectionTable ? publicCollectionPredicate(contentType) : publicCoursePredicate(contentType));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const totalResult = await pool.query(`SELECT COUNT(*)::int AS total FROM ${table} ${where}`, params);
+  const totalResult = await pool.query(`SELECT COUNT(*)::int AS total FROM ${table} c ${where}`, params);
   params.push(safePageSize, offset);
   const result = await pool.query(
     `SELECT id, name, cover, description, created_at, updated_at
-       FROM ${table}
+       FROM ${table} c
        ${where}
       ORDER BY ${order.column} ${order.order}, id DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
 
-  const countColumn = kind === 'track_collection' ? 'track_id' : 'knowledge_point_id';
   const collectionIds = result.rows.map((row) => row.id);
   let countMap = new Map();
   if (collectionTable && collectionIds.length > 0) {
+    // 统计仅计入对当前查看者可见的子项（子项本身 public）。
+    const cfg = CONTENT_TYPES[contentType];
     const countResult = await pool.query(
-      `SELECT collection_id, COUNT(${countColumn})::int AS count FROM ${collectionTable} WHERE collection_id = ANY($1::int[]) GROUP BY collection_id`,
+      `SELECT ci.collection_id, COUNT(CASE WHEN ${canView ? 'TRUE' : publicCoursePredicate(contentType).replaceAll('c.', 'i.')} THEN ci.collection_id END)::int AS count
+         FROM ${collectionTable} ci
+         JOIN ${cfg.courseTable} i ON i.id = ci.${cfg.collectionItemCol}
+        WHERE ci.collection_id = ANY($1::int[])
+        GROUP BY ci.collection_id`,
       [collectionIds]
     );
     countMap = new Map(countResult.rows.map((row) => [row.collection_id, row.count]));
@@ -277,25 +371,40 @@ async function listContent({ table, collectionTable, kind, keyword = '', page = 
   };
 }
 
-export async function listTracks(query) {
+export async function listTracks(query, viewer) {
+  const canView = canViewPrivate(viewer);
   const type = query.type || 'track_point';
   if (type === 'track_collection') {
-    return listContent({ table: 'track_collections', collectionTable: 'track_collection_items', kind: 'track_collection', ...query });
+    return listContent({ ...query, table: 'track_collections', collectionTable: 'track_collection_items', kind: 'track_collection', contentType: 'track_point', canView });
   }
-  return listContent({ table: 'track_points', collectionTable: '', kind: 'track_point', ...query });
+  return listContent({ ...query, table: 'track_points', collectionTable: '', kind: 'track_point', contentType: 'track_point', canView });
 }
 
-export async function listKnowledge(query) {
+export async function listKnowledge(query, viewer) {
+  const canView = canViewPrivate(viewer);
   const type = query.type || 'knowledge_point';
   if (type === 'knowledge_collection') {
-    return listContent({ table: 'knowledge_collections', collectionTable: 'knowledge_collection_items', kind: 'knowledge_collection', ...query });
+    return listContent({ ...query, table: 'knowledge_collections', collectionTable: 'knowledge_collection_items', kind: 'knowledge_collection', contentType: 'knowledge_point', canView });
   }
-  return listContent({ table: 'knowledge_points', collectionTable: '', kind: 'knowledge_point', ...query });
+  return listContent({ ...query, table: 'knowledge_points', collectionTable: '', kind: 'knowledge_point', contentType: 'knowledge_point', canView });
 }
 
-function formatRendition(row = {}) {
+function formatRendition(row = {}, options = {}) {
   const quality = String(row.quality || 'source');
   const videoUrl = normalizePublicUrl(row.video_url || '');
+  if (options.private) {
+    // 私密清晰度：不下发永久地址，改为授权端点占位（阶段 E）。
+    return {
+      quality,
+      label: quality === 'source' ? '原画' : quality.toUpperCase(),
+      videoUrl: '',
+      playUrl: '',
+      authorizeEndpoint: `/api/playback/videos/${row.video_id || ''}/play-url?source=rendition&quality=${encodeURIComponent(quality)}`,
+      fileSize: Number(row.file_size || 0),
+      status: row.status || '',
+      updatedAt: row.updated_at || ''
+    };
+  }
   return {
     quality,
     label: quality === 'source' ? '原画' : quality.toUpperCase(),
@@ -308,12 +417,15 @@ function formatRendition(row = {}) {
   };
 }
 
-async function getParts(table, parentColumn, parentId) {
+async function getParts(table, parentColumn, parentId, canView = true) {
+  const visibilityFilter = canView
+    ? ''
+    : `AND COALESCE(NULLIF(p.visibility, ''), 'public') = 'public'`;
   const result = await pool.query(
-    `SELECT p.id, p.part_no, p.title, p.duration, p.video_id, v.video_url, v.cover_url
+    `SELECT p.id, p.part_no, p.title, p.duration, p.video_id, p.visibility, v.video_url, v.cover_url
        FROM ${table} p
        LEFT JOIN videos v ON v.id = p.video_id
-      WHERE p.${parentColumn} = $1
+      WHERE p.${parentColumn} = $1 ${visibilityFilter}
       ORDER BY p.part_no ASC`,
     [parentId]
   );
@@ -341,10 +453,30 @@ async function getParts(table, parentColumn, parentId) {
 
   return result.rows.map((row) => {
     const sourceUrl = normalizePublicUrl(row.video_url || '');
+    // 该 P 是否私密：私密 P 的视频不下发永久地址（教师可看，但需通过授权端点取短期签名）。
+    const partPrivate = normalizeStoredVisibility(row.visibility) === PRIVATE;
     const renditions = renditionsByVideoId.get(row.video_id) || [];
     if (sourceUrl && !renditions.some((item) => item.quality === 'source')) {
       // 兼容式新增：source 补项也提供 CDN 播放地址；原 videoUrl 保留 COS 原值。
-      renditions.unshift({ quality: 'source', label: '原画', videoUrl: sourceUrl, playUrl: toPlaybackUrl(sourceUrl), fileSize: 0, status: 'ready', updatedAt: '' });
+      renditions.unshift(partPrivate
+        ? { quality: 'source', label: '原画', videoUrl: '', playUrl: '', authorizeEndpoint: `/api/playback/videos/${row.video_id}/play-url?source=video`, fileSize: 0, status: 'ready', updatedAt: '' }
+        : { quality: 'source', label: '原画', videoUrl: sourceUrl, playUrl: toPlaybackUrl(sourceUrl), fileSize: 0, status: 'ready', updatedAt: '' });
+    }
+
+    if (partPrivate) {
+      return {
+        id: String(row.id),
+        partNo: row.part_no,
+        title: row.title,
+        duration: row.duration,
+        durationText: durationText(row.duration),
+        videoId: row.video_id ? String(row.video_id) : '',
+        videoUrl: '',
+        playUrl: '',
+        authorizeEndpoint: `/api/playback/videos/${row.video_id}/play-url?source=video`,
+        coverUrl: normalizePublicUrl(row.cover_url || ''),
+        renditions: renditionsByVideoId.get(row.video_id)?.map((r) => formatRendition(r, { private: true })) || []
+      };
     }
 
     return {
@@ -363,14 +495,17 @@ async function getParts(table, parentColumn, parentId) {
   });
 }
 
-export async function getTrackDetail(id) {
-  const result = await pool.query('SELECT id, name, cover, description, created_at, updated_at FROM track_points WHERE id = $1', [id]);
+export async function getTrackDetail(id, viewer) {
+  const canView = canViewPrivate(viewer);
+  const result = await pool.query(`SELECT id, name, cover, description, created_at, updated_at, visibility FROM track_points WHERE id = $1 ${canView ? '' : `AND ${publicCoursePredicate('track_point').replaceAll('c.', 'track_points.')}`}`, [id]);
   const row = result.rows[0];
   if (!row) return null;
+  // 私密曲目对非授权查看者不可见（与列表一致：隐藏而非暴露）。
+  if (!canView && normalizeStoredVisibility(row.visibility) === PRIVATE) return null;
   const [attachments, directResources, prerequisites] = await Promise.all([
     getAttachments('track_point', row.id),
     getLinkedLibraryResources('track_point', row.id),
-    getPrerequisites('track_point', row.id)
+    getPrerequisites('track_point', row.id, canView)
   ]);
 
   return {
@@ -379,21 +514,24 @@ export async function getTrackDetail(id) {
     title: row.name,
     coverUrl: normalizePublicUrl(row.cover || ''),
     description: row.description || '',
-    parts: await getParts('track_parts', 'track_id', row.id),
+    parts: await getParts('track_parts', 'track_id', row.id, canView),
     attachments,
     libraryResources: directResources,
     prerequisites
   };
 }
 
-export async function getKnowledgeDetail(id) {
-  const result = await pool.query('SELECT id, name, cover, description, created_at, updated_at FROM knowledge_points WHERE id = $1', [id]);
+export async function getKnowledgeDetail(id, viewer) {
+  const canView = canViewPrivate(viewer);
+  const result = await pool.query(`SELECT id, name, cover, description, created_at, updated_at, visibility FROM knowledge_points WHERE id = $1 ${canView ? '' : `AND ${publicCoursePredicate('knowledge_point').replaceAll('c.', 'knowledge_points.')}`}`, [id]);
   const row = result.rows[0];
   if (!row) return null;
+  // 私密知识点对非授权查看者不可见（与列表一致：隐藏而非暴露）。
+  if (!canView && normalizeStoredVisibility(row.visibility) === PRIVATE) return null;
   const [attachments, directResources, prerequisites] = await Promise.all([
     getAttachments('knowledge_point', row.id),
     getLinkedLibraryResources('knowledge_point', row.id),
-    getPrerequisites('knowledge_point', row.id)
+    getPrerequisites('knowledge_point', row.id, canView)
   ]);
 
   return {
@@ -402,26 +540,33 @@ export async function getKnowledgeDetail(id) {
     title: row.name,
     coverUrl: normalizePublicUrl(row.cover || ''),
     description: row.description || '',
-    parts: await getParts('knowledge_parts', 'knowledge_point_id', row.id),
+    parts: await getParts('knowledge_parts', 'knowledge_point_id', row.id, canView),
     attachments,
     libraryResources: directResources,
     prerequisites
   };
 }
 
-async function getCollectionDetail({ id, table, itemsTable, itemTable, itemColumn, type, itemType }) {
+async function getCollectionDetail({ id, table, itemsTable, itemTable, itemColumn, type, itemType, partsTable, canView = true }) {
   const result = await pool.query(`SELECT id, name, cover, description, created_at, updated_at FROM ${table} WHERE id = $1`, [id]);
   const row = result.rows[0];
   if (!row) return null;
 
+  // 非私密查看者：仅可见“子项本身 public 且存在公开 P”的子项；无可见子项则整体隐藏。
+  const itemVisibilityFilter = canView
+    ? ''
+    : `AND COALESCE(NULLIF(i.visibility, ''), 'public') = 'public' AND EXISTS (SELECT 1 FROM ${partsTable} pp WHERE pp.${itemColumn} = i.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')`;
   const items = await pool.query(
     `SELECT i.id, i.name, i.cover, i.description, i.updated_at
        FROM ${itemsTable} ci
        JOIN ${itemTable} i ON i.id = ci.${itemColumn}
-      WHERE ci.collection_id = $1
+      WHERE ci.collection_id = $1 ${itemVisibilityFilter}
       ORDER BY ci.sort_order ASC, ci.created_at ASC, i.id ASC`,
     [id]
   );
+
+  // 合集本身无 visibility：对非私密查看者，若没有任何可见子项则等同于“私密”，整体不可见。
+  if (!canView && items.rowCount === 0) return null;
 
   const resources = await getLinkedLibraryResources(type, row.id);
 
@@ -444,12 +589,14 @@ async function getCollectionDetail({ id, table, itemsTable, itemTable, itemColum
   };
 }
 
-export function getTrackCollectionDetail(id) {
-  return getCollectionDetail({ id, table: 'track_collections', itemsTable: 'track_collection_items', itemTable: 'track_points', itemColumn: 'track_id', type: 'track_collection', itemType: 'track_point' });
+export function getTrackCollectionDetail(id, viewer) {
+  const canView = canViewPrivate(viewer);
+  return getCollectionDetail({ id, table: 'track_collections', itemsTable: 'track_collection_items', itemTable: 'track_points', itemColumn: 'track_id', type: 'track_collection', itemType: 'track_point', partsTable: 'track_parts', canView });
 }
 
-export function getKnowledgeCollectionDetail(id) {
-  return getCollectionDetail({ id, table: 'knowledge_collections', itemsTable: 'knowledge_collection_items', itemTable: 'knowledge_points', itemColumn: 'knowledge_point_id', type: 'knowledge_collection', itemType: 'knowledge_point' });
+export function getKnowledgeCollectionDetail(id, viewer) {
+  const canView = canViewPrivate(viewer);
+  return getCollectionDetail({ id, table: 'knowledge_collections', itemsTable: 'knowledge_collection_items', itemTable: 'knowledge_points', itemColumn: 'knowledge_point_id', type: 'knowledge_collection', itemType: 'knowledge_point', partsTable: 'knowledge_parts', canView });
 }
 
 export async function listLibrary({ keyword = '', page = 1, pageSize = 20 } = {}) {
@@ -518,7 +665,7 @@ async function getAttachments(objectType, objectId) {
   const result = await pool.query(
     `SELECT id, file_name, file_url, file_key, file_type, file_size, sort_order, created_at
        FROM content_attachments
-      WHERE object_type = $1 AND object_id = $2
+      WHERE object_type = $1 AND object_id = $2 AND visibility = 'public'
       ORDER BY sort_order ASC, created_at ASC, id ASC`,
     [objectType, objectId]
   );
@@ -537,7 +684,7 @@ async function getLinkedLibraryResources(objectType, objectId) {
   return result.rows.map(serializeLibraryResource);
 }
 
-async function getPrerequisites(objectType, objectId) {
+async function getPrerequisites(objectType, objectId, canView = true) {
   const result = await pool.query(
     `SELECT p.prerequisite_type,
             p.prerequisite_id,
@@ -549,8 +696,9 @@ async function getPrerequisites(objectType, objectId) {
        LEFT JOIN track_collections tc ON p.prerequisite_type = 'track_collection' AND tc.id = p.prerequisite_id
        LEFT JOIN knowledge_collections kc ON p.prerequisite_type = 'knowledge_collection' AND kc.id = p.prerequisite_id
       WHERE p.object_type = $1 AND p.object_id = $2
+        AND ($3::boolean = TRUE OR ${relatedCourseVisibleConditions()})
       ORDER BY p.prerequisite_type ASC, p.prerequisite_id ASC`,
-    [objectType, objectId]
+    [objectType, objectId, canView]
   );
   return result.rows
     .filter((row) => row.title)
@@ -574,7 +722,7 @@ function mergeResources(...groups) {
   return [...map.values()];
 }
 
-async function getLibraryRelatedCourses(resourceId) {
+async function getLibraryRelatedCourses(resourceId, canView = true) {
   const result = await pool.query(
     `SELECT l.object_type,
             l.object_id,
@@ -586,8 +734,9 @@ async function getLibraryRelatedCourses(resourceId) {
        LEFT JOIN knowledge_points kp ON l.object_type = 'knowledge_point' AND kp.id = l.object_id
        LEFT JOIN knowledge_collections kc ON l.object_type = 'knowledge_collection' AND kc.id = l.object_id
       WHERE l.library_resource_id = $1
+        AND ($2::boolean = TRUE OR ${relatedCourseVisibleConditions()})
       ORDER BY l.object_type ASC, l.object_id ASC`,
-    [resourceId]
+    [resourceId, canView]
   );
 
   return result.rows
@@ -600,12 +749,13 @@ async function getLibraryRelatedCourses(resourceId) {
     }));
 }
 
-export async function getLibraryDetail(id) {
+export async function getLibraryDetail(id, viewer) {
+  const canView = canViewPrivate(viewer);
   const result = await pool.query(
     'SELECT id, title, cover, file_url, file_size, file_type, created_at, updated_at FROM library_resources WHERE id = $1',
     [id]
   );
   const row = result.rows[0];
   if (!row) return null;
-  return { ...serializeLibraryResource(row), relatedCourses: await getLibraryRelatedCourses(row.id) };
+  return { ...serializeLibraryResource(row), relatedCourses: await getLibraryRelatedCourses(row.id, canView) };
 }

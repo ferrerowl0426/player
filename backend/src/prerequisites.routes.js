@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { pool } from './db.js';
-import { requireSuperAdmin } from './auth.js';
+import { requireSuperAdmin, optionalContentViewer } from './auth.js';
+import { canReadContentObject, canAssignContentObject } from './content-object-access.js';
+import { lockCourse } from './content-visibility.js';
 
 const prerequisiteRouter = Router();
 const OBJECT_TYPES = new Set(['track_point', 'track_collection', 'knowledge_point', 'knowledge_collection', 'track_part', 'knowledge_part', 'video']);
@@ -28,10 +30,10 @@ async function findObject(type, id) {
     return pool.query('SELECT id, name AS title, cover FROM knowledge_collections WHERE id = $1', [id]);
   }
   if (type === 'track_part') {
-    return pool.query('SELECT id, title, track_id AS parent_id FROM track_parts WHERE id = $1', [id]);
+    return pool.query('SELECT tp.id, CONCAT(t.name, \'-\', tp.title) AS title, tp.track_id AS parent_id FROM track_parts tp JOIN track_points t ON t.id = tp.track_id WHERE tp.id = $1', [id]);
   }
   if (type === 'knowledge_part') {
-    return pool.query('SELECT id, title, knowledge_point_id AS parent_id FROM knowledge_parts WHERE id = $1', [id]);
+    return pool.query('SELECT kp.id, CONCAT(kpt.name, \'-\', kp.title) AS title, kp.knowledge_point_id AS parent_id FROM knowledge_parts kp JOIN knowledge_points kpt ON kpt.id = kp.knowledge_point_id WHERE kp.id = $1', [id]);
   }
   if (type === 'video') {
     return pool.query('SELECT id, title, cover_url AS cover FROM videos WHERE id = $1', [id]);
@@ -45,7 +47,40 @@ async function ensureObjectExists(type, id) {
   return result.rowCount > 0;
 }
 
-async function listPrerequisites(objectType, objectId) {
+// 在事务内锁前置目标，保证与“改私密/删 P”使用相同锁顺序，避免“检查时公开、提交时私密”。
+//   - 课程类型：锁课程行（与 lockCourse 一致）。
+//   - P 类型：锁父课程行 + P 行。
+//   - video/合集：锁对应行（改私密对 video 经由父课程锁间接串行化）。
+async function lockPrerequisiteTarget(client, type, id) {
+  if (type === 'track_point' || type === 'knowledge_point') {
+    await lockCourse(client, type, id);
+    return;
+  }
+  if (type === 'track_part') {
+    const r = await client.query('SELECT track_id FROM track_parts WHERE id = $1 FOR UPDATE', [id]);
+    if (r.rowCount && r.rows[0].track_id) await lockCourse(client, 'track_point', r.rows[0].track_id);
+    return;
+  }
+  if (type === 'knowledge_part') {
+    const r = await client.query('SELECT knowledge_point_id FROM knowledge_parts WHERE id = $1 FOR UPDATE', [id]);
+    if (r.rowCount && r.rows[0].knowledge_point_id) await lockCourse(client, 'knowledge_point', r.rows[0].knowledge_point_id);
+    return;
+  }
+  if (type === 'track_collection') {
+    await client.query('SELECT id FROM track_collections WHERE id = $1 FOR UPDATE', [id]);
+    return;
+  }
+  if (type === 'knowledge_collection') {
+    await client.query('SELECT id FROM knowledge_collections WHERE id = $1 FOR UPDATE', [id]);
+    return;
+  }
+  if (type === 'video') {
+    await client.query('SELECT id FROM videos WHERE id = $1 FOR UPDATE', [id]);
+    return;
+  }
+}
+
+async function listPrerequisites(objectType, objectId, viewer) {
   const result = await pool.query(
     `SELECT prerequisite_type, prerequisite_id, created_at
      FROM prerequisites
@@ -56,6 +91,7 @@ async function listPrerequisites(objectType, objectId) {
 
   const rows = [];
   for (const row of result.rows) {
+    if (!(await canReadContentObject(pool, row.prerequisite_type, row.prerequisite_id, viewer))) continue;
     const objectResult = await findObject(row.prerequisite_type, row.prerequisite_id);
     rows.push({
       objectType: row.prerequisite_type,
@@ -69,7 +105,7 @@ async function listPrerequisites(objectType, objectId) {
 }
 
 // GET /api/prerequisites?objectType=track_point&objectId=1
-prerequisiteRouter.get('/', async (req, res, next) => {
+prerequisiteRouter.get('/', optionalContentViewer, async (req, res, next) => {
   try {
     const objectType = normalizeType(req.query.objectType);
     const objectId = normalizeId(req.query.objectId);
@@ -84,7 +120,8 @@ prerequisiteRouter.get('/', async (req, res, next) => {
       return;
     }
 
-    const prerequisites = await listPrerequisites(objectType, objectId);
+    if (!(await canReadContentObject(pool, objectType, objectId, req.contentViewer))) return res.status(404).json({ message: '对象不存在' });
+    const prerequisites = await listPrerequisites(objectType, objectId, req.contentViewer);
     res.json({ data: prerequisites });
   } catch (error) {
     next(error);
@@ -135,6 +172,18 @@ prerequisiteRouter.put('/', requireSuperAdmin, async (req, res, next) => {
     }
 
     await client.query('BEGIN');
+    // 锁并复核每个前置目标：锁顺序与“改私密/删 P”一致，避免并发产生私密前置。
+    for (const item of normalized) {
+      await lockPrerequisiteTarget(client, item.prerequisiteType, item.prerequisiteId);
+      if (!(await canAssignContentObject(client, item.prerequisiteType, item.prerequisiteId))) {
+        await client.query('ROLLBACK');
+        // 带上私密内容标题，方便老师定位是哪一项不可用作前置。
+        const titleResult = await findObject(item.prerequisiteType, item.prerequisiteId);
+        const title = titleResult.rows[0]?.title || `${item.prerequisiteType} ${item.prerequisiteId}`;
+        res.status(409).json({ message: `前置项不可为私密内容：\n${title}` });
+        return;
+      }
+    }
     await client.query('DELETE FROM prerequisites WHERE object_type = $1 AND object_id = $2', [objectType, objectId]);
     for (const item of normalized) {
       await client.query(
@@ -145,10 +194,10 @@ prerequisiteRouter.put('/', requireSuperAdmin, async (req, res, next) => {
     }
     await client.query('COMMIT');
 
-    const data = await listPrerequisites(objectType, objectId);
+    const data = await listPrerequisites(objectType, objectId, { role: 'super_admin', status: 'active' });
     res.json({ data });
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     next(error);
   } finally {
     client.release();

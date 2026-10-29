@@ -1,4 +1,6 @@
 import pg from 'pg';
+import { assertVisibilitySchema } from './visibility-schema.js';
+import { validatePrivacyConfiguration } from './content-privacy-config.js';
 import { config } from './config.js';
 
 const DEFAULT_PASSWORD_HASH = '$2b$10$Wg6YkgUtnWlAtaQrv/q55eYBXt8RR8HxO3iYxFbJW8hG7eAzITGwu';
@@ -29,6 +31,8 @@ async function seedInitialAdmin() {
 }
 
 export async function ensureAppSchema() {
+  validatePrivacyConfiguration();
+  await assertVisibilitySchema(pool, { allowEmpty: true });
   await pool.query(`
     CREATE TABLE IF NOT EXISTS videos (
       id SERIAL PRIMARY KEY,
@@ -176,6 +180,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS track_points (
       id SERIAL PRIMARY KEY,
+      visibility TEXT NOT NULL DEFAULT 'private' CONSTRAINT track_points_visibility_check CHECK (visibility IN ('public', 'private')),
       name VARCHAR(120) NOT NULL,
       cover TEXT NOT NULL DEFAULT '',
       description TEXT NOT NULL DEFAULT '',
@@ -202,6 +207,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS track_parts (
       id SERIAL PRIMARY KEY,
+      visibility TEXT NOT NULL DEFAULT 'public' CONSTRAINT track_parts_visibility_check CHECK (visibility IN ('public', 'private')),
       track_id INTEGER NOT NULL REFERENCES track_points(id) ON DELETE CASCADE,
       part_no INTEGER NOT NULL DEFAULT 1,
       video_id INTEGER REFERENCES videos(id) ON DELETE SET NULL,
@@ -243,6 +249,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS knowledge_points (
       id SERIAL PRIMARY KEY,
+      visibility TEXT NOT NULL DEFAULT 'private' CONSTRAINT knowledge_points_visibility_check CHECK (visibility IN ('public', 'private')),
       name VARCHAR(120) NOT NULL,
       cover TEXT NOT NULL DEFAULT '',
       description TEXT NOT NULL DEFAULT '',
@@ -269,6 +276,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS knowledge_parts (
       id SERIAL PRIMARY KEY,
+      visibility TEXT NOT NULL DEFAULT 'public' CONSTRAINT knowledge_parts_visibility_check CHECK (visibility IN ('public', 'private')),
       knowledge_point_id INTEGER NOT NULL REFERENCES knowledge_points(id) ON DELETE CASCADE,
       part_no INTEGER NOT NULL DEFAULT 1,
       video_id INTEGER REFERENCES videos(id) ON DELETE SET NULL,
@@ -310,6 +318,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS content_attachments (
       id SERIAL PRIMARY KEY,
+      visibility TEXT NOT NULL DEFAULT 'public' CONSTRAINT content_attachments_visibility_check CHECK (visibility IN ('public', 'private')),
       object_type VARCHAR(30) NOT NULL,
       object_id INTEGER NOT NULL,
       file_name TEXT NOT NULL,
@@ -326,6 +335,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS video_attachments (
       id SERIAL PRIMARY KEY,
+      visibility TEXT NOT NULL DEFAULT 'public' CONSTRAINT video_attachments_visibility_check CHECK (visibility IN ('public', 'private')),
       video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
       file_name TEXT NOT NULL,
       file_url TEXT NOT NULL,
@@ -397,6 +407,25 @@ export async function ensureAppSchema() {
   await pool.query('CREATE INDEX IF NOT EXISTS idx_deletion_logs_object ON deletion_logs (object_type, object_id)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_deletion_logs_created_at ON deletion_logs (created_at DESC)');
 
+  // 改私密/删最后公开 P 时，需要撤销已公开的旧直链（CDN 缓存 + COS 匿名读）。
+  // 本表记录待撤销的对象 key 清单，供账号所有者在腾讯云控制台/脚本执行 purge 与授权回收，
+  // 并在处理后标记 status=revoked。代码不自动改写云端桶策略。
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS visibility_revocations (
+      id SERIAL PRIMARY KEY,
+      object_type VARCHAR(30) NOT NULL,
+      object_id INTEGER NOT NULL,
+      object_key TEXT NOT NULL,
+      reason TEXT NOT NULL DEFAULT '',
+      admin_id INTEGER REFERENCES admins(id) ON DELETE SET NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      revoked_at TIMESTAMP
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_visibility_revocations_status ON visibility_revocations (status)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_visibility_revocations_object ON visibility_revocations (object_type, object_id)');
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS video_prerequisites (
       video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
@@ -409,5 +438,6 @@ export async function ensureAppSchema() {
   await pool.query('CREATE INDEX IF NOT EXISTS idx_video_prerequisites_video_id ON video_prerequisites (video_id)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_video_prerequisites_prerequisite_id ON video_prerequisites (prerequisite_video_id)');
 
+  await assertVisibilitySchema(pool);
   await seedInitialAdmin();
 }

@@ -488,7 +488,7 @@ body.library-index-page .card:hover {
 .btn-ghost { color: var(--coffee); border: 1px solid var(--hair-2); background: var(--white); font-weight: 500; text-decoration: none; }
 .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
 .wiz-foot .spacer { flex: 1; }
-.foot-hint { font-size: 10.5px; color: var(--ink-3); letter-spacing: .5px; }
+.foot-hint { font-size: 10.5px; color: var(--ink-3); letter-spacing: .5px; white-space: pre-line; }
 .admin-track-list { display: grid; gap: 8px; }
 .admin-track-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; background: var(--white); border: 1px solid var(--hair-2); border-radius: 5px; }
 .admin-track-row strong { display: block; font-size: 12.5px; letter-spacing: .4px; }
@@ -849,4 +849,54 @@ body.library-index-page .card:hover {
   .crop-actions .primary-btn {
     flex: 1 1 180px;
   }
+}
+
+/* ============ 公开/私密可见性切换 ============ */
+.vis-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--hair-2);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--white);
+  flex: none;
+}
+.vis-opt {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 3px 9px;
+  font-size: 11px;
+  letter-spacing: .5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background .25s var(--ease), color .25s var(--ease);
+  white-space: nowrap;
+}
+.vis-opt + .vis-opt { border-left: 1px solid var(--hair-2); }
+/* .pops button 的全局描边会命中开关选项，重置掉，避免双重线框 */
+.pops button.vis-opt { border: 0; min-width: 0; height: auto; background: transparent; font-weight: 400; }
+.pops button.vis-opt:hover { border-color: transparent; color: var(--coffee); }
+.vis-opt:hover:not(:disabled) { color: var(--coffee); }
+.vis-opt:disabled { cursor: not-allowed; opacity: .5; }
+.vis-pub.on { background: rgba(79,125,58,.14); color: #4f7d3a; }
+.vis-priv.on { background: rgba(122,74,38,.14); color: var(--wood); }
+
+.pops .vis-toggle { align-self: center; }
+
+.vis-derive-hint {
+  margin: 0 0 10px;
+  padding: 7px 12px;
+  border: 1px dashed rgba(201,183,149,.65);
+  border-radius: 5px;
+  background: rgba(255,252,242,.6);
+  font-size: 12px;
+  letter-spacing: .3px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+.pm-batch-vis {
+  margin-left: 0;
 }

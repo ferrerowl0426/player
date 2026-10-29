@@ -1,11 +1,26 @@
-const { login } = require('../../services/auth');
+const { login, getStoredToken, getStoredStudent, isSessionExpired } = require('../../services/auth');
 
 Page({
   data: {
-    account: '13382800426',
-    password: 'Nxh123456',
+    account: '',
+    password: '',
     loading: false,
     error: ''
+  },
+
+  _redirecting: false,
+
+  onShow() {
+    if (this._redirecting || isSessionExpired()) return;
+    if (getStoredToken() && getStoredStudent()) {
+      this._redirecting = true;
+      wx.switchTab({
+        url: '/pages/home/index',
+        fail: () => {
+          this._redirecting = false;
+        }
+      });
+    }
   },
 
   onAccountInput(event) {
@@ -33,7 +48,18 @@ Page({
       getApp().setSession(result);
       wx.switchTab({ url: '/pages/home/index' });
     } catch (error) {
-      this.setData({ error: error.userMessage || '账号或密码错误，请联系老师确认账号' });
+      const message = String(error.userMessage || error.message || '');
+      const role = String(error.role || error.userType || error.accountType || '').toLowerCase();
+      const isNonStudent = Boolean(
+        error.isStudent === false
+        || ['teacher', 'director', 'admin', 'manager', 'staff', '老师', '教导主任', '管理员'].some((item) => role.includes(item))
+        || /没有这个学生|不是学生|非学生|学生账号不存在/.test(message)
+      );
+      this.setData({
+        error: isNonStudent
+          ? '此账号不是学生账号，请使用学生账号登录'
+          : (message || '账号或密码错误，请联系老师确认账号')
+      });
     } finally {
       this.setData({ loading: false });
     }

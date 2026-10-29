@@ -1,4 +1,6 @@
 import express from 'express';
+import { attachmentsRouter } from './attachments.routes.js';
+import { playbackRouter } from './playback.routes.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { config } from './config.js';
@@ -81,6 +83,10 @@ app.use('/api/tracks', tracksRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/prerequisites', prerequisiteRouter);
 app.use('/api/library', libraryRouter);
+app.use('/api/attachments', attachmentsRouter);
+
+// 视频/转码播放短期授权端点（私密视频不直接下发永久公开地址）。
+app.use('/api/playback', playbackRouter);
 
 // 视频相关接口统一挂载到 /api/videos。
 app.use('/api/videos', videoRouter);

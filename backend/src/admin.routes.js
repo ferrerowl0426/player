@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from './db.js';
 import { config } from './config.js';
 import { clearAdminCookie, getAdminCookieOptions, requireAdmin, requireAdminSession, requireSuperAdmin, signAdminToken } from './auth.js';
+import { canAssignContentObject } from './content-object-access.js';
 
 const USERNAME_PATTERN = /^\d+$/;
 const ADMIN_USERNAME_PATTERN = /^[A-Za-z0-9_]+$/;
@@ -17,6 +18,26 @@ const DELETE_REASON_MAX_LENGTH = 200;
 const MAX_ACTIVE_VIDEO_ASSIGNMENTS = 5;
 const ASSIGNMENT_OBJECT_TYPES = new Set(['video', 'track_point', 'track_collection', 'knowledge_point', 'knowledge_collection', 'track_part', 'knowledge_part']);
 const INVALID_TEXT_VALUES = ['null', 'undefined', 'nan'];
+
+// 作业目标当前是否“私密不可见”。供老师端读取作业列表标记 target_private，
+// 便于提示“已布置内容被设为私密，需重新布置”。语义与 content-object-access.js 一致。
+function assignmentTargetPrivateExpr(ua, v, t, c, kp, kpc, tp, pt, kpp, pkp) {
+  const coursePublic = (table, parts, parent) =>
+    `(COALESCE(NULLIF(${table}.visibility, ''), 'public') = 'public' AND EXISTS (SELECT 1 FROM ${parts} WHERE ${parts}.${parent} = ${table}.id AND COALESCE(NULLIF(${parts}.visibility, ''), 'public') = 'public'))`;
+  return `CASE COALESCE(${ua}.object_type, 'video')
+    WHEN 'message' THEN FALSE
+    WHEN 'video' THEN NOT (${v}.id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM track_parts x JOIN track_points xc ON xc.id = x.track_id WHERE x.video_id = ${v}.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')
+        UNION ALL SELECT 1 FROM knowledge_parts x JOIN knowledge_points xc ON xc.id = x.knowledge_point_id WHERE x.video_id = ${v}.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')))
+    WHEN 'track_point' THEN NOT (${t}.id IS NOT NULL AND ${coursePublic(t, 'track_parts', 'track_id')})
+    WHEN 'knowledge_point' THEN NOT (${kp}.id IS NOT NULL AND ${coursePublic(kp, 'knowledge_parts', 'knowledge_point_id')})
+    WHEN 'track_collection' THEN NOT (${c}.id IS NOT NULL AND EXISTS (SELECT 1 FROM track_collection_items ci JOIN track_points cc ON cc.id = ci.track_id WHERE ci.collection_id = ${c}.id AND ${coursePublic('cc', 'track_parts', 'track_id')}))
+    WHEN 'knowledge_collection' THEN NOT (${kpc}.id IS NOT NULL AND EXISTS (SELECT 1 FROM knowledge_collection_items ci JOIN knowledge_points cc ON cc.id = ci.knowledge_point_id WHERE ci.collection_id = ${kpc}.id AND ${coursePublic('cc', 'knowledge_parts', 'knowledge_point_id')}))
+    WHEN 'track_part' THEN NOT (${tp}.id IS NOT NULL AND COALESCE(NULLIF(${tp}.visibility, ''), 'public') = 'public' AND ${coursePublic(pt, 'track_parts', 'track_id')})
+    WHEN 'knowledge_part' THEN NOT (${kpp}.id IS NOT NULL AND COALESCE(NULLIF(${kpp}.visibility, ''), 'public') = 'public' AND ${coursePublic(pkp, 'knowledge_parts', 'knowledge_point_id')})
+    ELSE TRUE
+  END`;
+}
 
 function normalizeLoginText(value) {
   return String(value ?? '').trim();
@@ -1232,13 +1253,18 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
          ua.object_type, ua.part_id,
          COALESCE(NULLIF(ua.assigned_object_title, ''), NULLIF(ua.assigned_video_title, ''), v.title, t.name, c.name, kp.name, kpc.name, '已删除内容') AS title,
          COALESCE(v.description, t.description, c.description, kp.description, kpc.description, '') AS description,
-         COALESCE(v.cover_url, t.cover, c.cover, kp.cover, kpc.cover, '') AS cover_url
+         COALESCE(v.cover_url, t.cover, c.cover, kp.cover, kpc.cover, '') AS cover_url,
+         ${assignmentTargetPrivateExpr('ua', 'v', 't', 'c', 'kp', 'kpc', 'tp', 'pt', 'kpp', 'pkp')} AS target_private
        FROM user_assignments ua
        LEFT JOIN videos v ON v.id = COALESCE(ua.object_id, ua.video_id) AND COALESCE(ua.object_type, 'video') = 'video'
        LEFT JOIN track_points t ON t.id = ua.object_id AND ua.object_type = 'track_point'
        LEFT JOIN track_collections c ON c.id = ua.object_id AND ua.object_type = 'track_collection'
        LEFT JOIN knowledge_points kp ON kp.id = ua.object_id AND ua.object_type = 'knowledge_point'
        LEFT JOIN knowledge_collections kpc ON kpc.id = ua.object_id AND ua.object_type = 'knowledge_collection'
+       LEFT JOIN track_parts tp ON tp.id = ua.part_id AND ua.object_type = 'track_part'
+       LEFT JOIN track_points pt ON pt.id = tp.track_id
+       LEFT JOIN knowledge_parts kpp ON kpp.id = ua.part_id AND ua.object_type = 'knowledge_part'
+       LEFT JOIN knowledge_points pkp ON pkp.id = kpp.knowledge_point_id
        WHERE ua.user_id = $1 AND (ua.object_id IS NOT NULL OR ua.video_id IS NOT NULL) AND ua.is_deleted = FALSE
        ORDER BY ua.created_at DESC`,
       [userId]
@@ -1311,6 +1337,14 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
       }
       const result = await pool.query(query, params);
       if (!result.rows[0]) return res.status(404).json({ message: `推送对象不存在：${object.objectType} ${object.objectId}` });
+      // 私密目标不可布置（课程/P/合集/video 同口径）。video 反查所有宿主，任一私密即拒绝。
+      // 教师/教导主任也不得把私密内容布置给学员。
+      // part 目标的真实 P id 是 result.rows[0].part_id（而非 object.objectId）。
+      const assignTargetId = object.objectType.endsWith('_part') ? result.rows[0].part_id : object.objectId;
+      if (!(await canAssignContentObject(pool, object.objectType, assignTargetId))) {
+        // 带上私密内容标题（多个私密对象时命中第一个即返回，只提示第一个）。
+        return res.status(409).json({ message: `该内容为私密，无法布置给学员：\n${result.rows[0].title || `${object.objectType} ${assignTargetId}`}` });
+      }
       validated.push({ ...object, ...result.rows[0], objectId: object.objectType.endsWith('_part') ? result.rows[0].part_id : object.objectId });
     }
 

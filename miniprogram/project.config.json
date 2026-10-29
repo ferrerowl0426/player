@@ -31,12 +31,13 @@
     "compileType": "miniprogram",
     "libVersion": "latest",
     "lazyCodeLoading": "requiredComponents",
-    "appid": "wxac6da6bf2ec26ced",
+    "appid": "wx7ea902a6b353f538",
     "projectname": "nengxuehui-guitar-student",
     "condition": {},
     "simulatorPluginLibVersion": {},
     "editorSetting": {
         "tabIndent": "insertSpaces",
         "tabSize": 4
-    }
+    },
+    "isGameTourist": false
 }

@@ -6,10 +6,15 @@ function getBaseUrl() {
 }
 
 function normalizeError(statusCode, body) {
-  const message = body?.error?.message || body?.message || body?.error || '请求失败，请稍后重试';
+  const payload = body?.error && typeof body.error === 'object' ? body.error : body;
+  const message = payload?.message || body?.message || (typeof body?.error === 'string' ? body.error : '') || '请求失败，请稍后重试';
   const error = new Error(message);
   error.statusCode = statusCode;
   error.userMessage = message;
+  ['role', 'userType', 'accountType', 'isStudent', 'code'].forEach((key) => {
+    if (payload?.[key] !== undefined) error[key] = payload[key];
+    else if (body?.[key] !== undefined) error[key] = body[key];
+  });
   return error;
 }
 

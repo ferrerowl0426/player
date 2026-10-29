@@ -9,3 +9,13 @@ teacher_cookies.txt
 docs/design/guitar-home/_edgetmp/
 tmp-*.txt
 .dbg/
+
+# 调试/测试残留（不提交）
+*.log
+tmp-*.log
+probe.*
+mock-loader.mjs
+register-mocks.mjs
+
+# 敏感凭据（私钥等，绝不提交）
+docs/密钥/

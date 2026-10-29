@@ -3,7 +3,14 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { pool } from './db.js';
 import { config } from './config.js';
-import { requireSuperAdmin, requireUserOrAdmin } from './auth.js';
+import { requireSuperAdmin, requireUserOrAdmin, optionalContentViewer } from './auth.js';
+import {
+  canViewPrivate,
+  VisibilityError,
+  normalizeStoredVisibility,
+  PUBLIC,
+  PRIVATE
+} from './content-visibility.js';
 import {
   abortMultipartUpload,
   completeMultipartUpload,
@@ -30,6 +37,8 @@ import {
   verifyCiCallbackRequest
 } from './transcode.js';
 import { logStandaloneDeletion } from './deletion.js';
+import { serializeAttachments } from './attachment-access.js';
+import { resolveVideoAttachmentVisibility, assertVideoAttachmentWriteAllowed } from './video-attachment-visibility.js';
 
 const TITLE_MAX_LENGTH = 120;
 const DESCRIPTION_MAX_LENGTH = 1000;
@@ -193,7 +202,8 @@ function normalizeCompletedAttachments(value) {
   return normalizeAttachments(value).map((attachment) => ({
     key: String(attachment?.key || '').trim(),
     fileName: normalizeText(attachment?.fileName),
-    fileType: normalizeText(attachment?.fileType)
+    fileType: normalizeText(attachment?.fileType),
+    visibility: attachment?.visibility
   }));
 }
 
@@ -207,7 +217,8 @@ function normalizeAttachmentPlan(value) {
       oldAttachmentId: Number(attachment?.oldAttachmentId),
       key: String(attachment?.key || '').trim(),
       fileName: normalizeText(attachment?.fileName),
-      fileType: normalizeText(attachment?.fileType)
+      fileType: normalizeText(attachment?.fileType),
+      visibility: attachment?.visibility
     })).filter((attachment) => Number.isInteger(attachment.oldAttachmentId) && attachment.oldAttachmentId > 0),
     add: normalizeCompletedAttachments(plan.add)
   };
@@ -265,8 +276,18 @@ function normalizeMultipartParts(parts) {
     .sort((first, second) => first.partNumber - second.partNumber);
 }
 
-function formatVideoResponse(video) {
+function formatVideoResponse(video, options = {}) {
   const videoUrl = normalizePublicUrl(video.video_url);
+  if (options.private) {
+    // 私密视频：不下发永久公开 COS/CDN 地址，改为授权端点占位（阶段 E）。
+    return {
+      ...video,
+      video_url: '',
+      play_url: '',
+      cover_url: normalizePublicUrl(video.cover_url),
+      authorize_endpoint: `/api/playback/videos/${video.id}/play-url?source=video`
+    };
+  }
   return {
     ...video,
     video_url: videoUrl,
@@ -276,20 +297,22 @@ function formatVideoResponse(video) {
   };
 }
 
-function formatRenditionResponse(rendition) {
+function formatRenditionResponse(rendition, options = {}) {
   const videoUrl = normalizePublicUrl(rendition.video_url);
+  if (options.private) {
+    // 私密清晰度：不下发永久地址，改为授权端点占位（阶段 E）。
+    return {
+      ...rendition,
+      video_url: '',
+      play_url: '',
+      authorize_endpoint: `/api/playback/videos/${rendition.video_id || ''}/play-url?source=rendition&quality=${encodeURIComponent(rendition.quality || 'source')}`
+    };
+  }
   return {
     ...rendition,
     video_url: videoUrl,
     // 兼容式新增：CDN 播放地址 play_url；原 video_url 仍保留 COS 原值。
     play_url: toPlaybackUrl(videoUrl)
-  };
-}
-
-function formatAttachmentResponse(attachment) {
-  return {
-    ...attachment,
-    file_url: normalizePublicUrl(attachment.file_url || attachment.file_key)
   };
 }
 
@@ -309,6 +332,43 @@ function normalizeDate(value) {
   }
 
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+}
+
+// 旧视频若被 track_parts / knowledge_parts 关联，则其可见性取决于“父课程 + 该 P”的交集。
+// 该查询返回视频所关联的所有 (父课程可见性, 具体 P 可见性)，用于判定是否对外可见。
+export function buildVideoCourseAssociationQuery() {
+  return `
+    SELECT 'track_point' AS parent_type, tp.track_id AS parent_id, c.visibility AS course_visibility, tp.visibility AS part_visibility
+      FROM track_parts tp JOIN track_points c ON c.id = tp.track_id
+     WHERE tp.video_id = $1
+    UNION ALL
+    SELECT 'knowledge_point', kp.knowledge_point_id, c.visibility, kp.visibility
+      FROM knowledge_parts kp JOIN knowledge_points c ON c.id = kp.knowledge_point_id
+     WHERE kp.video_id = $1`;
+}
+
+// 判定视频对当前访问者是否可访问：
+//   - 未关联任何课程 P（旧独立视频）：standalone，按原规则（需登录）放行。
+//   - 关联的 P 中至少存在一个“父课程 public 且对应 P public”：登录用户即可看。
+//   - 其余（关联但无任何公开可达路径）：仅有效 teacher / super_admin 可看，否则阻断。
+export function isVideoAccessible(associations, viewer) {
+  if (!Array.isArray(associations) || associations.length === 0) {
+    return true;
+  }
+  const publiclyVisible = associations.some(
+    (row) => normalizeStoredVisibility(row.course_visibility) === PUBLIC
+      && normalizeStoredVisibility(row.part_visibility) === PUBLIC
+  );
+  return publiclyVisible || canViewPrivate(viewer);
+}
+
+// 统一把带有 status 的已知错误映射为对应的 HTTP 响应（VisibilityError / 私密写入开关等）。
+function respondVisibilityError(res, error) {
+  if (error && error.status) {
+    res.status(error.status).json({ message: error.message });
+    return true;
+  }
+  return false;
 }
 
 export const videoRouter = Router();
@@ -610,16 +670,25 @@ videoRouter.post('/complete', requireSuperAdmin, async (req, res, next) => {
       }
 
       for (const [index, attachment] of attachments.entries()) {
+        const visibility = resolveVideoAttachmentVisibility(attachment.visibility, undefined);
+        await assertVideoAttachmentWriteAllowed({
+          client,
+          videoId: video.id,
+          fileKey: attachment.key,
+          visibility,
+          previousVisibility: undefined
+        });
         await client.query(
-          `INSERT INTO video_attachments (video_id, file_name, file_url, file_key, file_type, file_size)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+          `INSERT INTO video_attachments (video_id, file_name, file_url, file_key, file_type, file_size, visibility)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             video.id,
             attachment.fileName,
             getPublicUrl(attachment.key),
             attachment.key,
             attachment.fileType,
-            Number(attachmentHeads[index].ContentLength || 0)
+            Number(attachmentHeads[index].ContentLength || 0),
+            visibility
           ]
         );
       }
@@ -633,6 +702,7 @@ videoRouter.post('/complete', requireSuperAdmin, async (req, res, next) => {
       client.release();
     }
   } catch (error) {
+    if (respondVisibilityError(res, error)) return;
     next(error);
   }
 });
@@ -873,7 +943,9 @@ videoRouter.patch('/:id/renditions/:quality', requireSuperAdmin, async (req, res
 
 // GET /api/videos/:id
 // 获取单个视频详情，播放页会用到。
-videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
+// 安全：若视频被 track_parts / knowledge_parts 关联，需检查“父课程 + 对应 P”是否公开；
+// 无任何公开可达路径时，仅有效 teacher / super_admin 可见，否则以 404 隐藏（不暴露存在）。
+videoRouter.get('/:id', optionalContentViewer, requireUserOrAdmin, async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT id, title, description, video_url, cover_url, created_at
@@ -887,8 +959,18 @@ videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
       return;
     }
 
+    // 关联课程可见性门禁：公开无关联旧视频仍按原规则；私密关联仅教师/超管可看。
+    const associations = await pool.query(buildVideoCourseAssociationQuery(), [req.params.id]);
+    if (!isVideoAccessible(associations.rows, req.contentViewer)) {
+      res.status(404).json({ message: '视频不存在' });
+      return;
+    }
+    // 是否公开可达：决定是否对当前访问者下发永久播放地址，还是改为授权端点占位。
+    const publiclyReadable = associations.rows.length === 0
+      || associations.rows.some((row) => normalizeStoredVisibility(row.course_visibility) === PUBLIC && normalizeStoredVisibility(row.part_visibility) === PUBLIC);
+
     const attachmentsResult = await pool.query(
-      `SELECT id, file_name, file_url, file_key, file_type, file_size, created_at
+      `SELECT id, file_name, file_url, file_key, file_type, file_size, visibility, created_at
        FROM video_attachments
        WHERE video_id = $1
        ORDER BY created_at ASC`,
@@ -905,7 +987,7 @@ videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
     );
 
     const renditionsResult = await pool.query(
-      `SELECT quality, video_url, file_size, status, updated_at
+      `SELECT video_id, quality, video_url, file_size, status, updated_at
        FROM video_renditions
        WHERE video_id = $1
        ORDER BY CASE quality WHEN '1080p' THEN 1 WHEN '720p' THEN 2 WHEN 'source' THEN 3 ELSE 4 END`,
@@ -929,10 +1011,10 @@ videoRouter.get('/:id', requireUserOrAdmin, async (req, res, next) => {
 
     res.json({
       data: {
-        ...formatVideoResponse(result.rows[0]),
-        attachments: attachmentsResult.rows.map(formatAttachmentResponse),
+        ...formatVideoResponse(result.rows[0], { private: !publiclyReadable }),
+        attachments: serializeAttachments(attachmentsResult.rows, req.contentViewer, 'video'),
         prerequisites: prerequisitesResult.rows,
-        renditions: renditionsResult.rows.map(formatRenditionResponse),
+        renditions: renditionsResult.rows.map((row) => formatRenditionResponse(row, { private: !publiclyReadable })),
         descendantVideoIds: descendantsResult.rows.map((row) => row.id)
       }
     });
@@ -975,8 +1057,8 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       return;
     }
 
-    const plannedNewAttachments = [...attachmentPlan.replace, ...attachmentPlan.add];
-    const attachmentValidation = validateAttachmentInput(plannedNewAttachments.map((attachment) => buildAttachmentFileMeta({
+    const rawNewAttachments = [...attachmentPlan.replace, ...attachmentPlan.add];
+    const attachmentValidation = validateAttachmentInput(rawNewAttachments.map((attachment) => buildAttachmentFileMeta({
       name: attachment.fileName,
       type: attachment.fileType,
       size: 0
@@ -987,7 +1069,7 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       return;
     }
 
-    for (const attachment of plannedNewAttachments) {
+    for (const attachment of rawNewAttachments) {
       if (!isExpectedUploadKey(attachment.key, 'attachments/')) {
         res.status(400).json({ message: '资料文件地址无效' });
         return;
@@ -1015,9 +1097,22 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
 
     const oldVideo = videoResult.rows[0];
     const currentAttachmentsResult = await pool.query(
-      `SELECT id, file_key FROM video_attachments WHERE video_id = $1`,
+      `SELECT id, file_key, visibility FROM video_attachments WHERE video_id = $1`,
       [videoId]
     );
+    const currentAttachmentMap = new Map(currentAttachmentsResult.rows.map((item) => [item.id, item]));
+    // 解析每个新增/替换附件的最终可见性：
+    //   - 新增（add）：无 previous，遗漏则默认 public。
+    //   - 替换（replace）：沿用被替换旧附件的 previous；遗漏则保留其 private。
+    //   - 显式 private 在写入前由 assertVideoAttachmentWriteAllowed 校验（私密开关 + 共用 key）。
+    const plannedNewAttachments = rawNewAttachments.map((attachment) => {
+      const previous = attachment.oldAttachmentId && currentAttachmentMap.has(attachment.oldAttachmentId)
+        ? currentAttachmentMap.get(attachment.oldAttachmentId)
+        : undefined;
+      const previousVisibility = previous?.visibility;
+      const visibility = resolveVideoAttachmentVisibility(attachment.visibility, previousVisibility);
+      return { ...attachment, visibility, previousVisibility };
+    });
     const currentAttachmentIds = new Set(currentAttachmentsResult.rows.map((item) => item.id));
     const changedOldAttachmentIds = [
       ...attachmentPlan.deleteIds,
@@ -1096,6 +1191,21 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
 
     try {
       await client.query('BEGIN');
+      await client.query('SELECT id FROM videos WHERE id=$1 FOR UPDATE', [videoId]);
+      const visibilityChanges = req.body.attachmentPlan?.visibilityChanges ?? [];
+      if (!Array.isArray(visibilityChanges)) throw new VisibilityError('附件权限编辑清单无效');
+      const seenVisibilityIds = new Set();
+      for (const change of visibilityChanges) {
+        const attachmentId = Number(change?.id);
+        if (!Number.isSafeInteger(attachmentId) || seenVisibilityIds.has(attachmentId) || changedOldAttachmentIds.includes(attachmentId)) throw new VisibilityError('附件权限编辑清单无效');
+        seenVisibilityIds.add(attachmentId);
+        const existing = await client.query('SELECT id,file_key,visibility FROM video_attachments WHERE id=$1 AND video_id=$2 FOR UPDATE', [attachmentId, videoId]);
+        if (!existing.rows.length) throw new VisibilityError('附件不属于当前课程');
+        const previous = existing.rows[0];
+        const visibility = resolveVideoAttachmentVisibility(change.visibility, previous.visibility);
+        await assertVideoAttachmentWriteAllowed({ client, videoId, fileKey: previous.file_key, visibility, previousVisibility: previous.visibility });
+        await client.query('UPDATE video_attachments SET visibility=$1 WHERE id=$2 AND video_id=$3', [visibility, attachmentId, videoId]);
+      }
       const result = await client.query(
         `UPDATE videos
          SET title = $1,
@@ -1147,10 +1257,17 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       }
 
       for (const [index, attachment] of plannedNewAttachments.entries()) {
+        await assertVideoAttachmentWriteAllowed({
+          client,
+          videoId,
+          fileKey: attachment.key,
+          visibility: attachment.visibility,
+          previousVisibility: attachment.previousVisibility
+        });
         await client.query(
-          `INSERT INTO video_attachments (video_id, file_name, file_url, file_key, file_type, file_size)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [videoId, attachment.fileName, getPublicUrl(attachment.key), attachment.key, attachment.fileType, Number(newAttachmentHeads[index].ContentLength || 0)]
+          `INSERT INTO video_attachments (video_id, file_name, file_url, file_key, file_type, file_size, visibility)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [videoId, attachment.fileName, getPublicUrl(attachment.key), attachment.key, attachment.fileType, Number(newAttachmentHeads[index].ContentLength || 0), attachment.visibility]
         );
       }
 
@@ -1164,6 +1281,7 @@ videoRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       client.release();
     }
   } catch (error) {
+    if (respondVisibilityError(res, error)) return;
     next(error);
   }
 });

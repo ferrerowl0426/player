@@ -9,7 +9,7 @@ export async function logDeletion(client, { objectType, objectId, objectTitle = 
   );
 }
 
-export async function clearObjectReferences(client, { objectType, objectId }) {
+export async function clearObjectReferences(client, { objectType, objectId, deferredFileKeys }) {
   await client.query(
     `DELETE FROM prerequisites
      WHERE (object_type = $1 AND object_id = $2)
@@ -30,11 +30,13 @@ export async function clearObjectReferences(client, { objectType, objectId }) {
     [objectType, objectId]
   );
 
-  await Promise.all(attachments.rows.map((row) => row.file_key).filter(Boolean).map((key) => deleteFromBucket(key).catch(() => {})));
+  const keys = attachments.rows.map((row) => row.file_key).filter(Boolean);
+  if (deferredFileKeys) deferredFileKeys.push(...keys);
+  else await Promise.all(keys.map((key) => deleteFromBucket(key).catch(() => {})));
 }
 
-export async function deleteWithReferences(client, { objectType, objectId, objectTitle = '', adminId = null }) {
-  await clearObjectReferences(client, { objectType, objectId });
+export async function deleteWithReferences(client, { objectType, objectId, objectTitle = '', adminId = null, deferredFileKeys }) {
+  await clearObjectReferences(client, { objectType, objectId, deferredFileKeys });
   await logDeletion(client, { objectType, objectId, objectTitle, adminId });
 }
 

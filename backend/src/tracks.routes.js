@@ -1,7 +1,24 @@
 import { Router } from 'express';
+import { saveContentAttachments } from './attachment-save.js';
+import { serializeAttachments } from './attachment-access.js';
 import { v4 as uuid } from 'uuid';
 import { pool } from './db.js';
-import { requireSuperAdmin } from './auth.js';
+import { requireSuperAdmin, optionalContentViewer } from './auth.js';
+import {
+  canViewPrivate,
+  publicCoursePredicate,
+  normalizeStoredVisibility,
+  PRIVATE,
+  resolveVisibilityInput,
+  lockCourse,
+  refreshCourseVisibility
+} from './content-visibility.js';
+import {
+  assertPrivateWriteAllowed,
+  finalizeCourseVisibility,
+  findPrivatePartPrerequisiteConflicts,
+  PrerequisiteConflictError
+} from './content-privacy-config.js';
 import {
   abortMultipartUpload,
   completeMultipartUpload,
@@ -10,13 +27,13 @@ import {
   createUploadUrl,
   deleteFromBucket,
   ensureObjectExists,
-  finalizePdfInlineMetadata,
   getPublicUrl,
   normalizePublicUrl
 } from './storage.js';
 import { createInitialRenditions, deleteVideoObjects } from './transcode.js';
 import { toPlaybackUrl } from './playback-url.js';
 import { deleteWithReferences } from './deletion.js';
+import { recordVisibilityRevocations, getVideoObjectKeys } from './revocation.js';
 
 function normalizeKeyword(value) {
   return String(value ?? '').trim();
@@ -101,7 +118,7 @@ function mapPart(row) {
 
 async function findTrack(trackId) {
   const result = await pool.query(
-    `SELECT id, name, cover, description, created_at, updated_at
+    `SELECT id, name, cover, description, created_at, updated_at, visibility
      FROM track_points WHERE id = $1`,
     [trackId]
   );
@@ -117,13 +134,16 @@ async function findCollection(collectionId) {
   return result.rows[0] || null;
 }
 
-async function getTrackParts(trackId) {
+async function getTrackParts(trackId, canView = true) {
+  const visibilityFilter = canView
+    ? ''
+    : `AND COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public'`;
   const result = await pool.query(
-    `SELECT tp.id, tp.part_no, tp.title, tp.duration, tp.video_id,
+    `SELECT tp.id, tp.part_no, tp.title, tp.duration, tp.video_id, tp.visibility,
             v.video_url, v.cover_url AS video_cover_url
      FROM track_parts tp
      LEFT JOIN videos v ON v.id = tp.video_id
-     WHERE tp.track_id = $1
+     WHERE tp.track_id = $1 ${visibilityFilter}
      ORDER BY tp.part_no ASC, tp.id ASC`,
     [trackId]
   );
@@ -156,70 +176,20 @@ async function getTrackParts(trackId) {
   }));
 }
 
-async function getContentAttachments(objectType, objectId) {
+async function getContentAttachments(objectType, objectId, viewer) {
   const result = await pool.query(
-    `SELECT id, file_name, file_url, file_key, file_type, file_size, sort_order, created_at
+    `SELECT id, visibility, file_name, file_url, file_key, file_type, file_size, sort_order, created_at
      FROM content_attachments
      WHERE object_type = $1 AND object_id = $2
      ORDER BY sort_order ASC, created_at ASC, id ASC`,
     [objectType, objectId]
   );
-  return result.rows.map((row) => ({ ...row, file_url: normalizePublicUrl(row.file_url) }));
+  return serializeAttachments(result.rows.map((row) => ({ ...row, file_url: normalizePublicUrl(row.file_url) })), viewer);
 }
 
 function normalizeFileSize(value) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.round(number) : 0;
-}
-
-function isAttachmentKey(key) {
-  return typeof key === 'string' && key.startsWith('attachments/') && !key.includes('..');
-}
-
-function normalizeAttachments(values) {
-  return (Array.isArray(values) ? values : [])
-    .map((item, index) => ({
-      id: normalizeId(item?.id),
-      fileName: normalizeText(item?.fileName || item?.file_name),
-      fileUrl: normalizeText(item?.fileUrl || item?.file_url),
-      fileKey: normalizeText(item?.fileKey || item?.file_key),
-      fileType: normalizeText(item?.fileType || item?.file_type),
-      fileSize: normalizeFileSize(item?.fileSize || item?.file_size),
-      sortOrder: Number.isInteger(Number(item?.sortOrder ?? item?.sort_order)) ? Number(item?.sortOrder ?? item?.sort_order) : index
-    }))
-    .filter((item) => item.fileName && item.fileUrl && isAttachmentKey(item.fileKey));
-}
-
-async function replaceContentAttachments({ objectType, objectId, attachments }) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const old = await client.query(
-      `SELECT file_key FROM content_attachments WHERE object_type = $1 AND object_id = $2`,
-      [objectType, objectId]
-    );
-    await client.query('DELETE FROM content_attachments WHERE object_type = $1 AND object_id = $2', [objectType, objectId]);
-    for (const [index, attachment] of attachments.entries()) {
-      await ensureObjectExists(attachment.fileKey);
-      if (String(attachment.fileType || '').toLowerCase().includes('application/pdf')) {
-        await finalizePdfInlineMetadata(attachment.fileKey);
-      }
-      await client.query(
-        `INSERT INTO content_attachments (object_type, object_id, file_name, file_url, file_key, file_type, file_size, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [objectType, objectId, attachment.fileName, attachment.fileUrl, attachment.fileKey, attachment.fileType, attachment.fileSize, index]
-      );
-    }
-    await client.query('COMMIT');
-
-    const kept = new Set(attachments.map((item) => item.fileKey));
-    await Promise.all(old.rows.map((row) => row.file_key).filter((key) => key && !kept.has(key)).map((key) => deleteFromBucket(key).catch(() => {})));
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
-  } finally {
-    client.release();
-  }
 }
 
 async function getTrackCollections(trackId) {
@@ -303,49 +273,119 @@ async function getTrackLibraryResources(trackId) {
   }));
 }
 
+// 当前登录者（经 optionalContentViewer 解析）是否能查看私密内容：仅有效 teacher / super_admin。
+function viewerCanSeePrivate(req) {
+  return canViewPrivate(req.contentViewer);
+}
+
+// 游客/学生读取时，仅统计/列出公开 P。
+function publicPartCountExpression(canView) {
+  return canView
+    ? 'COUNT(tp.id)'
+    : "COUNT(CASE WHEN COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public' THEN tp.id END)";
+}
+
+// 曲目（track_point）列表 / 搜索查询构造。
+// 游客/学生：父课程必须满足 public 且存在至少一个公开 P（publicCoursePredicate），P 计数仅公开 P。
+export function buildTrackPointsListQuery({ canView, keyword }) {
+  const params = [];
+  const conditions = [];
+  if (keyword) {
+    params.push(`%${keyword}%`);
+    conditions.push(`c.name ILIKE $${params.length}`);
+  }
+  if (!canView) {
+    conditions.push(publicCoursePredicate('track_point'));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const sql = `
+    SELECT c.id, c.name, c.cover, c.description, c.updated_at,
+           ${publicPartCountExpression(canView)}::int AS part_count
+    FROM track_points c
+    LEFT JOIN track_parts tp ON tp.track_id = c.id
+    ${where}
+    GROUP BY c.id
+    ORDER BY c.updated_at DESC, c.id DESC`;
+  return { sql, params };
+}
+
+// 曲谱集（track_collections）列表 / 搜索查询构造。
+// 曲谱集本身无 visibility 字段；游客/学生仅展示包含至少一个公开曲目的合集，track_count 仅统计可见曲目。
+export function buildTrackCollectionsListQuery({ canView, keyword }) {
+  const params = [];
+  const conditions = [];
+  if (keyword) {
+    params.push(`%${keyword}%`);
+    conditions.push(`c.name ILIKE $${params.length}`);
+  }
+  if (!canView) {
+    conditions.push(`EXISTS (
+      SELECT 1 FROM track_collection_items ci
+      JOIN track_points tp ON tp.id = ci.track_id
+      WHERE ci.collection_id = c.id
+        AND COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public'
+        AND EXISTS (SELECT 1 FROM track_parts pp WHERE pp.track_id = tp.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')
+    )`);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const trackCountExpr = canView
+    ? 'COUNT(ct.track_id)'
+    : `COUNT(CASE WHEN COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public' THEN ct.track_id END)`;
+  const sql = `
+    SELECT c.id, c.name, c.cover, c.description, c.updated_at,
+           ${trackCountExpr}::int AS track_count
+    FROM track_collections c
+    LEFT JOIN track_collection_items ct ON ct.collection_id = c.id
+    LEFT JOIN track_points tp ON tp.id = ct.track_id
+    ${where}
+    GROUP BY c.id
+    ORDER BY c.updated_at DESC, c.id DESC`;
+  return { sql, params };
+}
+
+// 曲谱集详情内的曲目查询构造：游客/学生仅可见公开曲目，P 计数仅公开 P。
+export function buildTrackCollectionTracksQuery({ canView, collectionId }) {
+  const params = [collectionId];
+  const courseFilter = canView
+    ? ''
+    : `AND COALESCE(NULLIF(t.visibility, ''), 'public') = 'public'
+       AND EXISTS (SELECT 1 FROM track_parts pp WHERE pp.track_id = t.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')`;
+  const sql = `
+    SELECT t.id, t.name, t.cover, t.description, t.updated_at,
+           ${publicPartCountExpression(canView)}::int AS part_count
+    FROM track_collection_items ct
+    JOIN track_points t ON t.id = ct.track_id
+    LEFT JOIN track_parts tp ON tp.track_id = t.id
+    WHERE ct.collection_id = $1 ${courseFilter}
+    GROUP BY t.id, ct.sort_order
+    ORDER BY ct.sort_order ASC, t.id ASC`;
+  return { sql, params };
+}
+
+// 统一把带有 status 的已知错误映射为对应的 HTTP 响应（VisibilityError / 私密写入 / 前置引用冲突等）。
+function respondVisibilityError(res, error) {
+  if (error && error.status) {
+    res.status(error.status).json({ message: error.message });
+    return true;
+  }
+  return false;
+}
+
 export const tracksRouter = Router();
 
 // GET /api/tracks
 // 曲目库首页公开接口：游客、学员、老师和教导主任都可以访问。
-// 当前只返回曲目和曲谱集首页所需数据，前置知识点暂不读取。
-tracksRouter.get('/', async (req, res, next) => {
+// 仅有效 teacher / super_admin 能读取私密；游客/学生按父课程可见性 + 公开 P 过滤，P 计数仅公开 P。
+tracksRouter.get('/', optionalContentViewer, async (req, res, next) => {
   try {
     const keyword = normalizeKeyword(req.query.keyword);
-    const searchPattern = `%${keyword}%`;
-    const params = keyword ? [searchPattern] : [];
-    const whereClause = keyword ? 'WHERE name ILIKE $1' : '';
+    const canView = viewerCanSeePrivate(req);
+    const { sql: tracksSql, params: tracksParams } = buildTrackPointsListQuery({ canView, keyword });
+    const { sql: collectionsSql, params: collectionsParams } = buildTrackCollectionsListQuery({ canView, keyword });
 
     const [tracksResult, collectionsResult] = await Promise.all([
-      pool.query(
-        `SELECT
-           t.id,
-           t.name,
-           t.cover,
-           t.description,
-           t.updated_at,
-           COUNT(tp.id)::int AS part_count
-         FROM track_points t
-         LEFT JOIN track_parts tp ON tp.track_id = t.id
-         ${whereClause}
-         GROUP BY t.id
-         ORDER BY t.updated_at DESC, t.id DESC`,
-        params
-      ),
-      pool.query(
-        `SELECT
-           c.id,
-           c.name,
-           c.cover,
-           c.description,
-           c.updated_at,
-           COUNT(ct.track_id)::int AS track_count
-         FROM track_collections c
-         LEFT JOIN track_collection_items ct ON ct.collection_id = c.id
-         ${whereClause}
-         GROUP BY c.id
-         ORDER BY c.updated_at DESC, c.id DESC`,
-        params
-      )
+      pool.query(tracksSql, tracksParams),
+      pool.query(collectionsSql, collectionsParams)
     ]);
 
     res.json({
@@ -360,7 +400,7 @@ tracksRouter.get('/', async (req, res, next) => {
 });
 
 // GET /api/tracks/:id
-tracksRouter.get('/:id', async (req, res, next) => {
+tracksRouter.get('/:id', optionalContentViewer, async (req, res, next) => {
   if (req.params.id === 'collections') {
     next();
     return;
@@ -381,12 +421,20 @@ tracksRouter.get('/:id', async (req, res, next) => {
       return;
     }
 
+    // 私密曲目对非授权访问者不可见（与列表一致的隐藏策略）。
+    if (!viewerCanSeePrivate(req) && normalizeStoredVisibility(track.visibility) === PRIVATE) {
+      res.status(404).json({ message: '曲目不存在' });
+      return;
+    }
+
+    const canView = viewerCanSeePrivate(req);
     const [parts, attachments, track_collections, library_resources] = await Promise.all([
-      getTrackParts(trackId),
-      getContentAttachments('track_point', trackId),
+      getTrackParts(trackId, canView),
+      getContentAttachments('track_point', trackId, req.contentViewer || (req.admin ? { role: 'super_admin', status: 'active' } : null)),
       getTrackCollections(trackId),
       getTrackLibraryResources(trackId)
     ]);
+    if (!canView && !parts.length) return res.status(404).json({ message: '曲目不存在' });
 
     res.json({
       data: {
@@ -403,8 +451,8 @@ tracksRouter.get('/:id', async (req, res, next) => {
 });
 
 // GET /api/tracks/collections/:id
-// 曲谱集详情公开接口
-tracksRouter.get('/collections/:id', async (req, res, next) => {
+// 曲谱集详情公开接口。游客/学生仅可见公开曲目，P 计数仅公开 P。
+tracksRouter.get('/collections/:id', optionalContentViewer, async (req, res, next) => {
   try {
     const collectionId = normalizeId(req.params.id);
 
@@ -420,18 +468,11 @@ tracksRouter.get('/collections/:id', async (req, res, next) => {
       return;
     }
 
+    const canView = viewerCanSeePrivate(req);
+    const { sql, params } = buildTrackCollectionTracksQuery({ canView, collectionId });
+
     const [tracksResult, libraryResources] = await Promise.all([
-      pool.query(
-        `SELECT t.id, t.name, t.cover, t.description, t.updated_at,
-                COUNT(tp.id)::int AS part_count
-         FROM track_collection_items ct
-         JOIN track_points t ON t.id = ct.track_id
-         LEFT JOIN track_parts tp ON tp.track_id = t.id
-         WHERE ct.collection_id = $1
-         GROUP BY t.id, ct.sort_order
-         ORDER BY ct.sort_order ASC, t.id ASC`,
-        [collectionId]
-      ),
+      pool.query(sql, params),
       getLinkedLibraryResources('track_collection', collectionId)
     ]);
 
@@ -439,7 +480,7 @@ tracksRouter.get('/collections/:id', async (req, res, next) => {
       data: {
         ...mapTrack(collection),
         track_points: tracksResult.rows.map(mapTrack),
-        attachments: await getContentAttachments('track_collection', collectionId),
+        attachments: await getContentAttachments('track_collection', collectionId, req.contentViewer),
         library_resources: libraryResources
       }
     });
@@ -460,10 +501,12 @@ tracksRouter.post('/', requireSuperAdmin, async (req, res, next) => {
       return;
     }
 
+    // 新建空课默认为 private：此时没有任何公开 P，派生可见性即为 private。
+    // 这是派生默认态，不经私密写入开关拦截（私密写入开关只保护“新的私密写入”）。
     const result = await pool.query(
-      `INSERT INTO track_points (name, cover, description)
-       VALUES ($1, $2, $3)
-       RETURNING id, name, cover, description, created_at, updated_at`,
+      `INSERT INTO track_points (name, cover, description, visibility)
+       VALUES ($1, $2, $3, 'private')
+       RETURNING id, name, cover, description, created_at, updated_at, visibility`,
       [name, cover, description]
     );
 
@@ -474,7 +517,9 @@ tracksRouter.post('/', requireSuperAdmin, async (req, res, next) => {
 });
 
 // PATCH /api/tracks/:id
+// 课程字段 visibility 只能派生（刷新得到），不接收前端输入。同事务锁父后保存并刷新派生可见性。
 tracksRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const trackId = normalizeId(req.params.id);
     const name = normalizeText(req.body.name);
@@ -486,22 +531,27 @@ tracksRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       return;
     }
 
-    const result = await pool.query(
+    await client.query('BEGIN');
+    // 锁父（曲目）后保存再刷新派生可见性。
+    await lockCourse(client, 'track_point', trackId);
+    const previousVisibility = (await client.query('SELECT visibility FROM track_points WHERE id = $1 FOR UPDATE', [trackId])).rows[0]?.visibility;
+    const result = await client.query(
       `UPDATE track_points
        SET name = $1, cover = $2, description = $3, updated_at = CURRENT_TIMESTAMP
        WHERE id = $4
-       RETURNING id, name, cover, description, created_at, updated_at`,
+       RETURNING id, name, cover, description, created_at, updated_at, visibility`,
       [name, cover, description, trackId]
     );
-
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: '曲目不存在' });
-      return;
-    }
-
+    // 刷新派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
+    await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
+    await client.query('COMMIT');
     res.json({ data: mapTrack(result.rows[0]) });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (respondVisibilityError(res, error)) return;
     next(error);
+  } finally {
+    client.release();
   }
 });
 
@@ -600,8 +650,8 @@ tracksRouter.put('/:id/attachments', requireSuperAdmin, async (req, res, next) =
       return;
     }
 
-    await replaceContentAttachments({ objectType: 'track_point', objectId: trackId, attachments: normalizeAttachments(req.body.attachments) });
-    res.json({ data: await getContentAttachments('track_point', trackId) });
+    await saveContentAttachments({ pool, objectType: 'track_point', objectId: trackId, values: req.body.attachments, ensureObjectExists, getPublicUrl });
+    res.json({ data: await getContentAttachments('track_point', trackId, req.contentViewer || (req.admin ? { role: 'super_admin', status: 'active' } : null)) });
   } catch (error) {
     next(error);
   }
@@ -693,7 +743,9 @@ tracksRouter.post('/:id/parts/upload/abort', requireSuperAdmin, async (req, res,
 });
 
 // POST /api/tracks/:id/parts
+// 同事务锁父后保存并刷新派生可见性。新 P 缺省 public；显式 private 受私密写入开关保护。
 tracksRouter.post('/:id/parts', requireSuperAdmin, async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const trackId = normalizeId(req.params.id);
     const partNo = normalizeId(req.body.partNo);
@@ -712,51 +764,62 @@ tracksRouter.post('/:id/parts', requireSuperAdmin, async (req, res, next) => {
       return;
     }
 
+    // 新 P 缺省 public；显式 private 受私密写入开关保护。
+    const partVisibility = resolveVisibilityInput(req.body.visibility, undefined);
+
+    await client.query('BEGIN');
+    // 锁父（曲目）后保存并刷新派生可见性。
+    await lockCourse(client, 'track_point', trackId);
+    const previousVisibility = (await client.query('SELECT visibility FROM track_points WHERE id = $1 FOR UPDATE', [trackId])).rows[0]?.visibility;
+    // 新私密写入（之前不存在该 P）需经开关保护。
+    if (partVisibility === PRIVATE) {
+      assertPrivateWriteAllowed(PRIVATE, undefined);
+    }
     const videoHead = await ensureObjectExists(videoKey);
     const videoUrl = getPublicUrl(videoKey);
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
-      const videoResult = await client.query(
-        `INSERT INTO videos (title, description, video_url, cover_url)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, title, video_url, cover_url, created_at`,
-        [title, `曲目 ${track.name} 的 P${partNo}`, videoUrl, '']
-      );
-      const video = videoResult.rows[0];
-      await createInitialRenditions(client, {
-        videoId: video.id,
-        sourceUrl: video.video_url,
-        sourceSize: Number(videoHead.ContentLength || 0)
-      });
-      const partResult = await client.query(
-        `INSERT INTO track_parts (track_id, part_no, video_id, title, duration)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, track_id, part_no, video_id, title, duration, created_at, updated_at`,
-        [trackId, partNo, video.id, title, duration]
-      );
-      await client.query('UPDATE track_points SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [trackId]);
-      await client.query('COMMIT');
-      res.status(201).json({ data: { ...partResult.rows[0], video_url: videoUrl, video_size: Number(videoHead.ContentLength || 0) } });
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      await deleteFromBucket(videoKey).catch(() => {});
-      throw error;
-    } finally {
-      client.release();
-    }
+    const videoResult = await client.query(
+      `INSERT INTO videos (title, description, video_url, cover_url)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, title, video_url, cover_url, created_at`,
+      [title, `曲目 ${track.name} 的 P${partNo}`, videoUrl, '']
+    );
+    const video = videoResult.rows[0];
+    await createInitialRenditions(client, {
+      videoId: video.id,
+      sourceUrl: video.video_url,
+      sourceSize: Number(videoHead.ContentLength || 0)
+    });
+    const partResult = await client.query(
+      `INSERT INTO track_parts (track_id, part_no, video_id, title, duration, visibility)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, track_id, part_no, video_id, title, duration, visibility, created_at, updated_at`,
+      [trackId, partNo, video.id, title, duration, partVisibility]
+    );
+    // 刷新父课程派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
+    await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
+    await client.query('COMMIT');
+    res.status(201).json({ data: { ...partResult.rows[0], video_url: videoUrl, video_size: Number(videoHead.ContentLength || 0) } });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    // 政策拦截（私密写入开关 / 前置引用冲突）不删除已上传文件，便于管理员修正后重试。
+    if (respondVisibilityError(res, error)) return;
     if (error.code === '23505') {
       res.status(409).json({ message: '这个 P 序号已经存在' });
+      await deleteFromBucket(videoKey).catch(() => {});
       return;
     }
+    await deleteFromBucket(videoKey).catch(() => {});
     next(error);
+  } finally {
+    client.release();
   }
 });
 
 // PATCH /api/tracks/:id/parts/:partId
+// 同事务锁父后保存并刷新派生可见性。P 的 visibility 缺省保留旧值（旧 private 不被重置），
+// 显式改私密受私密写入开关保护；课程因此“新变私密”时再经前置引用检查保护。
 tracksRouter.patch('/:id/parts/:partId', requireSuperAdmin, async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const trackId = normalizeId(req.params.id);
     const partId = normalizeId(req.params.partId);
@@ -769,31 +832,64 @@ tracksRouter.patch('/:id/parts/:partId', requireSuperAdmin, async (req, res, nex
       return;
     }
 
-    const result = await pool.query(
-      `UPDATE track_parts
-       SET part_no = $1, title = $2, duration = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4 AND track_id = $5
-       RETURNING id, track_id, part_no, video_id, title, duration, created_at, updated_at`,
-      [partNo, title, duration, partId, trackId]
-    );
-
-    if (result.rowCount === 0) {
+    await client.query('BEGIN');
+    // 锁父（曲目）后保存并刷新派生可见性。
+    await lockCourse(client, 'track_point', trackId);
+    const previousVisibility = (await client.query('SELECT visibility FROM track_points WHERE id = $1 FOR UPDATE', [trackId])).rows[0]?.visibility;
+    const currentPart = await client.query('SELECT visibility FROM track_parts WHERE id = $1 AND track_id = $2 FOR UPDATE', [partId, trackId]);
+    if (currentPart.rowCount === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ message: 'P 分段不存在' });
       return;
     }
-
-    await pool.query('UPDATE track_points SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [trackId]);
+    // 缺省保留旧值；显式改私密（之前非 private）受开关保护。
+    const partVisibility = resolveVisibilityInput(req.body.visibility, currentPart.rows[0].visibility);
+    const partBecamePrivate = partVisibility === PRIVATE && normalizeStoredVisibility(currentPart.rows[0].visibility) !== PRIVATE;
+    if (partBecamePrivate) {
+      assertPrivateWriteAllowed(PRIVATE, currentPart.rows[0].visibility);
+      // P 改私密会令其失公开，若该 P 正被其它内容作为前置项引用，须阻止并回滚。
+      const conflicts = await findPrivatePartPrerequisiteConflicts(client, 'track_point', partId);
+      if (conflicts.length > 0) {
+        throw new PrerequisiteConflictError('该分 P 正被其它内容作为前置项引用，无法转为私密，请先移除相关前置项');
+      }
+      // 记录需撤销的旧公开直链（视频原画 + 转码 + 封面），供云端 purge 与授权回收（E04）。
+      const videoIdResult = await client.query('SELECT video_id FROM track_parts WHERE id = $1', [partId]);
+      const revokedVideoId = videoIdResult.rows[0]?.video_id;
+      if (revokedVideoId) {
+        const keys = await getVideoObjectKeys(client, revokedVideoId);
+        await recordVisibilityRevocations(client, {
+          objectType: 'track_part', objectId: partId, keys,
+          reason: '分 P 改为私密，撤销旧公开直链', adminId: req.admin.adminId
+        });
+      }
+    }
+    const result = await client.query(
+      `UPDATE track_parts
+       SET part_no = $1, title = $2, duration = $3, visibility = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5 AND track_id = $6
+       RETURNING id, track_id, part_no, video_id, title, duration, visibility, created_at, updated_at`,
+      [partNo, title, duration, partVisibility, partId, trackId]
+    );
+    // 刷新父课程派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
+    await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
+    await client.query('COMMIT');
     res.json({ data: result.rows[0] });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (respondVisibilityError(res, error)) return;
     if (error.code === '23505') {
       res.status(409).json({ message: '这个 P 序号已经存在' });
       return;
     }
     next(error);
+  } finally {
+    client.release();
   }
 });
 
 // DELETE /api/tracks/:id/parts/:partId
+// 同事务锁父后删除 P 并刷新派生可见性。删除 P 可能导致课程变私密，
+// 若“新变私密”则经私密写入开关与前置引用检查保护（409 回滚）。
 tracksRouter.delete('/:id/parts/:partId', requireSuperAdmin, async (req, res, next) => {
   try {
     const trackId = normalizeId(req.params.id);
@@ -818,25 +914,38 @@ tracksRouter.delete('/:id/parts/:partId', requireSuperAdmin, async (req, res, ne
     }
 
     const part = partResult.rows[0];
-    if (part.video_id) {
-      await deleteVideoObjects(part.video_id, [part.video_url, part.cover_url]);
-    }
-
+    // Only remove cloud objects after authorization and database commit succeed.
+    let removedVideo = false;
+    const deferredFileKeys = [];
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await deleteWithReferences(client, { objectType: 'track_part', objectId: partId, objectTitle: part.title || '', adminId: req.admin.adminId });
+      // 锁父（曲目）后删除 P 并刷新派生可见性。
+      await lockCourse(client, 'track_point', trackId);
+      const previousVisibility = (await client.query('SELECT visibility FROM track_points WHERE id = $1 FOR UPDATE', [trackId])).rows[0]?.visibility;
+      // 删除 P 前：若该 P 正被其它内容作为前置项引用，删除会使前置关系失效，须阻止。
+      const partPrereqConflicts = await findPrivatePartPrerequisiteConflicts(client, 'track_point', partId);
+      if (partPrereqConflicts.length > 0) {
+        throw new PrerequisiteConflictError('该分 P 正被其它内容作为前置项引用，无法删除，请先移除相关前置项');
+      }
+      await deleteWithReferences(client, { objectType: 'track_part', objectId: partId, objectTitle: part.title || '', adminId: req.admin.adminId, deferredFileKeys });
       await client.query('DELETE FROM track_parts WHERE id = $1 AND track_id = $2', [partId, trackId]);
       await client.query('UPDATE track_points SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [trackId]);
       if (part.video_id) {
-        const referenceResult = await client.query('SELECT 1 FROM track_parts WHERE video_id = $1 LIMIT 1', [part.video_id]);
+        const referenceResult = await client.query('SELECT 1 FROM track_parts WHERE video_id = $1 UNION ALL SELECT 1 FROM knowledge_parts WHERE video_id = $1 LIMIT 1', [part.video_id]);
         if (referenceResult.rowCount === 0) {
           await client.query('DELETE FROM videos WHERE id = $1', [part.video_id]);
+          removedVideo = true;
         }
       }
+      // 删除 P 可能导致课程变私密；若“新变私密”则经私密写入开关与前置引用检查保护。
+      await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
       await client.query('COMMIT');
+      await Promise.all(deferredFileKeys.map((key) => deleteFromBucket(key).catch(() => {})));
+      if (removedVideo) await deleteVideoObjects(part.video_id, [part.video_url, part.cover_url]);
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
+      if (respondVisibilityError(res, error)) return;
       throw error;
     } finally {
       client.release();

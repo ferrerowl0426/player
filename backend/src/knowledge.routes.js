@@ -1,7 +1,24 @@
 import { Router } from 'express';
+import { saveContentAttachments } from './attachment-save.js';
+import { serializeAttachments } from './attachment-access.js';
 import { v4 as uuid } from 'uuid';
 import { pool } from './db.js';
-import { requireSuperAdmin } from './auth.js';
+import { requireSuperAdmin, optionalContentViewer } from './auth.js';
+import {
+  canViewPrivate,
+  publicCoursePredicate,
+  normalizeStoredVisibility,
+  PRIVATE,
+  resolveVisibilityInput,
+  lockCourse,
+  refreshCourseVisibility
+} from './content-visibility.js';
+import {
+  assertPrivateWriteAllowed,
+  finalizeCourseVisibility,
+  findPrivatePartPrerequisiteConflicts,
+  PrerequisiteConflictError
+} from './content-privacy-config.js';
 import {
   abortMultipartUpload,
   completeMultipartUpload,
@@ -10,13 +27,13 @@ import {
   createMultipartPartUrl,
   deleteFromBucket,
   ensureObjectExists,
-  finalizePdfInlineMetadata,
   getPublicUrl,
   normalizePublicUrl
 } from './storage.js';
 import { createInitialRenditions, deleteVideoObjects } from './transcode.js';
 import { toPlaybackUrl } from './playback-url.js';
 import { deleteWithReferences } from './deletion.js';
+import { recordVisibilityRevocations, getVideoObjectKeys } from './revocation.js';
 
 function id(value) {
   const number = Number(value);
@@ -58,52 +75,6 @@ function size(value) {
   return Number.isFinite(number) && number >= 0 ? Math.round(number) : 0;
 }
 
-function isAttachmentKey(value) {
-  return typeof value === 'string' && value.startsWith('attachments/') && !value.includes('..');
-}
-
-function normalizeAttachments(values) {
-  return (Array.isArray(values) ? values : [])
-    .map((item, index) => ({
-      fileName: text(item?.fileName || item?.file_name),
-      fileUrl: text(item?.fileUrl || item?.file_url),
-      fileKey: text(item?.fileKey || item?.file_key),
-      fileType: text(item?.fileType || item?.file_type),
-      fileSize: size(item?.fileSize || item?.file_size),
-      sortOrder: Number.isInteger(Number(item?.sortOrder ?? item?.sort_order)) ? Number(item?.sortOrder ?? item?.sort_order) : index
-    }))
-    .filter((item) => item.fileName && item.fileUrl && isAttachmentKey(item.fileKey));
-}
-
-async function replaceAttachments({ objectType, objectId, values }) {
-  const next = normalizeAttachments(values);
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const old = await client.query('SELECT file_key FROM content_attachments WHERE object_type = $1 AND object_id = $2', [objectType, objectId]);
-    await client.query('DELETE FROM content_attachments WHERE object_type = $1 AND object_id = $2', [objectType, objectId]);
-    for (const [index, attachment] of next.entries()) {
-      await ensureObjectExists(attachment.fileKey);
-      if (String(attachment.fileType || '').toLowerCase().includes('application/pdf')) {
-        await finalizePdfInlineMetadata(attachment.fileKey);
-      }
-      await client.query(
-        `INSERT INTO content_attachments (object_type, object_id, file_name, file_url, file_key, file_type, file_size, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [objectType, objectId, attachment.fileName, attachment.fileUrl, attachment.fileKey, attachment.fileType, attachment.fileSize, index]
-      );
-    }
-    await client.query('COMMIT');
-    const kept = new Set(next.map((item) => item.fileKey));
-    await Promise.all(old.rows.map((row) => row.file_key).filter((key) => key && !kept.has(key)).map((key) => deleteFromBucket(key).catch(() => {})));
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
 function mapPart(row) {
   const videoUrl = normalizePublicUrl(row.video_url);
   return {
@@ -124,26 +95,29 @@ function multipartParts(values) {
 }
 
 async function findKnowledgePoint(pointId) {
-  const result = await pool.query('SELECT id, name, cover, description, created_at, updated_at FROM knowledge_points WHERE id = $1', [pointId]);
+  const result = await pool.query('SELECT id, name, cover, description, created_at, updated_at, visibility FROM knowledge_points WHERE id = $1', [pointId]);
   return result.rows[0] || null;
 }
 
-async function attachments(objectType, objectId) {
+async function attachments(objectType, objectId, viewer) {
   const result = await pool.query(
-    `SELECT id, file_name, file_url, file_key, file_type, file_size, sort_order, created_at
+    `SELECT id, visibility, file_name, file_url, file_key, file_type, file_size, sort_order, created_at
      FROM content_attachments WHERE object_type = $1 AND object_id = $2
      ORDER BY sort_order ASC, created_at ASC, id ASC`,
     [objectType, objectId]
   );
-  return result.rows.map((row) => ({ ...row, file_url: normalizePublicUrl(row.file_url) }));
+  return serializeAttachments(result.rows.map((row) => ({ ...row, file_url: normalizePublicUrl(row.file_url) })), viewer);
 }
 
-async function pointParts(pointId) {
+async function pointParts(pointId, canView = true) {
+  const visibilityFilter = canView
+    ? ''
+    : `AND COALESCE(NULLIF(kp.visibility, ''), 'public') = 'public'`;
   const result = await pool.query(
-    `SELECT kp.id, kp.part_no, kp.title, kp.duration, kp.video_id,
+    `SELECT kp.id, kp.part_no, kp.title, kp.duration, kp.video_id, kp.visibility,
             v.video_url, v.cover_url AS video_cover_url
      FROM knowledge_parts kp LEFT JOIN videos v ON v.id = kp.video_id
-     WHERE kp.knowledge_point_id = $1 ORDER BY kp.part_no ASC, kp.id ASC`,
+     WHERE kp.knowledge_point_id = $1 ${visibilityFilter} ORDER BY kp.part_no ASC, kp.id ASC`,
     [pointId]
   );
 
@@ -259,27 +233,118 @@ async function findCollection(collectionId) {
   return result.rows[0] || null;
 }
 
+// 当前登录者（经 optionalContentViewer 解析）是否能查看私密内容：仅有效 teacher / super_admin。
+function viewerCanSeePrivate(req) {
+  return canViewPrivate(req.contentViewer);
+}
+
+// 游客/学生读取时，仅统计/列出公开 P。
+function publicPartCountExpression(canView) {
+  return canView
+    ? 'COUNT(kpp.id)'
+    : "COUNT(CASE WHEN COALESCE(NULLIF(kpp.visibility, ''), 'public') = 'public' THEN kpp.id END)";
+}
+
+// 知识点（knowledge_point）列表 / 搜索查询构造。
+// 游客/学生：父课程必须满足 public 且存在至少一个公开 P（publicCoursePredicate），P 计数仅公开 P。
+export function buildKnowledgePointsListQuery({ canView, keyword }) {
+  const params = [];
+  const conditions = [];
+  if (keyword) {
+    params.push(`%${keyword}%`);
+    params.push(`%${keyword}%`);
+    conditions.push(`($1 = '' OR c.name ILIKE $2 OR c.description ILIKE $2)`);
+  }
+  if (!canView) {
+    conditions.push(publicCoursePredicate('knowledge_point'));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const sql = `
+    SELECT c.id, c.name, c.cover, c.description, c.updated_at,
+           ${publicPartCountExpression(canView)}::int AS part_count
+    FROM knowledge_points c
+    LEFT JOIN knowledge_parts kpp ON kpp.knowledge_point_id = c.id
+    ${where}
+    GROUP BY c.id
+    ORDER BY c.updated_at DESC, c.id DESC`;
+  return { sql, params };
+}
+
+// 知识点集（knowledge_collections）列表 / 搜索查询构造。
+// 知识点集本身无 visibility 字段；游客/学生仅展示包含至少一个公开知识点的合集，point_count 仅统计可见知识点。
+export function buildKnowledgeCollectionsListQuery({ canView, keyword }) {
+  const params = [];
+  const conditions = [];
+  if (keyword) {
+    params.push(`%${keyword}%`);
+    params.push(`%${keyword}%`);
+    conditions.push(`($1 = '' OR c.name ILIKE $2 OR c.description ILIKE $2)`);
+  }
+  if (!canView) {
+    conditions.push(`EXISTS (
+      SELECT 1 FROM knowledge_collection_items ci
+      JOIN knowledge_points kp ON kp.id = ci.knowledge_point_id
+      WHERE ci.collection_id = c.id
+        AND COALESCE(NULLIF(kp.visibility, ''), 'public') = 'public'
+        AND EXISTS (SELECT 1 FROM knowledge_parts pp WHERE pp.knowledge_point_id = kp.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')
+    )`);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const pointCountExpr = canView
+    ? 'COUNT(ci.knowledge_point_id)'
+    : `COUNT(CASE WHEN COALESCE(NULLIF(kp.visibility, ''), 'public') = 'public' THEN ci.knowledge_point_id END)`;
+  const sql = `
+    SELECT c.id, c.name, c.cover, c.description, c.updated_at,
+           ${pointCountExpr}::int AS point_count
+    FROM knowledge_collections c
+    LEFT JOIN knowledge_collection_items ci ON ci.collection_id = c.id
+    LEFT JOIN knowledge_points kp ON kp.id = ci.knowledge_point_id
+    ${where}
+    GROUP BY c.id
+    ORDER BY c.updated_at DESC, c.id DESC`;
+  return { sql, params };
+}
+
+// 知识点集详情内的知识点查询构造：游客/学生仅可见公开知识点，P 计数仅公开 P。
+export function buildKnowledgeCollectionPointsQuery({ canView, collectionId }) {
+  const params = [collectionId];
+  const courseFilter = canView
+    ? ''
+    : `AND COALESCE(NULLIF(kp.visibility, ''), 'public') = 'public'
+       AND EXISTS (SELECT 1 FROM knowledge_parts pp WHERE pp.knowledge_point_id = kp.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')`;
+  const sql = `
+    SELECT kp.id, kp.name, kp.cover, kp.description, kp.updated_at,
+           ${publicPartCountExpression(canView)}::int AS part_count
+    FROM knowledge_collection_items ci
+    JOIN knowledge_points kp ON kp.id = ci.knowledge_point_id
+    LEFT JOIN knowledge_parts kpp ON kpp.knowledge_point_id = kp.id
+    WHERE ci.collection_id = $1 ${courseFilter}
+    GROUP BY kp.id, ci.sort_order
+    ORDER BY ci.sort_order ASC, kp.id ASC`;
+  return { sql, params };
+}
+
+// 统一把带有 status 的已知错误映射为对应的 HTTP 响应（VisibilityError / 私密写入 / 前置引用冲突等）。
+function respondVisibilityError(res, error) {
+  if (error && error.status) {
+    res.status(error.status).json({ message: error.message });
+    return true;
+  }
+  return false;
+}
+
 export const knowledgeRouter = Router();
 
-knowledgeRouter.get('/', async (req, res, next) => {
+knowledgeRouter.get('/', optionalContentViewer, async (req, res, next) => {
   try {
     const keyword = text(req.query.keyword);
-    const query = `%${keyword}%`;
+    const canView = viewerCanSeePrivate(req);
+    const { sql: pointsSql, params: pointsParams } = buildKnowledgePointsListQuery({ canView, keyword });
+    const { sql: collectionsSql, params: collectionsParams } = buildKnowledgeCollectionsListQuery({ canView, keyword });
+
     const [points, knowledgeCollections] = await Promise.all([
-      pool.query(
-        `SELECT kp.id, kp.name, kp.cover, kp.description, kp.updated_at, COUNT(kpp.id)::int AS part_count
-         FROM knowledge_points kp LEFT JOIN knowledge_parts kpp ON kpp.knowledge_point_id = kp.id
-         WHERE $1 = '' OR kp.name ILIKE $2 OR kp.description ILIKE $2
-         GROUP BY kp.id ORDER BY kp.updated_at DESC, kp.id DESC`,
-        [keyword, query]
-      ),
-      pool.query(
-        `SELECT c.id, c.name, c.cover, c.description, c.updated_at, COUNT(ci.knowledge_point_id)::int AS point_count
-         FROM knowledge_collections c LEFT JOIN knowledge_collection_items ci ON ci.collection_id = c.id
-         WHERE $1 = '' OR c.name ILIKE $2 OR c.description ILIKE $2
-         GROUP BY c.id ORDER BY c.updated_at DESC, c.id DESC`,
-        [keyword, query]
-      )
+      pool.query(pointsSql, pointsParams),
+      pool.query(collectionsSql, collectionsParams)
     ]);
     // 口径统一：与 /api/tracks 的 track_points / track_collections 对齐。
     // points 仅为旧字段兼容别名，新代码一律读 knowledge_points。
@@ -296,7 +361,7 @@ knowledgeRouter.get('/', async (req, res, next) => {
   }
 });
 
-knowledgeRouter.get('/collections/:id', async (req, res, next) => {
+knowledgeRouter.get('/collections/:id', optionalContentViewer, async (req, res, next) => {
   try {
     const collectionId = id(req.params.id);
     const collection = collectionId ? await findCollection(collectionId) : null;
@@ -304,23 +369,19 @@ knowledgeRouter.get('/collections/:id', async (req, res, next) => {
       res.status(collectionId ? 404 : 400).json({ message: collectionId ? '知识点集不存在' : '知识点集 ID 无效' });
       return;
     }
+    const canView = viewerCanSeePrivate(req);
+    const { sql, params } = buildKnowledgeCollectionPointsQuery({ canView, collectionId });
     const [points, libraryResources] = await Promise.all([
-      pool.query(
-        `SELECT kp.id, kp.name, kp.cover, kp.description, kp.updated_at, COUNT(kpp.id)::int AS part_count
-         FROM knowledge_collection_items ci JOIN knowledge_points kp ON kp.id = ci.knowledge_point_id
-         LEFT JOIN knowledge_parts kpp ON kpp.knowledge_point_id = kp.id
-         WHERE ci.collection_id = $1 GROUP BY kp.id, ci.sort_order ORDER BY ci.sort_order ASC, kp.id ASC`,
-        [collectionId]
-      ),
+      pool.query(sql, params),
       linkedLibraryResources('knowledge_collection', collectionId)
     ]);
-    res.json({ data: { ...mapContent(collection), points: points.rows.map(mapContent), attachments: await attachments('knowledge_collection', collectionId), library_resources: libraryResources } });
+    res.json({ data: { ...mapContent(collection), points: points.rows.map(mapContent), attachments: await attachments('knowledge_collection', collectionId, req.contentViewer), library_resources: libraryResources } });
   } catch (error) {
     next(error);
   }
 });
 
-knowledgeRouter.get('/:id', async (req, res, next) => {
+knowledgeRouter.get('/:id', optionalContentViewer, async (req, res, next) => {
   try {
     const pointId = id(req.params.id);
     const point = pointId ? await findKnowledgePoint(pointId) : null;
@@ -328,7 +389,15 @@ knowledgeRouter.get('/:id', async (req, res, next) => {
       res.status(pointId ? 404 : 400).json({ message: pointId ? '知识点不存在' : '知识点 ID 无效' });
       return;
     }
-    res.json({ data: { ...mapContent(point), parts: await pointParts(pointId), attachments: await attachments('knowledge_point', pointId), knowledge_collections: await pointCollections(pointId), library_resources: await pointLibraryResources(pointId) } });
+    // 私密知识点对非授权访问者不可见（与列表一致的隐藏策略）。
+    if (!viewerCanSeePrivate(req) && normalizeStoredVisibility(point.visibility) === PRIVATE) {
+      res.status(404).json({ message: '知识点不存在' });
+      return;
+    }
+    const canView = viewerCanSeePrivate(req);
+    const parts = await pointParts(pointId, canView);
+    if (!canView && !parts.length) return res.status(404).json({ message: '知识点不存在' });
+    res.json({ data: { ...mapContent(point), parts, attachments: await attachments('knowledge_point', pointId, req.contentViewer || (req.admin ? { role: 'super_admin', status: 'active' } : null)), knowledge_collections: await pointCollections(pointId), library_resources: await pointLibraryResources(pointId) } });
   } catch (error) {
     next(error);
   }
@@ -341,9 +410,11 @@ knowledgeRouter.post('/', requireSuperAdmin, async (req, res, next) => {
       res.status(400).json({ message: '请填写知识点名称' });
       return;
     }
+    // 新建空课默认为 private：此时没有任何公开 P，派生可见性即为 private。
+    // 这是派生默认态，不经私密写入开关拦截（私密写入开关只保护“新的私密写入”）。
     const result = await pool.query(
-      `INSERT INTO knowledge_points (name, cover, description) VALUES ($1, $2, $3)
-       RETURNING id, name, cover, description, created_at, updated_at`,
+      `INSERT INTO knowledge_points (name, cover, description, visibility) VALUES ($1, $2, $3, 'private')
+       RETURNING id, name, cover, description, created_at, updated_at, visibility`,
       [name, text(req.body.cover), text(req.body.description)]
     );
     res.status(201).json({ data: mapContent(result.rows[0]) });
@@ -352,7 +423,10 @@ knowledgeRouter.post('/', requireSuperAdmin, async (req, res, next) => {
   }
 });
 
+// PATCH /api/knowledge/:id
+// 课程字段 visibility 只能派生（刷新得到），不接收前端输入。同事务锁父后保存并刷新派生可见性。
 knowledgeRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const pointId = id(req.params.id);
     const name = text(req.body.name);
@@ -360,18 +434,25 @@ knowledgeRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       res.status(400).json({ message: '知识点参数无效' });
       return;
     }
-    const result = await pool.query(
+    await client.query('BEGIN');
+    // 锁父（知识点）后保存再刷新派生可见性。
+    await lockCourse(client, 'knowledge_point', pointId);
+    const previousVisibility = (await client.query('SELECT visibility FROM knowledge_points WHERE id = $1 FOR UPDATE', [pointId])).rows[0]?.visibility;
+    const result = await client.query(
       `UPDATE knowledge_points SET name = $1, cover = $2, description = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4 RETURNING id, name, cover, description, created_at, updated_at`,
+       WHERE id = $4 RETURNING id, name, cover, description, created_at, updated_at, visibility`,
       [name, text(req.body.cover), text(req.body.description), pointId]
     );
-    if (!result.rowCount) {
-      res.status(404).json({ message: '知识点不存在' });
-      return;
-    }
+    // 刷新派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
+    await finalizeCourseVisibility(client, 'knowledge_point', pointId, previousVisibility);
+    await client.query('COMMIT');
     res.json({ data: mapContent(result.rows[0]) });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (respondVisibilityError(res, error)) return;
     next(error);
+  } finally {
+    client.release();
   }
 });
 
@@ -555,8 +636,8 @@ knowledgeRouter.put('/:id/attachments', requireSuperAdmin, async (req, res, next
       res.status(404).json({ message: '知识点不存在' });
       return;
     }
-    await replaceAttachments({ objectType: 'knowledge_point', objectId: pointId, values: req.body.attachments });
-    res.json({ data: await attachments('knowledge_point', pointId) });
+    await saveContentAttachments({ pool, objectType: 'knowledge_point', objectId: pointId, values: req.body.attachments, ensureObjectExists, getPublicUrl });
+    res.json({ data: await attachments('knowledge_point', pointId, req.contentViewer || (req.admin ? { role: 'super_admin', status: 'active' } : null)) });
   } catch (error) {
     next(error);
   }
@@ -631,7 +712,10 @@ knowledgeRouter.post('/:id/parts/upload/abort', requireSuperAdmin, async (req, r
   }
 });
 
+// POST /api/knowledge/:id/parts
+// 同事务锁父后保存并刷新派生可见性。新 P 缺省 public；显式 private 受私密写入开关保护。
 knowledgeRouter.post('/:id/parts', requireSuperAdmin, async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const pointId = id(req.params.id);
     const partNo = id(req.body.partNo);
@@ -647,44 +731,56 @@ knowledgeRouter.post('/:id/parts', requireSuperAdmin, async (req, res, next) => 
       res.status(404).json({ message: '知识点不存在' });
       return;
     }
-    const videoHead = await ensureObjectExists(key);
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const video = (await client.query(
-        `INSERT INTO videos (title, description, video_url, cover_url) VALUES ($1, $2, $3, '') RETURNING id, video_url`,
-        [title, `知识点 ${point.name} 的 P${partNo}`, getPublicUrl(key)]
-      )).rows[0];
-      await createInitialRenditions(client, {
-        videoId: video.id,
-        sourceUrl: video.video_url,
-        sourceSize: Number(videoHead.ContentLength || 0)
-      });
-      const part = (await client.query(
-        `INSERT INTO knowledge_parts (knowledge_point_id, part_no, video_id, title, duration) VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, knowledge_point_id, part_no, video_id, title, duration, created_at, updated_at`,
-        [pointId, partNo, video.id, title, duration]
-      )).rows[0];
-      await client.query('UPDATE knowledge_points SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [pointId]);
-      await client.query('COMMIT');
-      res.status(201).json({ data: { ...part, video_url: getPublicUrl(key) } });
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      await deleteFromBucket(key).catch(() => {});
-      throw error;
-    } finally {
-      client.release();
+    // 新 P 缺省 public；显式 private 受私密写入开关保护。
+    const partVisibility = resolveVisibilityInput(req.body.visibility, undefined);
+    await client.query('BEGIN');
+    // 锁父（知识点）后保存并刷新派生可见性。
+    await lockCourse(client, 'knowledge_point', pointId);
+    const previousVisibility = (await client.query('SELECT visibility FROM knowledge_points WHERE id = $1 FOR UPDATE', [pointId])).rows[0]?.visibility;
+    // 新私密写入（之前不存在该 P）需经开关保护。
+    if (partVisibility === PRIVATE) {
+      assertPrivateWriteAllowed(PRIVATE, undefined);
     }
+    const videoHead = await ensureObjectExists(key);
+    const video = (await client.query(
+      `INSERT INTO videos (title, description, video_url, cover_url) VALUES ($1, $2, $3, '') RETURNING id, video_url`,
+      [title, `知识点 ${point.name} 的 P${partNo}`, getPublicUrl(key)]
+    )).rows[0];
+    await createInitialRenditions(client, {
+      videoId: video.id,
+      sourceUrl: video.video_url,
+      sourceSize: Number(videoHead.ContentLength || 0)
+    });
+    const part = (await client.query(
+      `INSERT INTO knowledge_parts (knowledge_point_id, part_no, video_id, title, duration, visibility) VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, knowledge_point_id, part_no, video_id, title, duration, visibility, created_at, updated_at`,
+      [pointId, partNo, video.id, title, duration, partVisibility]
+    )).rows[0];
+    // 刷新父课程派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
+    await finalizeCourseVisibility(client, 'knowledge_point', pointId, previousVisibility);
+    await client.query('COMMIT');
+    res.status(201).json({ data: { ...part, video_url: getPublicUrl(key) } });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    // 政策拦截（私密写入开关 / 前置引用冲突）不删除已上传文件，便于管理员修正后重试。
+    if (respondVisibilityError(res, error)) return;
     if (error.code === '23505') {
       res.status(409).json({ message: '这个 P 序号已经存在' });
+      await deleteFromBucket(text(req.body.videoKey || '')).catch(() => {});
       return;
     }
+    await deleteFromBucket(text(req.body.videoKey || '')).catch(() => {});
     next(error);
+  } finally {
+    client.release();
   }
 });
 
+// PATCH /api/knowledge/:id/parts/:partId
+// 同事务锁父后保存并刷新派生可见性。P 的 visibility 缺省保留旧值（旧 private 不被重置），
+// 显式改私密受私密写入开关保护；课程因此“新变私密”时再经前置引用检查保护。
 knowledgeRouter.patch('/:id/parts/:partId', requireSuperAdmin, async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const pointId = id(req.params.id);
     const partId = id(req.params.partId);
@@ -695,26 +791,62 @@ knowledgeRouter.patch('/:id/parts/:partId', requireSuperAdmin, async (req, res, 
       res.status(400).json({ message: '知识点 P 参数无效' });
       return;
     }
-    const result = await pool.query(
-      `UPDATE knowledge_parts SET part_no = $1, title = $2, duration = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4 AND knowledge_point_id = $5 RETURNING id, knowledge_point_id, part_no, video_id, title, duration, created_at, updated_at`,
-      [partNo, title, duration, partId, pointId]
-    );
-    if (!result.rowCount) {
+    await client.query('BEGIN');
+    // 锁父（知识点）后保存并刷新派生可见性。
+    await lockCourse(client, 'knowledge_point', pointId);
+    const previousVisibility = (await client.query('SELECT visibility FROM knowledge_points WHERE id = $1 FOR UPDATE', [pointId])).rows[0]?.visibility;
+    const currentPart = await client.query('SELECT visibility FROM knowledge_parts WHERE id = $1 AND knowledge_point_id = $2 FOR UPDATE', [partId, pointId]);
+    if (!currentPart.rowCount) {
+      await client.query('ROLLBACK');
       res.status(404).json({ message: '知识点 P 不存在' });
       return;
     }
-    await pool.query('UPDATE knowledge_points SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [pointId]);
+    // 缺省保留旧值；显式改私密（之前非 private）受开关保护。
+    const partVisibility = resolveVisibilityInput(req.body.visibility, currentPart.rows[0].visibility);
+    const partBecamePrivate = partVisibility === PRIVATE && normalizeStoredVisibility(currentPart.rows[0].visibility) !== PRIVATE;
+    if (partBecamePrivate) {
+      assertPrivateWriteAllowed(PRIVATE, currentPart.rows[0].visibility);
+      // P 改私密会令其失公开，若该 P 正被其它内容作为前置项引用，须阻止并回滚。
+      const conflicts = await findPrivatePartPrerequisiteConflicts(client, 'knowledge_point', partId);
+      if (conflicts.length > 0) {
+        throw new PrerequisiteConflictError('该知识点 P 正被其它内容作为前置项引用，无法转为私密，请先移除相关前置项');
+      }
+      // 记录需撤销的旧公开直链（视频原画 + 转码 + 封面），供云端 purge 与授权回收（E04）。
+      const videoIdResult = await client.query('SELECT video_id FROM knowledge_parts WHERE id = $1', [partId]);
+      const revokedVideoId = videoIdResult.rows[0]?.video_id;
+      if (revokedVideoId) {
+        const keys = await getVideoObjectKeys(client, revokedVideoId);
+        await recordVisibilityRevocations(client, {
+          objectType: 'knowledge_part', objectId: partId, keys,
+          reason: '知识点 P 改为私密，撤销旧公开直链', adminId: req.admin.adminId
+        });
+      }
+    }
+    const result = await client.query(
+      `UPDATE knowledge_parts SET part_no = $1, title = $2, duration = $3, visibility = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5 AND knowledge_point_id = $6 RETURNING id, knowledge_point_id, part_no, video_id, title, duration, visibility, created_at, updated_at`,
+      [partNo, title, duration, partVisibility, partId, pointId]
+    );
+    // 刷新父课程派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
+    await finalizeCourseVisibility(client, 'knowledge_point', pointId, previousVisibility);
+    await client.query('COMMIT');
     res.json({ data: result.rows[0] });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (respondVisibilityError(res, error)) return;
     if (error.code === '23505') {
       res.status(409).json({ message: '这个 P 序号已经存在' });
       return;
     }
     next(error);
+  } finally {
+    client.release();
   }
 });
 
+// DELETE /api/knowledge/:id/parts/:partId
+// 同事务锁父后删除 P 并刷新派生可见性。删除 P 可能导致课程变私密，
+// 若“新变私密”则经私密写入开关与前置引用检查保护（409 回滚）。
 knowledgeRouter.delete('/:id/parts/:partId', requireSuperAdmin, async (req, res, next) => {
   try {
     const pointId = id(req.params.id);
@@ -729,21 +861,35 @@ knowledgeRouter.delete('/:id/parts/:partId', requireSuperAdmin, async (req, res,
       return;
     }
     const item = part.rows[0];
-    if (item.video_id) {
-      await deleteVideoObjects(item.video_id, [item.video_url, item.cover_url]);
-    }
+    // Cloud cleanup must not precede a transaction that can be rejected.
+    let removedVideo = false;
+    const deferredFileKeys = [];
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await deleteWithReferences(client, { objectType: 'knowledge_part', objectId: partId, objectTitle: item.title || '', adminId: req.admin.adminId });
+      // 锁父（知识点）后删除 P 并刷新派生可见性。
+      await lockCourse(client, 'knowledge_point', pointId);
+      const previousVisibility = (await client.query('SELECT visibility FROM knowledge_points WHERE id = $1 FOR UPDATE', [pointId])).rows[0]?.visibility;
+      // 删除 P 前：若该 P 正被其它内容作为前置项引用，删除会使前置关系失效，须阻止。
+      const partPrereqConflicts = await findPrivatePartPrerequisiteConflicts(client, 'knowledge_point', partId);
+      if (partPrereqConflicts.length > 0) {
+        throw new PrerequisiteConflictError('该知识点 P 正被其它内容作为前置项引用，无法删除，请先移除相关前置项');
+      }
+      await deleteWithReferences(client, { objectType: 'knowledge_part', objectId: partId, objectTitle: item.title || '', adminId: req.admin.adminId, deferredFileKeys });
       await client.query('DELETE FROM knowledge_parts WHERE id = $1 AND knowledge_point_id = $2', [partId, pointId]);
       await client.query('UPDATE knowledge_points SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [pointId]);
-      if (item.video_id && !(await client.query('SELECT 1 FROM knowledge_parts WHERE video_id = $1 LIMIT 1', [item.video_id])).rowCount) {
+      if (item.video_id && !(await client.query('SELECT 1 FROM knowledge_parts WHERE video_id = $1 UNION ALL SELECT 1 FROM track_parts WHERE video_id = $1 LIMIT 1', [item.video_id])).rowCount) {
         await client.query('DELETE FROM videos WHERE id = $1', [item.video_id]);
+        removedVideo = true;
       }
+      // 删除 P 可能导致课程变私密；若“新变私密”则经私密写入开关与前置引用检查保护。
+      await finalizeCourseVisibility(client, 'knowledge_point', pointId, previousVisibility);
       await client.query('COMMIT');
+      await Promise.all(deferredFileKeys.map((key) => deleteFromBucket(key).catch(() => {})));
+      if (removedVideo) await deleteVideoObjects(item.video_id, [item.video_url, item.cover_url]);
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
+      if (respondVisibilityError(res, error)) return;
       throw error;
     } finally {
       client.release();

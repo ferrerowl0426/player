@@ -1,8 +1,10 @@
 import Link from 'next/link';
 
 function Cover({ cover, title, collection }) {
+  // stack 堆叠装饰只用于无封面的占位图；有封面图时叠加会变成意义不明的半透明横条。
+  const stack = collection && !cover;
   return (
-    <div className={collection ? 'cover stack' : 'cover'}>
+    <div className={stack ? 'cover stack' : 'cover'}>
       {cover ? <img src={cover} alt={title} /> : <span className="disc"><span className="lbl"><i /></span></span>}
     </div>
   );

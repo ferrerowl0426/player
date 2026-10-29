@@ -238,7 +238,8 @@ GET  /files/:fileId/signed-url?source=library|attachment
 - 排序参数当前页面使用：`updated_desc`、`updated_asc`、`title`；
 - 课程四分区类型：`track_point`、`track_collection`、`knowledge_point`、`knowledge_collection`；
 - 文件预签名返回兼容 `{ url }` 或 `{ signedUrl }`；
-- 登录返回建议稳定为 `{ token, student, expiresAt }`。
+- 登录返回建议稳定为 `{ token, student, expiresAt }`；
+- 私密内容（`visibility='private'`）由后端过滤，学生端列表/详情/作业不会返回私密项；私密视频不下发永久地址，改下发 `authorizeEndpoint`（`/api/playback/videos/:id/play-url`），学生端无需处理。
 
 ---
 
@@ -419,7 +420,23 @@ PDF/其他  → getSignedUrl → wx.downloadFile → wx.openDocument(showMenu: t
 
 ---
 
-## 9. 后续修改 README 的规则
+## 9. 私密内容与学生端行为
+
+后端已上线「分 P 公开/私密」能力（`visibility` 字段，`public` / `private`），小程序作为**纯学生端**的结论是：**前端无需额外改动即可正确过滤私密内容**。原因如下：
+
+- 课程四分区列表、合集详情、单课/单知识点详情、附件、作业的**后端 SQL 均已按「公开」过滤**（`COALESCE(NULLIF(visibility,''),'public') = 'public'` 及「存在公开 P」派生口径），学生端拿到的都是公开数据。
+- 私密 P 不会下发永久视频地址，而是下发 `authorizeEndpoint`（`/api/playback/videos/:id/play-url`）占位；但学生端根本看不到私密 P，因此详情页只需消费公开 P 的 `videoUrl` / `playUrl`，无需适配授权端点。
+- 附件下载已统一走 `/files/:fileId/signed-url`（`services/files.js` 的 `getSignedUrl()`），非永久直链，符合「下载前授权」要求。
+
+协作约束：
+
+- 小程序端**不新增管理入口**（公开/私密开关在网页端 `/admin/tracks`、`/admin/knowledge` 编辑页）；
+- 若未来需要在学生端展示「老师端才可见」的私密标识，必须先与网页端口径对齐，不要在页面里自行判断 `visibility` 字段；
+- 学生端历史作业中「教学内容已调整」文案由后端对私密目标脱敏后下发，前端只负责展示。
+
+---
+
+## 10. 后续修改 README 的规则
 
 - 每次新增页面、接口、服务文件、对象类型或播放器行为，都同步更新本文档；
 - 不要把开发计划、阶段表、待办清单写回这里；

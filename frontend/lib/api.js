@@ -322,8 +322,8 @@ export async function deleteKnowledgePoint(id) {
   return parseJsonResponse(response, '删除知识点失败');
 }
 
-export async function createKnowledgePartUpload({ pointId, partNo, title, video }) {
-  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/upload/create`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNo, title, video: { name: video.name, size: video.size, type: video.type } }) });
+export async function createKnowledgePartUpload({ pointId, partNo, title, video, visibility = 'public' }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/upload/create`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNo, title, visibility, video: { name: video.name, size: video.size, type: video.type } }) });
   return parseJsonResponse(response, '创建知识点 P 上传任务失败');
 }
 
@@ -342,13 +342,15 @@ export async function abortKnowledgePartUpload({ pointId, uploadId, key }) {
   return parseJsonResponse(response, '取消知识点 P 上传失败');
 }
 
-export async function saveKnowledgePart({ pointId, partNo, title, duration, videoKey }) {
-  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNo, title, duration, videoKey }) });
+export async function saveKnowledgePart({ pointId, partNo, title, duration, videoKey, visibility = 'public' }) {
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNo, title, duration, videoKey, visibility }) });
   return parseJsonResponse(response, '保存知识点 P 失败');
 }
 
-export async function updateKnowledgePart({ pointId, partId, partNo, title, duration }) {
-  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/${partId}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partNo, title, duration }) });
+export async function updateKnowledgePart({ pointId, partId, partNo, title, duration, visibility }) {
+  const body = { partNo, title, duration };
+  if (visibility !== undefined) body.visibility = visibility;
+  const response = await fetch(`${getApiBaseUrl()}/knowledge/${pointId}/parts/${partId}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return parseJsonResponse(response, '更新知识点 P 失败');
 }
 
@@ -449,7 +451,7 @@ export async function savePrerequisites({ objectType, objectId, prerequisites })
 }
 
 // 创建 P 分段上传任务。
-export async function createTrackPartUpload({ trackId, partNo, title, video }) {
+export async function createTrackPartUpload({ trackId, partNo, title, video, visibility = 'public' }) {
   const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts/upload/create`, {
     method: 'POST',
     credentials: 'include',
@@ -457,6 +459,7 @@ export async function createTrackPartUpload({ trackId, partNo, title, video }) {
     body: JSON.stringify({
       partNo,
       title,
+      visibility,
       video: { name: video.name, size: video.size, type: video.type }
     })
   });
@@ -493,22 +496,24 @@ export async function abortTrackPartUpload({ trackId, uploadId, key }) {
   return parseJsonResponse(response, '取消 P 分段上传失败');
 }
 
-export async function saveTrackPart({ trackId, partNo, title, duration, videoKey }) {
+export async function saveTrackPart({ trackId, partNo, title, duration, videoKey, visibility = 'public' }) {
   const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ partNo, title, duration, videoKey })
+    body: JSON.stringify({ partNo, title, duration, videoKey, visibility })
   });
   return parseJsonResponse(response, '保存 P 分段失败');
 }
 
-export async function updateTrackPart({ trackId, partId, partNo, title, duration }) {
+export async function updateTrackPart({ trackId, partId, partNo, title, duration, visibility }) {
+  const body = { partNo, title, duration };
+  if (visibility !== undefined) body.visibility = visibility;
   const response = await fetch(`${getApiBaseUrl()}/tracks/${trackId}/parts/${partId}`, {
     method: 'PATCH',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ partNo, title, duration })
+    body: JSON.stringify(body)
   });
   return parseJsonResponse(response, '更新 P 分段失败');
 }

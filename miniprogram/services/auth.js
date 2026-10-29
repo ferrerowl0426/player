@@ -26,6 +26,11 @@ function isSessionExpired() {
 
 function clearSession() {
   SESSION_CACHE_KEYS.forEach((key) => wx.removeStorageSync(key));
+  const app = getApp({ allowDefault: true });
+  if (app?.globalData) {
+    app.globalData.token = '';
+    app.globalData.student = null;
+  }
 }
 
 function getStoredToken() {
@@ -79,6 +84,21 @@ async function login({ account, password }) {
 
   const token = data.token || '';
   const student = data.student || data.user || data;
+  const role = String(data.role || data.userType || data.accountType || student?.role || student?.userType || '').toLowerCase();
+  const isStudent = data.isStudent !== undefined ? data.isStudent : student?.isStudent;
+  if (isStudent === false || ['teacher', 'director', 'admin', 'manager', 'staff', '老师', '教导主任', '管理员'].some((item) => role.includes(item))) {
+    const error = new Error('此账号不是学生账号');
+    error.userMessage = error.message;
+    error.isStudent = false;
+    clearSession();
+    throw error;
+  }
+  if (!token || !student) {
+    const error = new Error('登录响应缺少学生会话信息');
+    error.userMessage = '登录失败，请联系老师检查学生账号';
+    clearSession();
+    throw error;
+  }
   const expiresAt = Number(data.expiresAt || data.expires_at || 0) || Date.now() + SESSION_TTL_MS;
   setStoredSession({ token, student, expiresAt });
 
@@ -86,7 +106,11 @@ async function login({ account, password }) {
 }
 
 async function logout() {
-  return request({ url: '/logout', method: 'POST' });
+  try {
+    return await request({ url: '/logout', method: 'POST' });
+  } finally {
+    clearSession();
+  }
 }
 
 async function getMe() {

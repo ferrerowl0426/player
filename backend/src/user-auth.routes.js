@@ -57,6 +57,29 @@ function liveAssignmentFilter() {
            OR (ua.object_type = 'knowledge_part' AND kpp.id IS NOT NULL AND parent_kp.id IS NOT NULL))`;
 }
 
+// 作业目标当前是否“私密不可见”。私密目标对学生脱敏：标题改“教学内容已调整”，
+// 不下发封面、导航地址或可播放入口。message 类型不受影响。
+// 语义与 content-object-access.js 的公开判断一致。
+function assignmentTargetPrivateExpr() {
+  const coursePublic = (table, parts, parent) =>
+    `(COALESCE(NULLIF(${table}.visibility, ''), 'public') = 'public' AND EXISTS (SELECT 1 FROM ${parts} WHERE ${parts}.${parent} = ${table}.id AND COALESCE(NULLIF(${parts}.visibility, ''), 'public') = 'public'))`;
+  return `CASE COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END)
+    WHEN 'message' THEN FALSE
+    WHEN 'video' THEN NOT (v.id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM track_parts x JOIN track_points xc ON xc.id = x.track_id WHERE x.video_id = v.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')
+        UNION ALL SELECT 1 FROM knowledge_parts x JOIN knowledge_points xc ON xc.id = x.knowledge_point_id WHERE x.video_id = v.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')))
+    WHEN 'track_point' THEN NOT (t.id IS NOT NULL AND ${coursePublic('t', 'track_parts', 'track_id')})
+    WHEN 'knowledge_point' THEN NOT (kp.id IS NOT NULL AND ${coursePublic('kp', 'knowledge_parts', 'knowledge_point_id')})
+    WHEN 'track_collection' THEN NOT (c.id IS NOT NULL AND EXISTS (SELECT 1 FROM track_collection_items ci JOIN track_points cc ON cc.id = ci.track_id WHERE ci.collection_id = c.id AND ${coursePublic('cc', 'track_parts', 'track_id')}))
+    WHEN 'knowledge_collection' THEN NOT (kpc.id IS NOT NULL AND EXISTS (SELECT 1 FROM knowledge_collection_items ci JOIN knowledge_points cc ON cc.id = ci.knowledge_point_id WHERE ci.collection_id = kpc.id AND ${coursePublic('cc', 'knowledge_parts', 'knowledge_point_id')}))
+    WHEN 'track_part' THEN NOT (tp.id IS NOT NULL AND COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public' AND ${coursePublic('parent_t', 'track_parts', 'track_id')})
+    WHEN 'knowledge_part' THEN NOT (kpp.id IS NOT NULL AND COALESCE(NULLIF(kpp.visibility, ''), 'public') = 'public' AND ${coursePublic('parent_kp', 'knowledge_parts', 'knowledge_point_id')})
+    ELSE TRUE
+  END`;
+}
+
+const ADJUSTED_TITLE = '教学内容已调整，请联系老师';
+
 export const userAuthRouter = Router();
 
 // POST /api/user/login
@@ -182,10 +205,11 @@ userAuthRouter.get('/assignments/today', requireUser, async (req, res, next) => 
          COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) AS object_type,
          COALESCE(ua.object_id, ua.video_id) AS object_id,
          ua.part_id,
-         ${assignmentTitleExpression()} AS title,
-         ${assignmentCoverExpression()} AS cover_url,
+         CASE WHEN ${assignmentTargetPrivateExpr()} THEN '${ADJUSTED_TITLE}' ELSE ${assignmentTitleExpression()} END AS title,
+         CASE WHEN ${assignmentTargetPrivateExpr()} THEN '' ELSE ${assignmentCoverExpression()} END AS cover_url,
          v.description AS video_description,
-         ${assignmentNavigationExpression()} AS navigation_url,
+         CASE WHEN ${assignmentTargetPrivateExpr()} THEN NULL ELSE ${assignmentNavigationExpression()} END AS navigation_url,
+         ${assignmentTargetPrivateExpr()} AS target_private,
          COALESCE(a.nickname, a.username, a.account, '老师') AS teacher_name
        FROM user_assignments ua
        ${assignmentJoins()}
@@ -227,7 +251,8 @@ userAuthRouter.get('/assignments/history', requireUser, async (req, res, next) =
            COALESCE(json_agg(json_build_object(
              'id', ua.id,
              'object_type', COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END),
-             'title', ${assignmentSnapshotTitleExpression()}
+             'title', CASE WHEN ${assignmentTargetPrivateExpr()} THEN '${ADJUSTED_TITLE}' ELSE ${assignmentSnapshotTitleExpression()} END,
+             'target_private', ${assignmentTargetPrivateExpr()}
            ) ORDER BY ua.created_at ASC) FILTER (WHERE COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) <> 'message'), '[]'::json) AS items
          FROM user_assignments ua
          ${assignmentJoins()}

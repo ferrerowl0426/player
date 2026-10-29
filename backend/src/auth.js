@@ -1,6 +1,22 @@
 import jwt from 'jsonwebtoken';
 import { config } from './config.js';
 import { pool } from './db.js';
+import { createContentViewerResolver, createContentViewerMiddleware } from './content-viewer.js';
+
+const resolveContentViewer = createContentViewerResolver({
+  verifyToken: (token) => jwt.verify(token, config.auth.jwtSecret),
+  loadAdmin: loadCurrentAdmin,
+  loadUser: async (userId) => {
+    const result = await pool.query('SELECT id, status FROM users WHERE id = $1', [userId]);
+    return result.rows[0] || null;
+  }
+});
+
+// Applied to content reads in the next integration step; never accepts roles from the client.
+export const optionalContentViewer = createContentViewerMiddleware(resolveContentViewer, {
+  adminCookieName: config.auth.adminCookieName,
+  userCookieName: config.auth.userCookieName
+});
 
 // 管理端鉴权必须回查数据库当前状态，不能只信 token 里的快照。
 // 原因：JWT 有效期 7 天，老师被停用（或角色被升降）后，旧 token 里的

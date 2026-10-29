@@ -35,6 +35,53 @@ function isLibraryKey(value) {
   return typeof value === 'string' && value.startsWith('library/') && !value.includes('..');
 }
 
+// 同一物理文件的两种表示（存储 key 或完整 public URL）归一为 key，便于跨表比对是否指向同一对象。
+function normalizeToKey(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      return new URL(raw).pathname.replace(/^\/+/, '');
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+// 图书馆资料不应引用已经是私密内容的附件文件：
+//   若其 file_key / file_url（均归一为 key）命中 content_attachments 或 video_attachments 中的 private 行，
+//   拒绝创建 / 更新 / 文件替换，避免把私密文件通过公开图书馆接口泄露。
+// 本函数不引入图书馆自身的 visibility 概念（图书馆仍是公开集合），仅做跨表共享 key 旁路防护。
+async function rejectPrivateAttachmentReference(client, candidate) {
+  const key = normalizeToKey(candidate);
+  if (!key) return;
+  const { rows } = await client.query(
+    `SELECT file_key, file_url FROM content_attachments WHERE visibility = 'private'
+     UNION ALL
+     SELECT file_key, file_url FROM video_attachments WHERE visibility = 'private'`
+  );
+  const clashes = rows.some((row) => {
+    const candidates = [row.file_key, row.file_url, normalizeToKey(row.file_url)].filter(Boolean);
+    return candidates.includes(key);
+  });
+  if (clashes) {
+    const error = new Error('该文件已被私密内容引用，不能用作图书馆资料');
+    error.status = 409;
+    error.code = 'SHARED_ATTACHMENT';
+    throw error;
+  }
+}
+
+// 带 status 的已知业务错误（如上面的 409 共享冲突）映射为对应 HTTP 响应；否则交给全局错误处理。
+function failWithStatus(res, error) {
+  if (error && error.status) {
+    res.status(error.status).json({ message: error.message });
+    return true;
+  }
+  return false;
+}
+
 function mapResource(row) {
   return {
     ...row,
@@ -63,7 +110,9 @@ function normalizeLinks(value) {
   return links;
 }
 
-async function getLinks(resourceId) {
+export async function getLinks(resourceId, canView = false) {
+  // 关联课程过滤私密：图书馆本体权限留待后续阶段（C/E），但关联课程标题不得泄露私密内容。
+  // 图书馆列表/详情当前为公开接口，故默认 canView=false，仅返回对游客可见的关联课程。
   const result = await pool.query(
     `SELECT l.object_type, l.object_id,
             COALESCE(tp.name, tc.name, kp.name, kc.name, '') AS title
@@ -73,8 +122,24 @@ async function getLinks(resourceId) {
      LEFT JOIN knowledge_points kp ON l.object_type = 'knowledge_point' AND kp.id = l.object_id
      LEFT JOIN knowledge_collections kc ON l.object_type = 'knowledge_collection' AND kc.id = l.object_id
      WHERE l.library_resource_id = $1
+       AND ($2::boolean = TRUE OR (
+         (l.object_type = 'track_point' AND tp.id IS NOT NULL
+            AND COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public'
+            AND EXISTS (SELECT 1 FROM track_parts pp WHERE pp.track_id = tp.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public'))
+         OR (l.object_type = 'knowledge_point' AND kp.id IS NOT NULL
+            AND COALESCE(NULLIF(kp.visibility, ''), 'public') = 'public'
+            AND EXISTS (SELECT 1 FROM knowledge_parts pp WHERE pp.knowledge_point_id = kp.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public'))
+         OR (l.object_type = 'track_collection' AND tc.id IS NOT NULL
+            AND EXISTS (SELECT 1 FROM track_collection_items ci JOIN track_points ti ON ti.id = ci.track_id WHERE ci.collection_id = tc.id
+                        AND COALESCE(NULLIF(ti.visibility, ''), 'public') = 'public'
+                        AND EXISTS (SELECT 1 FROM track_parts pp WHERE pp.track_id = ti.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')))
+         OR (l.object_type = 'knowledge_collection' AND kc.id IS NOT NULL
+            AND EXISTS (SELECT 1 FROM knowledge_collection_items ci JOIN knowledge_points ki ON ki.id = ci.knowledge_point_id WHERE ci.collection_id = kc.id
+                        AND COALESCE(NULLIF(ki.visibility, ''), 'public') = 'public'
+                        AND EXISTS (SELECT 1 FROM knowledge_parts pp WHERE pp.knowledge_point_id = ki.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')))
+       ))
      ORDER BY l.created_at ASC`,
-    [resourceId]
+    [resourceId, canView]
   );
 
   return result.rows.filter((row) => row.title).map((row) => ({
@@ -231,6 +296,8 @@ libraryRouter.post('/', requireSuperAdmin, async (req, res, next) => {
 
     const uploader = await findUploader(req.admin);
     await client.query('BEGIN');
+    // 反向共享 key 防护：拒绝引用已私密附件文件（同 URL 归一）。
+    await rejectPrivateAttachmentReference(client, fileKey);
     const result = await client.query(
       `INSERT INTO library_resources (title, description, cover, file_name, file_url, file_key, file_type, file_size, uploader_id, uploader_name)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -243,6 +310,7 @@ libraryRouter.post('/', requireSuperAdmin, async (req, res, next) => {
     res.status(201).json({ data: { ...mapResource(result.rows[0]), links: await getLinks(result.rows[0].id) } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
+    if (failWithStatus(res, error)) return;
     next(error);
   } finally {
     client.release();
@@ -256,6 +324,7 @@ libraryRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
     const title = text(req.body.title);
     const description = text(req.body.description);
     const cover = text(req.body.cover);
+    const fileKey = text(req.body.fileKey);
     const links = normalizeLinks(req.body.links);
 
     if (!resourceId || !title || title.length > TITLE_MAX_LENGTH) {
@@ -269,6 +338,8 @@ libraryRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
     }
 
     await client.query('BEGIN');
+    // 文件替换场景：同样拒绝引用已私密附件文件（同 URL 归一）。
+    if (fileKey) await rejectPrivateAttachmentReference(client, fileKey);
     const result = await client.query(
       `UPDATE library_resources SET title = $1, description = $2, cover = $3, updated_at = CURRENT_TIMESTAMP
        WHERE id = $4
@@ -287,6 +358,7 @@ libraryRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
     res.json({ data: { ...mapResource(result.rows[0]), links: await getLinks(resourceId) } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
+    if (failWithStatus(res, error)) return;
     next(error);
   } finally {
     client.release();

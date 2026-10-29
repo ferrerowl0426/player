@@ -857,11 +857,29 @@ psql -U postgres -d video_player -c "SELECT video_id, quality, status, video_url
 
 | 值 | 行为 |
 |---|---|
-| `off`（默认） | 任何新的私密写入被拒绝；生产部署保持此值 |
+| `off`（默认） | 拒绝新的私密写入；作为显式关闭开关 |
+| `business` | 允许生产环境保存私密 P 和附件；应用接口按角色过滤，不承诺旧 COS/CDN 直链保密 |
 | `local-preview` | 仅非生产环境允许私密写入，用于本地联调 |
-| `enforced` | 强制模式，暂未开放 |
+| `enforced` | 文件级强制模式，暂未开放，不可用于启动 |
 
-本地 Docker 调试时 `.env` 设 `CONTENT_PRIVACY_MODE=local-preview` 且 `NODE_ENV=development`；生产 `/root/player/.env` **必须保持 `off` 且不设 `NODE_ENV=development`**，否则私密保护失效。
+业务私密：上传流程不变，仅保存 `visibility` 属性；有效老师/管理员可读取私密，学生/游客不可读取。前置引用冲突和作业资格限制继续生效，不能只在前端隐藏。
+
+生产启用业务私密时，编辑 `/root/player/.env` 的已有配置（不要重复追加），设置 `CONTENT_PRIVACY_MODE=business`、`NODE_ENV=production`。不要在生产使用 `local-preview` 或 `NODE_ENV=development`。数据库 visibility 迁移已完成时无需重跑。
+
+代码更新到包含 business 模式的版本后执行（必须先构建成功再重建容器）：
+
+```bash
+cd /root/player &&
+git pull gitee main &&
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml build backend &&
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml up -d --no-deps --force-recreate backend
+
+# 重建后验证；输出正常后再测试私密上传和角色隔离
+docker logs --tail 30 video_player_backend
+curl -f http://localhost:3000/api/health
+```
+
+仅更改 `.env` 时也必须重建后端容器，`restart` 不会重新注入环境变量。`business` 模式下已有公开直链仍可能直接访问，云端桶/CDN 鉴权是独立工作，不要把业务隐藏描述为文件加密或文件级保密。
 
 ### 19.3 关键后端实现
 

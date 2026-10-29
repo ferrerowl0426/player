@@ -17,6 +17,29 @@ export async function isVideoPubliclyReadable(client, videoId) {
   return canReadContentObject(client, 'video', videoId, { role: 'user', status: 'active' });
 }
 
+// 批量判断一组视频 ID 中哪些“对公开读取者可公开读取”：任一宿主（track/knowledge P）私密即视为不可公开。
+// 与 canReadContentObject 的 video 分支口径一致（NOT EXISTS 私密宿主）。
+// 返回 Set<videoId>，仅包含“无任何私密宿主”的视频；用于 tracks / knowledge / 小程序等列表场景，
+// 决定非授权查看者是否应抹掉永久播放地址（fail-closed）。
+export async function filterPubliclyReadableVideos(client, videoIds) {
+  const ids = Array.isArray(videoIds) ? videoIds.filter(Boolean) : [];
+  const readable = new Set();
+  if (ids.length === 0) return readable;
+  const result = await client.query(`
+    SELECT DISTINCT x.video_id FROM (
+      SELECT video_id FROM track_parts x JOIN track_points c ON c.id = x.track_id
+       WHERE x.video_id = ANY($1::int[]) AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(c.visibility, ''), 'public') <> 'public')
+      UNION ALL
+      SELECT video_id FROM knowledge_parts x JOIN knowledge_points c ON c.id = x.knowledge_point_id
+       WHERE x.video_id = ANY($1::int[]) AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(c.visibility, ''), 'public') <> 'public')
+    ) s`, [ids]);
+  const blocked = new Set(result.rows.map((row) => row.video_id));
+  for (const id of ids) {
+    if (!blocked.has(id)) readable.add(id);
+  }
+  return readable;
+}
+
 // 私密对象（仅教师/主任可见）才需要短期授权；公开对象无需授权即可直读。
 export function needsAuthorization(publiclyReadable, viewer) {
   if (publiclyReadable) return false;

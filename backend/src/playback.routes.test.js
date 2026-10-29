@@ -59,6 +59,7 @@ mock.module(SRC_STORAGE, {
       if (storageState.fail) throw new Error('COS internal error');
       return 'https://signed.example/videos/tracks/1/a.mp4?sig=abc';
     },
+    getPublicUrl: (key) => `https://cos.example/${key}`,
     getKeyFromPublicUrl: (url) => String(url || '').split('public.example/')[1] || ''
   }
 });

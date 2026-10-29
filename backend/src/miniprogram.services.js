@@ -1,6 +1,7 @@
 import { pool } from './db.js';
 import { getKeyFromPublicUrl, normalizePublicUrl } from './storage.js';
 import { toPlaybackUrl } from './playback-url.js';
+import { filterPubliclyReadableVideos } from './playback-access.js';
 import {
   canViewPrivate,
   normalizeStoredVisibility,
@@ -451,19 +452,26 @@ async function getParts(table, parentColumn, parentId, canView = true) {
     }
   }
 
+  // 共享视频：任一宿主私密即视为私密（fail-closed）。非授权查看者需据此抹掉永久播放地址。
+  // 授权查看者（教师/主任）本就能看私密内容，无需额外拦截。
+  const publiclyReadableVideos = (!canView && videoIds.length > 0)
+    ? await filterPubliclyReadableVideos(pool, videoIds)
+    : null;
+
   return result.rows.map((row) => {
     const sourceUrl = normalizePublicUrl(row.video_url || '');
-    // 该 P 是否私密：私密 P 的视频不下发永久地址（教师可看，但需通过授权端点取短期签名）。
-    const partPrivate = normalizeStoredVisibility(row.visibility) === PRIVATE;
     const renditions = renditionsByVideoId.get(row.video_id) || [];
+    // 该 P 是否抹掉永久播放地址（fail-closed）：私密 P，或公开 P 但所属视频存在私密宿主。
+    const cleared = isPartPlaybackCleared(row, canView, publiclyReadableVideos);
     if (sourceUrl && !renditions.some((item) => item.quality === 'source')) {
       // 兼容式新增：source 补项也提供 CDN 播放地址；原 videoUrl 保留 COS 原值。
-      renditions.unshift(partPrivate
+      renditions.unshift(cleared
         ? { quality: 'source', label: '原画', videoUrl: '', playUrl: '', authorizeEndpoint: `/api/playback/videos/${row.video_id}/play-url?source=video`, fileSize: 0, status: 'ready', updatedAt: '' }
         : { quality: 'source', label: '原画', videoUrl: sourceUrl, playUrl: toPlaybackUrl(sourceUrl), fileSize: 0, status: 'ready', updatedAt: '' });
     }
 
-    if (partPrivate) {
+    const authorizeEndpoint = `/api/playback/videos/${row.video_id}/play-url?source=video`;
+    if (cleared) {
       return {
         id: String(row.id),
         partNo: row.part_no,
@@ -473,9 +481,9 @@ async function getParts(table, parentColumn, parentId, canView = true) {
         videoId: row.video_id ? String(row.video_id) : '',
         videoUrl: '',
         playUrl: '',
-        authorizeEndpoint: `/api/playback/videos/${row.video_id}/play-url?source=video`,
+        authorizeEndpoint,
         coverUrl: normalizePublicUrl(row.cover_url || ''),
-        renditions: renditionsByVideoId.get(row.video_id)?.map((r) => formatRendition(r, { private: true })) || []
+        renditions: renditions.map((r) => formatRendition(r, { private: true }))
       };
     }
 
@@ -493,6 +501,15 @@ async function getParts(table, parentColumn, parentId, canView = true) {
       renditions
     };
   });
+}
+
+// 是否应抹掉该 P 的永久播放地址（fail-closed）：
+//   - 私密 P：一律抹掉（教师/主任也走授权端点，由 /playback 端点按角色放行）。
+//   - 公开 P 但所属视频存在任意私密宿主：非授权查看者抹掉（共享视频 fail-closed）。
+function isPartPlaybackCleared(row, canView, publiclyReadableVideos) {
+  if (normalizeStoredVisibility(row.visibility) === PRIVATE) return true;
+  if (publiclyReadableVideos && !publiclyReadableVideos.has(row.video_id)) return true;
+  return false;
 }
 
 export async function getTrackDetail(id, viewer) {

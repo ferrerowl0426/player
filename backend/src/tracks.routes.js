@@ -32,6 +32,7 @@ import {
 } from './storage.js';
 import { createInitialRenditions, deleteVideoObjects } from './transcode.js';
 import { toPlaybackUrl } from './playback-url.js';
+import { filterPubliclyReadableVideos } from './playback-access.js';
 import { deleteWithReferences } from './deletion.js';
 import { recordVisibilityRevocations, getVideoObjectKeys } from './revocation.js';
 
@@ -170,10 +171,36 @@ async function getTrackParts(trackId, canView = true) {
     }
   }
 
-  return rows.map((row) => ({
-    ...mapPart(row),
-    renditions: renditionsByVideoId.get(row.video_id) || []
-  }));
+  // 共享视频：任一宿主私密即视为私密（fail-closed）。非授权查看者需据此抹掉永久播放地址。
+  // 授权查看者（教师/主任）本就能看私密内容，无需额外拦截。
+  const publiclyReadableVideos = (videoIds.length > 0)
+    ? await filterPubliclyReadableVideos(pool, videoIds)
+    : null;
+
+  return rows.map((row) => {
+    const renditions = (renditionsByVideoId.get(row.video_id) || []).map((rendition) => ({ ...rendition }));
+    if (isPartPlaybackCleared(row, canView, publiclyReadableVideos)) {
+      // 私密 P / 共享私密宿主：返回 video_id 与 visibility，但清空永久 video_url / play_url
+      // 与转码 URL，交由前端经授权端点（/playback/videos/:id/play-url）播放。
+      return {
+        ...mapPart(row),
+        video_url: '',
+        play_url: '',
+        visibility: PRIVATE,
+        renditions: renditions.map((rendition) => ({ ...rendition, video_url: '', play_url: '' }))
+      };
+    }
+    return { ...mapPart(row), renditions };
+  });
+}
+
+// 是否应抹掉该 P 的永久播放地址（fail-closed）：
+//   - 私密 P：一律抹掉（教师/主任也走授权端点，由 /playback 端点按角色放行）。
+//   - 公开 P 但所属视频存在任意私密宿主：非授权查看者抹掉（共享视频 fail-closed）。
+function isPartPlaybackCleared(row, canView, publiclyReadableVideos) {
+  if (normalizeStoredVisibility(row.visibility) === PRIVATE) return true;
+  if (publiclyReadableVideos && !publiclyReadableVideos.has(row.video_id)) return true;
+  return false;
 }
 
 async function getContentAttachments(objectType, objectId, viewer) {

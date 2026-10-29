@@ -108,6 +108,8 @@ export default function KnowledgePointPage() {
   const activePartIndex = parts.findIndex((part) => part.id === activePart?.id);
   const prevPart = activePartIndex > 0 ? parts[activePartIndex - 1] : null;
   const nextPart = activePartIndex >= 0 ? parts[activePartIndex + 1] : null;
+  // 私密视频后端不下发 video_url，仅给 video_id + visibility=private。
+  const isPrivate = Boolean(activePart?.video_id) && activePart?.visibility === 'private';
 
   return (
     <>
@@ -141,8 +143,8 @@ export default function KnowledgePointPage() {
 
           <div className="video-wrap">
             <div className="video">
-              {activePart?.video_url ? (
-                <VideoPlayer src={activePart.video_url} playSrc={activePart.play_url} poster={point.cover || activePart.video_cover_url} renditions={activePart.renditions || []} onPrev={prevPart ? () => setActivePartId(prevPart.id) : null} onNext={nextPart ? () => setActivePartId(nextPart.id) : null} />
+              {(activePart?.video_url || isPrivate) ? (
+                <VideoPlayer src={activePart.video_url} playSrc={activePart.play_url} videoId={activePart.video_id} requiresAuthorization={isPrivate} poster={point.cover || activePart.video_cover_url} renditions={activePart.renditions || []} onPrev={prevPart ? () => setActivePartId(prevPart.id) : null} onNext={nextPart ? () => setActivePartId(nextPart.id) : null} />
               ) : (
                 <div className="video-cover"><span className="vlabel"><i /></span></div>
               )}

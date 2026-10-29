@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { getApiBaseUrl } from '../lib/api.js';
 
 // ===== PURE-FOR-TEST-START =====
 export function getReadySources(src, renditions = [], playSrc) {
@@ -32,7 +33,11 @@ export function formatTime(value) {
 //   'ignore'  : not our error (stale/foreign source) -> do nothing.
 //   'fallback': CDN failed and COS is available -> switch this quality to COS once.
 //   'final'   : already on COS (or single source) and failed -> surface error.
-export function decideFallbackError({ selectedSource, sourceKey, fallbackSet, videoError, currentSrc, assignedSrc }) {
+// `allowCosFallback` is false for authorized (private) sources where no
+// unsigned COS direct link exists. We also never fall back to an unsigned COS
+// origin when the CDN url is itself already signed (a signed CDN url must not
+// be swapped for an unsigned COS direct link).
+export function decideFallbackError({ selectedSource, sourceKey, fallbackSet, videoError, currentSrc, assignedSrc, allowCosFallback = true }) {
   if (!videoError || !selectedSource) return { type: 'ignore' };
   // Stale-error race guard: only treat the error as ours when the element's
   // actual currentSrc equals the URL we last assigned. A late/duplicate error
@@ -43,8 +48,57 @@ export function decideFallbackError({ selectedSource, sourceKey, fallbackSet, vi
   const onCos = fallbackSet.has(sourceKey);
   const cdn = selectedSource.src;
   const cos = selectedSource.originSrc;
-  if (!onCos && cdn !== cos && cos) return { type: 'fallback' };
+  if (allowCosFallback && !onCos && cdn !== cos && cos && !isSignedUrl(cdn)) return { type: 'fallback' };
   return { type: 'final' };
+}
+
+// Whether a URL is an already-signed CDN url (carries a `sign` query).
+// Such urls must never be swapped for an unsigned COS origin.
+export function isSignedUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url, 'http://placeholder.invalid');
+    return parsed.searchParams.has('sign');
+  } catch {
+    return /[?&]sign=/.test(url);
+  }
+}
+
+// Build the playback authorization endpoint (no permanent playback src).
+// source 'video' -> 原画; 'rendition' -> a specific ready quality.
+export function buildPlayUrl(apiBaseUrl, videoId, { source = 'video', quality } = {}) {
+  const params = new URLSearchParams();
+  params.set('source', source);
+  if (source === 'rendition' && quality) params.set('quality', quality);
+  const base = String(apiBaseUrl || '').replace(/\/+$/, '');
+  return `${base}/playback/videos/${videoId}/play-url?${params.toString()}`;
+}
+
+// Authorized source list for a private video: 原画 + ready renditions.
+// No permanent src/originSrc/fallbackSrc — URLs are fetched per quality.
+export function getAuthorizedSources(renditions = []) {
+  const ready = (renditions || [])
+    .filter((item) => item?.status === 'ready' && item.quality)
+    .map((item) => ({
+      quality: item.quality,
+      label: item.quality === 'source' ? '原画' : item.quality?.toUpperCase?.() || item.quality,
+      authorized: true
+    }));
+  if (!ready.some((item) => item.quality === 'source')) {
+    ready.unshift({ quality: 'source', label: '原画', authorized: true });
+  }
+  return ready;
+}
+
+// Decide how to react to an error on an authorized (private) source.
+//   'ignore': stale/foreign error -> drop it.
+//   'reauth': transient / signed-expired -> re-authorize once, keep progress.
+//   'error' : already re-authorized once -> surface, never refresh forever.
+export function decideAuthError({ videoError, currentSrc, assignedSrc, reauthAllowed }) {
+  if (!videoError) return { type: 'ignore' };
+  if (assignedSrc && currentSrc && currentSrc !== assignedSrc) return { type: 'ignore' };
+  if (reauthAllowed) return { type: 'reauth' };
+  return { type: 'error' };
 }
 
 // Pick the URL to actually load for the selected source, honoring the
@@ -58,11 +112,14 @@ export function pickActiveSource(selectedSource, sourceKey, fallbackSet, fallbac
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
-export default function VideoPlayer({ src, playSrc, poster, renditions = [], onPrev, onNext }) {
+export default function VideoPlayer({ src, playSrc, poster, renditions = [], onPrev, onNext, videoId, requiresAuthorization = false }) {
   const videoRef = useRef(null);
   const progressRef = useRef(null);
   const restoreRef = useRef({ time: 0, playing: false });
-  const sources = useMemo(() => getReadySources(src, renditions, playSrc), [src, renditions, playSrc]);
+  const sources = useMemo(() => {
+    if (requiresAuthorization) return getAuthorizedSources(renditions);
+    return getReadySources(src, renditions, playSrc);
+  }, [requiresAuthorization, src, renditions, playSrc]);
   const fallbackRef = useRef(new Set());
   const assignedSrcRef = useRef(null);
   const wantPlayRef = useRef(true);
@@ -77,6 +134,11 @@ export default function VideoPlayer({ src, playSrc, poster, renditions = [], onP
   const [qualityOpen, setQualityOpen] = useState(false);
   const [hoverTime, setHoverTime] = useState(0);
   const [hoverPercent, setHoverPercent] = useState(0);
+  // 私密授权播放：按需获取的临时地址，不保留永久 src/originSrc/fallbackSrc。
+  const [authorizedSrc, setAuthorizedSrc] = useState('');
+  const authRequestRef = useRef(0);
+  const authAbortRef = useRef(null);
+  const reauthCountsRef = useRef(new Map());
 
   useEffect(() => {
     setQuality(getDefaultQuality(sources));
@@ -85,21 +147,87 @@ export default function VideoPlayer({ src, playSrc, poster, renditions = [], onP
   const selectedSource = sources.find((item) => item.quality === quality) || sources[0];
   const sourceKey = selectedSource ? JSON.stringify([selectedSource.quality, selectedSource.src, selectedSource.originSrc]) : '';
   const activeSource = pickActiveSource(selectedSource, sourceKey, fallbackRef.current, src);
+  const videoSrc = requiresAuthorization ? authorizedSrc : activeSource;
 
   useEffect(() => {
     // Track the URL actually handed to the <video> element so the error handler
     // can drop stale errors fired for a previous source (src-switch race).
-    assignedSrcRef.current = activeSource || null;
-  }, [activeSource]);
+    assignedSrcRef.current = videoSrc || null;
+  }, [videoSrc]);
+
+  // 私密视频：按 quality 向授权接口获取临时播放地址。
+  // 使用 AbortController + 请求序号进行身份匹配，阻止旧响应覆盖新清晰度。
+  async function loadAuthorizedSource(nextQuality, { reauthorize = false } = {}) {
+    if (!requiresAuthorization || !videoId) return;
+    authAbortRef.current?.abort();
+    const controller = new AbortController();
+    authAbortRef.current = controller;
+    const requestId = (authRequestRef.current += 1);
+    try {
+      setPlaybackError('');
+      const url = buildPlayUrl(getApiBaseUrl(), videoId, {
+        source: nextQuality === 'source' ? 'video' : 'rendition',
+        quality: nextQuality === 'source' ? undefined : nextQuality
+      });
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store', signal: controller.signal });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result?.message || '获取播放地址失败');
+      const playUrl = result?.data?.url;
+      if (!playUrl) throw new Error('响应缺少播放地址');
+      // 身份匹配：仅当本次请求仍是最近一次时才应用，丢弃过期/陈旧响应。
+      if (requestId !== authRequestRef.current) return;
+      setAuthorizedSrc(playUrl);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (requestId !== authRequestRef.current) return;
+      // 私密视频失败不得直链回退。
+      setPlaybackError(error?.message || '视频加载失败，请稍后重试。');
+    }
+  }
+
+  // 切换清晰度/换片时加载对应授权地址；每个清晰度仅允许一次重新授权。
+  useEffect(() => {
+    if (!requiresAuthorization || !videoId) return;
+    setAuthorizedSrc('');
+    reauthCountsRef.current = new Map();
+    loadAuthorizedSource(quality);
+    return () => {
+      authRequestRef.current += 1;
+      authAbortRef.current?.abort();
+    };
+  }, [requiresAuthorization, videoId, quality]);
 
   useEffect(() => {
     restoreRef.current = { time: 0, playing: true };
     wantPlayRef.current = true;
     setPlaybackError('');
-  }, [src]);
+  }, [src, videoId]);
 
   function handlePlaybackError(event) {
     const video = event.currentTarget;
+    if (requiresAuthorization) {
+      // 私密授权源：签名过期等媒体错误允许仅一次重新授权并保持进度，
+      // 已重新授权一次后仍失败则报错，避免无限刷新。
+      const decision = decideAuthError({
+        videoError: video.error,
+        currentSrc: video.currentSrc,
+        assignedSrc: assignedSrcRef.current,
+        reauthAllowed: (reauthCountsRef.current.get(sourceKey) || 0) < 1
+      });
+      if (decision.type === 'ignore') return;
+      if (decision.type === 'reauth') {
+        reauthCountsRef.current.set(sourceKey, (reauthCountsRef.current.get(sourceKey) || 0) + 1);
+        restoreRef.current = {
+          time: video.currentTime || currentTime || restoreRef.current.time || 0,
+          playing: wantPlayRef.current
+        };
+        setPlaybackError('');
+        loadAuthorizedSource(quality, { reauthorize: true });
+        return;
+      }
+      setPlaybackError('视频加载失败，授权地址已失效且无法重新获取，请稍后重试或确认访问权限。');
+      return;
+    }
     const decision = decideFallbackError({
       selectedSource,
       sourceKey,
@@ -181,7 +309,7 @@ export default function VideoPlayer({ src, playSrc, poster, renditions = [], onP
 
     videoElement.addEventListener('loadedmetadata', restore);
     return () => videoElement.removeEventListener('loadedmetadata', restore);
-  }, [activeSource]);
+  }, [videoSrc]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -269,7 +397,7 @@ export default function VideoPlayer({ src, playSrc, poster, renditions = [], onP
       <video
         ref={videoRef}
         className="player"
-        src={activeSource}
+        src={videoSrc || undefined}
         poster={poster}
         autoPlay
         playsInline

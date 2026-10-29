@@ -76,6 +76,16 @@ test('isVideoAccessible：父 public 但 P private -> 学生不可访问', () =>
   assert.equal(mod.isVideoAccessible(associations, STUDENT_VIEWER), false);
 });
 
+test('isVideoAccessible：共享视频任一私密宿主即 fail-closed（OR 改为 every）', () => {
+  // 同一视频被两个宿主关联：一个完全公开，一个私密。任一私密即视为私密。
+  associations = [
+    { course_visibility: 'public', part_visibility: 'public' },
+    { course_visibility: 'private', part_visibility: 'private' }
+  ];
+  assert.equal(mod.isVideoAccessible(associations, STUDENT_VIEWER), false, '学生应被拒绝');
+  assert.equal(mod.isVideoAccessible(associations, TEACHER_VIEWER), true, '教师仍可访问');
+});
+
 test('buildVideoCourseAssociationQuery：覆盖 track_parts 与 knowledge_parts 两类关联', () => {
   const sql = mod.buildVideoCourseAssociationQuery();
   assert.ok(/FROM track_parts tp JOIN track_points c/.test(sql), '缺少 track_parts 关联');
@@ -115,4 +125,23 @@ test('GET /:id：父 public 但 P private 的学生返回 404', async () => {
   associations = [{ course_visibility: 'public', part_visibility: 'private' }];
   const res = await runDetailHandler(STUDENT_VIEWER);
   assert.equal(res.statusCode, 404);
+});
+
+test('GET /:id：共享视频任一私密宿主对学生 404（fail-closed）', async () => {
+  associations = [
+    { course_visibility: 'public', part_visibility: 'public' },
+    { course_visibility: 'private', part_visibility: 'private' }
+  ];
+  const res = await runDetailHandler(STUDENT_VIEWER);
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body?.message, '视频不存在');
+});
+
+test('GET /:id：共享视频任一私密宿主对教师 200', async () => {
+  associations = [
+    { course_visibility: 'public', part_visibility: 'public' },
+    { course_visibility: 'private', part_visibility: 'private' }
+  ];
+  const res = await runDetailHandler(TEACHER_VIEWER);
+  assert.equal(res.statusCode, 200);
 });

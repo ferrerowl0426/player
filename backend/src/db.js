@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { assertVisibilitySchema } from './visibility-schema.js';
 import { validatePrivacyConfiguration } from './content-privacy-config.js';
+import { validateCdnAuthConfiguration } from './playback-url.js';
 import { config } from './config.js';
 
 const DEFAULT_PASSWORD_HASH = '$2b$10$Wg6YkgUtnWlAtaQrv/q55eYBXt8RR8HxO3iYxFbJW8hG7eAzITGwu';
@@ -32,6 +33,7 @@ async function seedInitialAdmin() {
 
 export async function ensureAppSchema() {
   validatePrivacyConfiguration();
+  validateCdnAuthConfiguration();
   await assertVisibilitySchema(pool, { allowEmpty: true });
   await pool.query(`
     CREATE TABLE IF NOT EXISTS videos (

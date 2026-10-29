@@ -3,7 +3,8 @@
 import { PRIVATE, normalizeStoredVisibility, refreshCourseVisibility } from './content-visibility.js';
 
 // 部署模式：
-//   off          : 任何“新的私密写入”都被拒绝（默认，私密功能当前不可上线）。
+//   off          : 任何“新的私密写入”都被拒绝（默认，显式关闭开关）。
+//   business     : 生产可用的业务角色可见性；不承诺 COS/CDN 旧直链保密。
 //   local-preview: 仅非生产环境允许私密写入，用于本地联调。
 //   enforced     : 强制模式（暂禁，目前仍按未开放处理）。
 const RESOLVED_MODE = String(process.env.CONTENT_PRIVACY_MODE || 'off').toLowerCase();
@@ -32,7 +33,7 @@ const normalizeVisibility = normalizeStoredVisibility;
 
 export function validatePrivacyConfiguration(env = process.env) {
   const mode = env.CONTENT_PRIVACY_MODE || 'off';
-  if (!['off', 'local-preview', 'enforced'].includes(mode)) throw new Error('Invalid CONTENT_PRIVACY_MODE');
+  if (!['off', 'business', 'local-preview', 'enforced'].includes(mode)) throw new Error('Invalid CONTENT_PRIVACY_MODE');
   if (mode === 'local-preview' && env.NODE_ENV === 'production') throw new Error('local-preview is forbidden in production');
   if (mode === 'enforced') throw new Error('enforced requires cloud authorization acceptance and is not available yet');
   return mode;
@@ -52,6 +53,9 @@ function isProduction() {
 export function assertPrivateWriteAllowed(nextVisibility, previousVisibility) {
   if (nextVisibility !== PRIVATE) return;
   if (normalizeVisibility(previousVisibility) === PRIVATE) return;
+  // 写入资格由路由的管理员权限校验负责；读取仍走 canViewPrivate 等角色校验。
+  // business 只承诺应用接口内的访问控制，不改变对象存储/CDN 策略。
+  if (RESOLVED_MODE === 'business') return;
   if (RESOLVED_MODE === 'off') throw new PrivateWriteDisabledError();
   if (RESOLVED_MODE === 'local-preview') {
     if (isProduction()) throw new PrivateWriteDisabledError('私密内容功能仅本地预览环境开放');

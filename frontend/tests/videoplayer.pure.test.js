@@ -19,11 +19,11 @@ assert.ok(match, '未找到 PURE-FOR-TEST 标记区块');
 
 // 去掉 export 关键字后，在隔离上下文中求值纯函数。
 const code = match[1].replace(/export\s+/g, '');
-const ctx = {};
+const ctx = { URL, URLSearchParams };
 vm.createContext(ctx);
 vm.runInContext(code, ctx);
 
-const { getReadySources, getDefaultQuality, formatTime, decideFallbackError, pickActiveSource } = ctx;
+const { getReadySources, getDefaultQuality, formatTime, decideFallbackError, pickActiveSource, isSignedUrl, buildPlayUrl, getAuthorizedSources, decideAuthError } = ctx;
 
 // 构造一个典型源（CDN=play_url，COS=video_url）
 function makeSource(quality, cdn, cos) {
@@ -149,4 +149,91 @@ test('串联：同一 sourceKey 只回源一次', () => {
   assert.equal(decideFallbackError(args).type, 'fallback'); // 第一次 -> 回源
   set.add('k'); // 模拟组件把 key 加入 fallbackRef
   assert.equal(decideFallbackError({ ...args, assignedSrc: 'cos', currentSrc: 'cos' }).type, 'final'); // 第二次 -> 终态
+});
+
+// ---------------------------------------------------------------------------
+// isSignedUrl：已签名 CDN 必须识别（不得回退无签名 COS）
+// ---------------------------------------------------------------------------
+test('isSignedUrl 识别带 sign 查询的签名 URL', () => {
+  assert.equal(isSignedUrl('https://cdn.example.com/x.mp4?sign=abc123&t=1'), true);
+  assert.equal(isSignedUrl('https://cdn.example.com/x.mp4?a=1&sign=abc'), true);
+  assert.equal(isSignedUrl('https://cdn.example.com/x.mp4'), false);
+  assert.equal(isSignedUrl(''), false);
+  assert.equal(isSignedUrl(null), false);
+});
+
+// 公开已签名 CDN URL 失败时不得回退无签名 COS（返回 final 而非 fallback）
+test('decideFallbackError: 已签名 CDN 失败 -> final（不回退无签名 COS）', () => {
+  const signed = { quality: '1080p', label: '1080P', src: 'https://cdn/x.m3u8?sign=abc', originSrc: 'https://cos/x.mp4' };
+  const r = decideFallbackError({ selectedSource: signed, sourceKey: 'k', fallbackSet: new Set(), videoError: {}, currentSrc: 'https://cdn/x.m3u8?sign=abc', assignedSrc: 'https://cdn/x.m3u8?sign=abc' });
+  assert.equal(r.type, 'final');
+});
+
+test('decideFallbackError: allowCosFallback=false（私密授权源）直接 final，无直链回退', () => {
+  const r = decideFallbackError({ selectedSource: selSrc('cdn', 'cos'), sourceKey: 'k', fallbackSet: new Set(), videoError: {}, currentSrc: 'cdn', assignedSrc: 'cdn', allowCosFallback: false });
+  assert.equal(r.type, 'final');
+});
+
+// ---------------------------------------------------------------------------
+// buildPlayUrl：私密授权地址构造
+// ---------------------------------------------------------------------------
+test('buildPlayUrl 原画用 source=video', () => {
+  const url = buildPlayUrl('http://localhost:3000/api', '42', { source: 'video' });
+  assert.equal(url, 'http://localhost:3000/api/playback/videos/42/play-url?source=video');
+});
+
+test('buildPlayUrl 指定 rendition 带 quality', () => {
+  const url = buildPlayUrl('http://localhost:3000/api/', '7', { source: 'rendition', quality: '1080p' });
+  assert.equal(url, 'http://localhost:3000/api/playback/videos/7/play-url?source=rendition&quality=1080p');
+});
+
+// ---------------------------------------------------------------------------
+// getAuthorizedSources：私密源列表（原画 + ready renditions），无永久 URL
+// ---------------------------------------------------------------------------
+test('getAuthorizedSources 包含原画与 ready renditions，且无 src/originSrc', () => {
+  const renditions = [
+    { quality: '1080p', status: 'ready' },
+    { quality: '720p', status: 'pending' },
+    { quality: '480p', status: 'ready' },
+  ];
+  const out = getAuthorizedSources(renditions);
+  assert.deepEqual(out.map((i) => i.quality), ['source', '1080p', '480p']);
+  out.forEach((item) => {
+    assert.equal(item.authorized, true);
+    assert.equal(item.src, undefined);
+    assert.equal(item.originSrc, undefined);
+  });
+});
+
+test('getAuthorizedSources 无 renditions 时仅原画', () => {
+  const out = getAuthorizedSources([]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].quality, 'source');
+  assert.equal(out[0].label, '原画');
+  assert.equal(out[0].authorized, true);
+  assert.equal(out[0].src, undefined);
+  assert.equal(out[0].originSrc, undefined);
+});
+
+// ---------------------------------------------------------------------------
+// decideAuthError：私密签名过期仅一次重新授权
+// ---------------------------------------------------------------------------
+test('decideAuthError: 无 video.error -> ignore', () => {
+  const r = decideAuthError({ videoError: null, currentSrc: 'u', assignedSrc: 'u', reauthAllowed: true });
+  assert.equal(r.type, 'ignore');
+});
+
+test('decideAuthError: 竞态——currentSrc 与已分配 src 不一致 -> ignore', () => {
+  const r = decideAuthError({ videoError: {}, currentSrc: 'cdn', assignedSrc: 'cos', reauthAllowed: true });
+  assert.equal(r.type, 'ignore');
+});
+
+test('decideAuthError: 允许重新授权时 -> reauth', () => {
+  const r = decideAuthError({ videoError: {}, currentSrc: 'u', assignedSrc: 'u', reauthAllowed: true });
+  assert.equal(r.type, 'reauth');
+});
+
+test('decideAuthError: 已重新授权一次（reauthAllowed=false）-> error（避免无限刷新）', () => {
+  const r = decideAuthError({ videoError: {}, currentSrc: 'u', assignedSrc: 'u', reauthAllowed: false });
+  assert.equal(r.type, 'error');
 });

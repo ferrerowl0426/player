@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isVideoPubliclyReadable, needsAuthorization, serializePlaybackTarget } from './playback-access.js';
+import { isVideoPubliclyReadable, needsAuthorization, serializePlaybackTarget, filterPubliclyReadableVideos } from './playback-access.js';
 
 const STAFF = { role: 'super_admin', status: 'active' };
 const TEACHER = { role: 'teacher', status: 'active' };
@@ -74,4 +74,50 @@ test('serializePlaybackTarget：公开下发永久地址；私密教师给授权
   assert.equal(privateStudent.playUrl, '');
   assert.equal(privateStudent.authorized, false);
   assert.equal(privateStudent.authorizeEndpoint, '');
+});
+
+// filterPubliclyReadableVideos：共享视频任一私密宿主即视为不可公开（fail-closed）。
+// 命中 UNION ALL 两类宿主（track_parts / knowledge_parts）任一私密记录即被剔除。
+test('filterPubliclyReadableVideos：空输入返回空集', async () => {
+  const client = { query: async () => ({ rows: [], rowCount: 0 }) };
+  const r = await filterPubliclyReadableVideos(client, []);
+  assert.ok(r instanceof Set);
+  assert.equal(r.size, 0);
+});
+
+test('filterPubliclyReadableVideos：全部公开宿主的视频被保留', async () => {
+  const client = {
+    async query(sql) {
+      assert.ok(/UNION ALL/.test(sql), '应拼接 track_parts 与 knowledge_parts 两类宿主');
+      assert.ok(/track_parts/.test(sql) && /knowledge_parts/.test(sql));
+      return { rows: [], rowCount: 0 };
+    }
+  };
+  const r = await filterPubliclyReadableVideos(client, [10, 20, 30]);
+  assert.deepEqual([...r].sort((a, b) => a - b), [10, 20, 30]);
+});
+
+test('filterPubliclyReadableVideos：任一私密宿主（track 或 knowledge）的视频被剔除', async () => {
+  const client = {
+    async query(sql) {
+      assert.ok(/UNION ALL/.test(sql));
+      // 模拟“video_id=20 在任一宿主上为私密”。
+      return { rows: [{ video_id: 20 }], rowCount: 1 };
+    }
+  };
+  const r = await filterPubliclyReadableVideos(client, [10, 20, 30]);
+  assert.deepEqual([...r].sort((a, b) => a - b), [10, 30]);
+});
+
+test('filterPubliclyReadableVideos：knowledge 宿主私密同样剔除（SQL 同时覆盖两类）', async () => {
+  let capturedSql = '';
+  const client = {
+    async query(sql) {
+      capturedSql = sql;
+      return { rows: [{ video_id: 10 }], rowCount: 1 };
+    }
+  };
+  const r = await filterPubliclyReadableVideos(client, [10, 20]);
+  assert.ok(/FROM knowledge_parts x JOIN knowledge_points c/.test(capturedSql), 'SQL 应覆盖 knowledge 宿主');
+  assert.deepEqual([...r].sort((a, b) => a - b), [20]);
 });

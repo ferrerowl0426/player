@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { pool } from './db.js';
 import { optionalContentViewer } from './auth.js';
-import { createDownloadUrl } from './storage.js';
+import { createDownloadUrl, getPublicUrl } from './storage.js';
 import { isVideoPubliclyReadable } from './playback-access.js';
 import { canViewPrivate } from './content-visibility.js';
+import { isCdnAuthEnabled, getCdnAuthTtl, toPlaybackUrl } from './playback-url.js';
 
 // 视频/转码播放的短期授权端点（阶段 E）。
 // 私密视频不再下发永久公开 COS/CDN 地址；前端播放器在需要播放时，携带身份 Cookie
@@ -69,12 +70,28 @@ async function handlePlayUrl(req, res, next) {
   }
 
   try {
-    const url = await createDownloadUrl({ key, expiresIn: 300 });
+    let url;
+    let expiresIn = 300;
+    if (isCdnAuthEnabled()) {
+      // 优先返回可信 CDN 短签：把 COS 公开地址转成 CDN 并附加 TypeA 签名（有效期由
+      // MEDIA_CDN_AUTH_TTL_SECONDS 决定，须与 CDN 控制台一致）。
+      // 不改角色权限：上面的 isVideoPubliclyReadable / canViewPrivate 判断照常执行。
+      url = toPlaybackUrl(getPublicUrl(key));
+      if (!new URL(url).searchParams.has('sign')) {
+        // 自定义源域名或关闭 CDN 转换时，不得把未签名直链当作授权结果。
+        url = await createDownloadUrl({ key, expiresIn: 300 });
+      } else {
+        expiresIn = getCdnAuthTtl();
+      }
+    } else {
+      // 否则保持既有 COS 私有读短签。
+      url = await createDownloadUrl({ key, expiresIn: 300 });
+    }
     if (req.method === 'HEAD') {
       res.status(200).end();
       return;
     }
-    res.json({ data: { id, source, quality, url, expiresIn: 300 } });
+    res.json({ data: { id, source, quality, url, expiresIn } });
   } catch {
     // 签名失败：返回通用错误，不暴露底层存储错误。
     res.status(500).json({ message: '播放地址生成失败' });

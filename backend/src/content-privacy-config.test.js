@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const CONFIG_PATH = 'file:///C:/Users/user/Desktop/播放器/backend/src/content-privacy-config.js';
+const CONFIG_PATH = new URL('./content-privacy-config.js', import.meta.url).href;
 
 async function loadConfig(mode, nodeEnv) {
   const savedMode = process.env.CONTENT_PRIVACY_MODE;
@@ -21,6 +21,23 @@ async function loadConfig(mode, nodeEnv) {
 test('默认模式为 off', async () => {
   const { CONTENT_PRIVACY_MODE } = await loadConfig(undefined, undefined);
   assert.equal(CONTENT_PRIVACY_MODE, 'off');
+});
+
+test('business 模式允许生产私密新建和公开转私密', async () => {
+  const mod = await loadConfig('business', 'production');
+  assert.equal(mod.validatePrivacyConfiguration({ CONTENT_PRIVACY_MODE: 'business', NODE_ENV: 'production' }), 'business');
+  for (const previous of [undefined, null, '', 'public', 'private']) {
+    assert.doesNotThrow(() => mod.assertPrivateWriteAllowed('private', previous));
+  }
+});
+
+test('business 模式仍拒绝存在前置引用的课程转私密', async () => {
+  const mod = await loadConfig('business', 'production');
+  const client = { query: async (sql) => sql.includes('UPDATE')
+    ? { rows: [{ id: 1, visibility: 'private' }] }
+    : { rows: [{}], rowCount: 1 } };
+  await assert.rejects(() => mod.finalizeCourseVisibility(client, 'track_point', 1, 'public'),
+    (error) => error.code === 'PREREQUISITE_CONFLICT' && error.status === 409);
 });
 
 test('非 private 写入始终放行', async () => {

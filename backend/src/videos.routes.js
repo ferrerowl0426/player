@@ -355,10 +355,13 @@ export function isVideoAccessible(associations, viewer) {
   if (!Array.isArray(associations) || associations.length === 0) {
     return true;
   }
-  const publiclyVisible = associations.some(
-    (row) => normalizeStoredVisibility(row.course_visibility) === PUBLIC
-      && normalizeStoredVisibility(row.part_visibility) === PUBLIC
-  );
+  // fail-closed：视频被任意私密宿主关联时，非授权查看者一律不可访问；
+  // 仅当所有关联宿主均为“父课程 public 且对应 P public”时才视为公开可达。
+  const publiclyVisible = associations.length > 0
+    && associations.every(
+      (row) => normalizeStoredVisibility(row.course_visibility) === PUBLIC
+        && normalizeStoredVisibility(row.part_visibility) === PUBLIC
+    );
   return publiclyVisible || canViewPrivate(viewer);
 }
 
@@ -966,8 +969,9 @@ videoRouter.get('/:id', optionalContentViewer, requireUserOrAdmin, async (req, r
       return;
     }
     // 是否公开可达：决定是否对当前访问者下发永久播放地址，还是改为授权端点占位。
+    // fail-closed：视频被任意私密宿主关联时，不再下发永久播放地址（共享视频亦同）。
     const publiclyReadable = associations.rows.length === 0
-      || associations.rows.some((row) => normalizeStoredVisibility(row.course_visibility) === PUBLIC && normalizeStoredVisibility(row.part_visibility) === PUBLIC);
+      || associations.rows.every((row) => normalizeStoredVisibility(row.course_visibility) === PUBLIC && normalizeStoredVisibility(row.part_visibility) === PUBLIC);
 
     const attachmentsResult = await pool.query(
       `SELECT id, file_name, file_url, file_key, file_type, file_size, visibility, created_at

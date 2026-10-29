@@ -855,33 +855,51 @@ body.library-index-page .card:hover {
 .vis-toggle {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--hair-2);
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--white);
+  gap: 4px;
   flex: none;
 }
 .vis-opt {
   appearance: none;
-  border: 0;
-  background: transparent;
+  border: 1px solid var(--hair-2);
+  border-radius: 4px;
+  background: var(--white);
   padding: 3px 9px;
   font-size: 11px;
   letter-spacing: .5px;
   line-height: 1.5;
   color: var(--ink-3);
   cursor: pointer;
-  transition: background .25s var(--ease), color .25s var(--ease);
+  transition: background .25s var(--ease), color .25s var(--ease), border-color .25s var(--ease);
   white-space: nowrap;
 }
-.vis-opt + .vis-opt { border-left: 1px solid var(--hair-2); }
-/* .pops button 的全局描边会命中开关选项，重置掉，避免双重线框 */
-.pops button.vis-opt { border: 0; min-width: 0; height: auto; background: transparent; font-weight: 400; }
-.pops button.vis-opt:hover { border-color: transparent; color: var(--coffee); }
-.vis-opt:hover:not(:disabled) { color: var(--coffee); }
-.vis-opt:disabled { cursor: not-allowed; opacity: .5; }
-.vis-pub.on { background: rgba(79,125,58,.14); color: #4f7d3a; }
-.vis-priv.on { background: rgba(122,74,38,.14); color: var(--wood); }
+/* 将默认态和选中态限定在同一作用域，避免 .pops button 覆盖背景形成白底白字。
+   外层无边框，每个按钮仅保留一层边框；文字与选中色块始终显示。 */
+.vis-toggle button.vis-opt {
+  border: 1px solid var(--hair-2);
+  min-width: 0;
+  height: auto;
+  background: transparent;
+  color: #222;
+  font-weight: 400;
+}
+.vis-toggle button.vis-opt:hover:not(:disabled) {
+  background: transparent;
+  color: #222;
+  border-color: var(--wood);
+}
+.vis-toggle button.vis-opt:disabled { cursor: not-allowed; opacity: .5; }
+.vis-toggle button.vis-opt.vis-pub.on,
+.vis-toggle button.vis-opt.vis-pub.on:hover:not(:disabled) {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+.vis-toggle button.vis-opt.vis-priv.on,
+.vis-toggle button.vis-opt.vis-priv.on:hover:not(:disabled) {
+  background: #a64f4f;
+  border-color: #a64f4f;
+  color: #fff;
+}
 
 .pops .vis-toggle { align-self: center; }
 

@@ -182,6 +182,12 @@ docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml
 
 改了 `.env`、`NEXT_PUBLIC_API_BASE_URL`、后端配置或后端依赖时，对应的镜像必须重建，只 `restart` 不生效。
 
+> **数据库迁移（重要，2026-10-29 曾因此线上 502）**：新后端启动时会校验 `visibility` 等 schema（fail-fast，绝不自动改生产库）。凡是新版本新增了 `backend/scripts/` 下的迁移脚本（如 `migrate-content-visibility.js`），**必须在重建后端容器之前先执行迁移**，否则后端会因 `VISIBILITY_SCHEMA_REQUIRED` 崩溃循环、Nginx 502。步骤见 [2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md](file:///c:/Users/user/Desktop/播放器/docs/debug复盘/2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md)。要点：
+>
+> - 生产容器名是全下划线（`video_player_backend` / `video_player_postgres`），先 `docker ps --format "{{.Names}}"` 确认。
+> - 迁移前先 `pg_dump` 备份。
+> - 迁移幂等可重复：`docker exec video_player_backend node scripts/migrate-content-visibility.js --apply`；若后端正崩溃循环进不去，改在 postgres 容器内用 psql 执行等价 SQL（见复盘文档）。
+
 ---
 
 ## 4. 样式架构与 CSS Module 规则
@@ -878,3 +884,4 @@ psql -U postgres -d video_player -c "SELECT video_id, quality, status, video_url
 - 云端桶（COS）目前仍是公开读，真正的匿名不可读需账号所有者在腾讯云控制台执行桶策略 / CDN 鉴权，见 `outputs/阶段E-云端访问控制落地方案.md`。
 - 已签发的短期 URL 在其 300s 有效期内、以及已下载到客户端的内容无法追回。
 - 无归属独立旧视频的布置策略尚未收紧（沿用「无宿主按公开」），正式发布前需审计。
+- **部署前必须先跑数据库迁移**（`backend/scripts/migrate-content-visibility.js --apply`），否则后端 `assertVisibilitySchema` fail-fast 导致线上 502；见 3.2 节与 [复盘文档](file:///c:/Users/user/Desktop/播放器/docs/debug复盘/2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md)。

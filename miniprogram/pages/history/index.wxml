@@ -1,4 +1,4 @@
-
+<view class="page history-page">
   <view class="search-box">
     <view class="search-icon"></view>
     <input class="search-input" value="{{keyword}}" placeholder="搜索老师、曲目、练习要求或提交要求" placeholder-class="input-placeholder" confirm-type="search" cursor-spacing="16" bindinput="onKeywordInput" />

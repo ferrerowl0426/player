@@ -4,12 +4,23 @@
 
 这是给下一位程序员 / AI 编码助手的交接文档。详细需求不要以 README 为准，必须优先阅读：
 
-1. [PRD.md](file:///c:/Users/user/Desktop/播放器/docs/PRD.md)
-2. [开发计划-组件复用与实施.md](file:///c:/Users/user/Desktop/播放器/docs/开发计划-组件复用与实施.md)
-3. [design-spec.md](file:///c:/Users/user/Desktop/播放器/docs/design/guitar-home/design-spec.md)
-4. [docs/design/guitar-home](file:///c:/Users/user/Desktop/播放器/docs/design/guitar-home) 下对应页面设计稿
+1. [PRD.md](docs/PRD.md)
+2. [开发计划-组件复用与实施.md](docs/开发计划-组件复用与实施.md)
+3. [design-spec.md](docs/design/guitar-home/design-spec.md)
+4. [docs/design/guitar-home](docs/design/guitar-home) 下对应页面设计稿
 
-README 只记录当前代码状态、启动方式、已完成阶段和接手注意事项。
+README 只记录当前代码状态、启动方式、已完成阶段和接手注意事项。历史 PRD/阶段计划若与本文最新密码、作业或业务私密规则冲突，先核对当前实现和用户确认，不恢复旧方案。
+
+### Git 协作
+
+主分支 `main`；`gitee` 对应 `gitee.com/ferrerowl/player`，`origin` 对应 `github.com/ferrerowl0426/player`。本机推送必须使用系统 Git（内置 PortableGit 缺少凭据助手）：
+
+```bash
+"/c/Program Files/Git/cmd/git.exe" push gitee main
+"/c/Program Files/Git/cmd/git.exe" push origin main
+```
+
+仅在明确授权提交/推送后执行。不要提交 `.env`、备份 dump、真实密钥和临时测试输出；服务器本地配置有差异时不得用 reset --hard 强制覆盖。
 
 ---
 
@@ -119,9 +130,9 @@ http://backend:3000/api
 
 环境文件当前应保持：
 
-- 根目录 [.env](file:///c:/Users/user/Desktop/播放器/.env)
-- 根目录 [.env.local](file:///c:/Users/user/Desktop/播放器/.env.local)
-- 后端 [backend/.env](file:///c:/Users/user/Desktop/播放器/backend/.env)
+- 根目录 [.env](.env)
+- 根目录 [.env.local](.env.local)
+- 后端 [backend/.env](backend/.env)
 
 关键配置：
 
@@ -159,28 +170,68 @@ CI_CALLBACK_SECRET=<数据万象回调密钥，见第 17 节>
 
 部署、HTTPS 申请、Nginx、CORS、故障排查的完整记录见：
 
-- [debug复盘/2026-09-20-服务器部署问题复盘.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-09-20-服务器部署问题复盘.md)
+- [debug复盘/2026-09-20-服务器部署问题复盘.md](debug复盘/2026-09-20-服务器部署问题复盘.md)
 
-### 3.2 服务器更新代码的历史流程与当前门禁
+### 3.2 服务器更新规则（当前生产三文件组合）
 
-> **以下命令记录历史部署方式，当前不得直接照抄用于发布。** `docker-compose.local.yml`仍强制development；生产需先制定/核对不含该覆盖的Compose配置，同时保留确实需要的服务、卷和网络，不能简单删掉覆盖文件后假定部署等价。本轮只更新文档，未修复Compose或核验服务器。含schema变更时必须先备份，用包含新版迁移脚本的镜像/受控迁移环境演练并迁移，最后才启动新后端。
+> 当前服务器保留 `docker-compose.local.yml` 提供既有 MinIO 等服务，最后加载 `docker-compose.production.yml` 覆盖后端为 `NODE_ENV=production`。不能只用 base + local，也不能直接删掉 local 而忽略服务、网络及存储卷。生产覆盖文件在服务器上创建；全新拉取或换机时必须检查其是否存在，不假定 Git 已包含它。
+
+服务器生产覆盖文件至少应包含（不是本地试用配置）：
+
+```yaml
+services:
+  backend:
+    environment:
+      NODE_ENV: production
+      CONTENT_PRIVACY_MODE: business
+```
+
+`CONTENT_PRIVACY_MODE` 目前仅兼容/诊断，不再控制私密写入；不能用 development 绕过生产要求。
+
+**普通代码更新（不包含待执行 schema 变更）**：
 
 ```bash
 cd /root/player
-git pull gitee main
+# 先确认工作区，记录当前提交；有本地改动时先处理，禁止强制覆盖
+git status --short
+git rev-parse HEAD
+git pull --ff-only gitee main
 
-# 只改前端
-docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml build frontend
-docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml up -d --force-recreate frontend
-
-# 只改后端
-docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml build backend
-docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml up -d --force-recreate backend
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.production.yml build backend frontend
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.production.yml up -d --no-deps --force-recreate backend frontend
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.production.yml ps
+curl --fail http://127.0.0.1:3000/api/health
+curl -I http://127.0.0.1:3001
 ```
 
-改了 `.env`、`NEXT_PUBLIC_API_BASE_URL`、后端配置或后端依赖时，对应的镜像必须重建，只 `restart` 不生效。
+- 所有命令先进入 `/root/player`；在 `/root` 执行会找不到 compose 文件。
+- 三份文件顺序固定，production 必须最后；项目名固定 `video_player`，避免误建另一套数据卷。
+- 只改前端或后端可仅构建、重建对应服务。前端 `NEXT_PUBLIC_API_BASE_URL` 是构建期配置，改后必须重建前端镜像。
+- 后端 `.env` 在容器创建时注入，改环境变量至少要重建容器，单纯 restart 不会更新环境；依赖/代码变化还需 build。
+- 更新后检查 `docker exec video_player_backend printenv NODE_ENV` 返回 `production`，并检查日志、重启次数及域名入口；刚启动时短暂连接重置不等于发布成功，须等待就绪后复查。
+- 禁止 `docker compose down -v`，禁止清空或改名 PostgreSQL/MinIO 卷；既有 `video_player_minio_data` 的归属警告不构成删卷理由。
 
-> **数据库迁移（重要，2026-10-29 曾因此线上 502）**：新后端启动时会校验 `visibility` 等 schema（fail-fast，绝不自动改生产库）。凡是新版本新增了 `backend/scripts/` 下的迁移脚本（如 `migrate-content-visibility.js`），**必须在重建后端容器之前先执行迁移**，否则后端会因 `VISIBILITY_SCHEMA_REQUIRED` 崩溃循环、Nginx 502。步骤见 [2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md](file:///c:/Users/user/Desktop/播放器/docs/debug复盘/2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md)。要点：
+**首次升级或存在 schema 变更时**：备份 → 拉取并构建新版镜像 → 隔离副本迁移演练 → 审阅派生状态变化 → 人工批准 → 正式迁移 → 重建服务。不要先启动新后端再补迁移。
+
+本次需要关注两个显式脚本：
+
+1. `backend/scripts/migrate-content-visibility.js --apply`：八表可见性（含两合集），重算课程及合集派生值；保留 P/附件已有私密状态。
+2. `backend/scripts/migrate-auth-version.js --apply`：`admins` / `users.auth_version`，不重置已有账号密码、不注入业务数据。
+
+使用**新版镜像的一次性任务**执行，例如（只能在备份、演练和审批完成后执行正式库命令）：
+
+```bash
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.production.yml run --rm --no-deps backend node scripts/migrate-content-visibility.js --apply
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.production.yml run --rm --no-deps backend node scripts/migrate-auth-version.js --apply
+```
+
+运行前核对一次性任务的数据库连接确为预期目标；副本演练必须显式覆盖为隔离库，不能把上述正式库命令当成演练命令。两个脚本幂等不等于每次发布都需要执行；按当前 schema 和版本判断。禁止导入本地 dump、运行 reset/seed 或以初始化替代生产迁移。
+
+**备份与回滚**：升级前保存 `pg_dump`、当前代码提交、根 `.env`、生产覆盖配置及可回退镜像标识；备份只放受控目录，不提交密钥。数据库备份不包含 COS/MinIO 文件，涉及文件操作另制定备份方案。普通代码故障可切回已记录且与当前 schema 兼容的版本重建；迁移后的数据库不能靠回退 Git 撤销。恢复数据库必须单独审批并确认会丢失备份之后的写入，禁止自动覆盖。
+
+最近一次升级交接记录：提交 `24c9c32` 已同步双远端，服务器已完成副本演练、两项正式迁移及生产容器启动检查；备份目录 `/root/player-backups/20261118_012041`。这只证明部署与健康检查完成，不等同于浏览器、真机或真实 CDN 全量业务验收。
+
+> **数据库迁移（重要，2026-10-29 曾因此线上 502）**：新后端启动时会校验 `visibility` 等 schema（fail-fast，绝不自动改生产库）。凡是新版本新增了 `backend/scripts/` 下的迁移脚本（如 `migrate-content-visibility.js`），**必须在重建后端容器之前先执行迁移**，否则后端会因 `VISIBILITY_SCHEMA_REQUIRED` 崩溃循环、Nginx 502。步骤见 [2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md](docs/debug复盘/2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md)。要点：
 >
 > - 生产容器名是全下划线（`video_player_backend` / `video_player_postgres`），先 `docker ps --format "{{.Names}}"` 确认。
 > - 迁移前先 `pg_dump` 备份。
@@ -196,11 +247,11 @@ docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml
 
 全局样式分两层：
 
-- [design-system.css](file:///c:/Users/user/Desktop/播放器/frontend/app/design-system.css)
+- [design-system.css](frontend/app/design-system.css)
   - 设计 token。
   - 公共设计系统类。
   - 跨页面复用结构：导航、卡片、网格、分页、弹层、格纹背景等。
-- [globals.css](file:///c:/Users/user/Desktop/播放器/frontend/app/globals.css)
+- [globals.css](frontend/app/globals.css)
   - 只保留最小 reset。
   - 不要继续往里面堆页面样式。
 
@@ -209,19 +260,19 @@ docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml
 M6 收尾后已经明确：
 
 - 新页面私有样式使用 `*.module.css`。
-- 不要把页面私有样式继续追加进 [globals.css](file:///c:/Users/user/Desktop/播放器/frontend/app/globals.css)。
+- 不要把页面私有样式继续追加进 [globals.css](frontend/app/globals.css)。
 - 如果某个样式只服务单页，就放到该页同目录 CSS Module。
-- 如果某个样式跨多个 PRD 页面复用，才考虑放进 [design-system.css](file:///c:/Users/user/Desktop/播放器/frontend/app/design-system.css)。
+- 如果某个样式跨多个 PRD 页面复用，才考虑放进 [design-system.css](frontend/app/design-system.css)。
 
 已经使用 CSS Module 的页面包括：
 
-- [login.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/login/login.module.css)
-- [home.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/home.module.css)
-- [my-homework.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/my-homework/my-homework.module.css)
-- [library.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/library/library.module.css)
-- [library-book.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/library/[id]/library-book.module.css)
-- [admin-library.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/library/admin-library.module.css)
-- [page.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/classes/page.module.css)
+- [login.module.css](frontend/app/login/login.module.css)
+- [home.module.css](frontend/app/home.module.css)
+- [my-homework.module.css](frontend/app/my-homework/my-homework.module.css)
+- [library.module.css](frontend/app/library/library.module.css)
+- [library-book.module.css](frontend/app/library/[id]/library-book.module.css)
+- [admin-library.module.css](frontend/app/admin/library/admin-library.module.css)
+- [page.module.css](frontend/app/admin/classes/page.module.css)
 
 ### 4.3 CSS Module 故障排查
 
@@ -233,7 +284,7 @@ M6 收尾后已经明确：
 2. 确认 JSX 使用的 `styles.xxx` 在 CSS Module 中真实存在。
 3. 确认没有被全局样式覆盖。
 4. 如果代码没问题但 dev server 显示异常，重启前端。
-5. 必要时删除 [frontend/.next](file:///c:/Users/user/Desktop/播放器/frontend/.next) 后重新 `npm run dev`。
+5. 必要时删除 [frontend/.next](frontend/.next) 后重新 `npm run dev`。
 
 登录页曾出现裸 HTML，最终应保持 CSS Module 方案，不应绕开模块样式体系。
 
@@ -245,7 +296,9 @@ M6 收尾后已经明确：
 
 本地依赖由 Docker 提供，通常包括 PostgreSQL 和 MinIO。先确保 Docker Desktop 已启动。
 
-### 5.2 重置基础环境
+### 5.2 隔离测试环境重置（破坏性，生产禁止）
+
+> 以下 reset / seed / clean 仅用于已确认可丢弃的隔离测试库和测试桶。执行前核对真实连接目标；不要在生产服务器执行本节命令，正式业务库升级只能走第 3.2 节显式迁移。
 
 ```bash
 cd backend
@@ -256,10 +309,10 @@ npm run test:reset
 
 - DROP public schema 下旧表并重新建表。
 - 清空对象存储桶。
-- 执行 [ensureAppSchema](file:///c:/Users/user/Desktop/播放器/backend/src/db.js)。
+- 执行 [ensureAppSchema](backend/src/db.js)。
 - 初始化系统必需的基础账号 / 表结构。
 
-注意：完整业务测试数据已迁移到 [test-data](file:///c:/Users/user/Desktop/播放器/test-data/) 独立目录维护，不再把 README 里的旧账号当作准。
+注意：完整业务测试数据已迁移到 [test-data](test-data/) 独立目录维护，不再把 README 里的旧账号当作准。
 
 ### 5.3 注入 / 清理完整测试数据
 
@@ -272,19 +325,7 @@ node seed.mjs
 node clean.mjs
 ```
 
-服务器宿主机用法：
-
-```bash
-cd /root/player/test-data
-node clean.mjs
-```
-
-如果服务器根目录 `.env` 未提供适合宿主机访问的 `DATABASE_URL`，可显式指定连接串。本项目 Docker Compose 当前将 PostgreSQL 映射为 `15432:5432`，所以宿主机端口应使用 `15432`，不要使用容器内端口 `5432`：
-
-```bash
-cd /root/player/test-data
-DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:15432/video_player' node clean.mjs
-```
+不提供生产服务器 seed / clean 示例，避免误操作正式库。隔离测试连接须自行配置；PostgreSQL 宿主机映射端口为 `15432`，容器网络内端口为 `5432`，不要混用，也不要复制文档示例密码到生产。
 
 说明：
 
@@ -298,9 +339,9 @@ DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:15432/video_player' node 
 
 详细测试数据说明见：
 
-- [test-data/README.md](file:///c:/Users/user/Desktop/播放器/test-data/README.md)
-- [test-data/TEST_ACCOUNTS.md](file:///c:/Users/user/Desktop/播放器/test-data/TEST_ACCOUNTS.md)
-- [debug复盘/2026-10-09-测试数据清理脚本环境变量问题复盘.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-10-09-测试数据清理脚本环境变量问题复盘.md)
+- [test-data/README.md](test-data/README.md)
+- [test-data/TEST_ACCOUNTS.md](test-data/TEST_ACCOUNTS.md)
+- [debug复盘/2026-10-09-测试数据清理脚本环境变量问题复盘.md](debug复盘/2026-10-09-测试数据清理脚本环境变量问题复盘.md)
 
 ### 5.4 启动后端
 
@@ -335,9 +376,9 @@ $env:PORT='3001'; npm run dev
 
 ## 6. 测试账号
 
-测试数据账号以 [test-data/TEST_ACCOUNTS.md](file:///c:/Users/user/Desktop/播放器/test-data/TEST_ACCOUNTS.md) 为准；登录页左侧也有一个临时“测试账号”提示卡片，代码里已标注后续上线 / 交付前可整块删除。
+测试数据账号以 [test-data/TEST_ACCOUNTS.md](test-data/TEST_ACCOUNTS.md) 为准；登录页左侧也有一个临时“测试账号”提示卡片，代码里已标注后续上线 / 交付前可整块删除。
 
-当前所有演示账号密码统一为（测试环境统一演示密码，详见 [test-data/TEST_ACCOUNTS.md](file:///c:/Users/user/Desktop/播放器/test-data/TEST_ACCOUNTS.md)）：
+当前所有演示账号密码统一为（测试环境统一演示密码，详见 [test-data/TEST_ACCOUNTS.md](test-data/TEST_ACCOUNTS.md)）：
 
 ```txt
 <测试环境统一演示密码>
@@ -361,9 +402,9 @@ $env:PORT='3001'; npm run dev
 - 初始超级管理员账号是 `admin`，不由 `test-data` 注入。启动初始化只在**库中不存在任何 `super_admin`** 时创建它；如果已经存在超管（无论是否改过密码），启动过程不覆盖、不改密码。
 - `username = admin` 且 `role = super_admin` 的默认超管账号**禁止删除**，接口会返回「默认教导主任账号不可删除」。
 - `seed.mjs` 只负责注入普通教导主任、老师、学员和业务测试数据；`clean.mjs` 按 `manifest.json` 精确清理 seed 数据，不清理初始超级管理员。
-- 当前处于内部试用阶段：请重点验证老师布置作业、学生历史记录、学生学习首页、作业提交与查看；不要一次上传太多正式文件，正式上线前会清空测试数据重建。
+- 已有线上存量业务数据，不再采用“上线前清空重建”的旧约定；测试账号清单仅用于隔离测试环境，不代表线上账号或密码。新建学员初始密码服务端固定为 `Nxh123456`，可选择“暂不分班”（`class_id=null`）；不追溯重置已有账号，不改变老师/教导主任的创建密码规则。
 
-密码策略已接入：Web头像菜单与小程序“我的”支持本人凭旧密码改密；班级管理仅 root/教导主任可替权限范围内的其他账号重置为固定 `Nxh123456`，唯一 `admin` 禁改。密码变更原子递增 `auth_version`，旧 Cookie/Bearer 会话失效。首次部署必须备份并执行 `backend/scripts/migrate-auth-version.js`，再重建服务；不含版本字段的旧Token需要重新登录。隔离数据库真实HTTP集成25项检查通过；双端交互由用户验收，不能视为已完成真机验收。后端回归测试使用Node 22时须加 `--experimental-test-module-mocks`（测试使用 `mock.module`），不能只执行 `node --test`。详见 [实施计划与交接记录](docx/用户自助改密与固定密码重置实施计划.md)。
+密码策略已接入：Web头像菜单与小程序“我的”支持本人凭旧密码改密；班级管理仅 root/教导主任可替权限范围内的其他账号重置为固定 `Nxh123456`，唯一 `admin` 禁改。密码变更原子递增 `auth_version`，旧 Cookie/Bearer 会话失效。首次部署必须备份并执行 `backend/scripts/migrate-auth-version.js`，再重建服务；不含版本字段的旧Token需要重新登录。隔离数据库真实HTTP集成34项检查通过（历史实施结果，非本次重新测试）；双端交互由用户验收，不能视为已完成真机验收。后端回归测试使用Node 22时须加 `--experimental-test-module-mocks`（测试使用 `mock.module`），不能只执行 `node --test`。详见 [实施计划与交接记录](docx/用户自助改密与固定密码重置实施计划.md)。
 
 登录页：
 
@@ -419,7 +460,7 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 - 学员管理页仅保留“标记学生”和作业相关操作；重置密码、停用 / 恢复、删除等账号管理操作统一放在班级管理页。
 - 老师端和学生端历史作业均按推送时标题快照展示，历史记录不再作为跳转入口；搜索支持标题、练习要求、提交要求。老师端历史区有“回到顶部”。
 - 站点元数据标题已改为 `能学慧吉他课堂笔记整理工具`（`frontend/app/layout.js`），不是导航栏名称。
-- 公安备案审核期间的临时配置（未登录首屏游客曲目区、登录页审核提示）**已全部恢复**，现在未登录访问 `/` 会正常跳转 `/login`。相关记录见 [debug复盘/2026-09-29-公安备案审核临时配置说明.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-09-29-公安备案审核临时配置说明.md)。
+- 公安备案审核期间的临时配置（未登录首屏游客曲目区、登录页审核提示）**已全部恢复**，现在未登录访问 `/` 会正常跳转 `/login`。相关记录见 [debug复盘/2026-09-29-公安备案审核临时配置说明.md](debug复盘/2026-09-29-公安备案审核临时配置说明.md)。
 - 视频播放器控制栏已重构为：`上一P` / 播放暂停 / `下一P` / 进度条 / 时间 / 画质 / 倍速 / 全屏。上一P、下一P 由详情页传入，切换的是当前曲目 / 知识点的 P，不会跨对象跳转。
 - 图书馆详情页已修复被全局样式撑高的拉伸问题，图书馆列表翻页器也已统一为与知识点区一致的样式，见第 9 节。
 - 正在接腾讯云数据万象（CI）自动转码：曲目 / 知识点 P 上传后自动产出 720p、1080p 两档，播放器画质菜单可切换，详见第 17 节。
@@ -428,7 +469,7 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 ## 8. 测试数据覆盖范围
 
-完整测试数据位于 [test-data](file:///c:/Users/user/Desktop/播放器/test-data/)：
+完整测试数据位于 [test-data](test-data/)：
 
 - 账号：1 个普通教导主任、3 个老师、4 个常规测试班级 × 4 名学员 + 1 个「能学慧内部测试班」4 名内部测试学员；常规班级的第 3、8、13、16 名学员为停用状态。
 - 曲目区：20 个单曲目 + 5 个曲谱集；单曲按 1~4 个 P 分布，部分单曲加入多个合集。
@@ -445,13 +486,13 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 文件：
 
-- [tracks/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/tracks/page.js)
-- [ContentCard.js](file:///c:/Users/user/Desktop/播放器/frontend/components/ui/ContentCard.js)
-- [design-system.css](file:///c:/Users/user/Desktop/播放器/frontend/app/design-system.css)
+- [tracks/page.js](frontend/app/tracks/page.js)
+- [ContentCard.js](frontend/components/ui/ContentCard.js)
+- [design-system.css](frontend/app/design-system.css)
 
 已修复：
 
-- 按 [tracks-home.html](file:///c:/Users/user/Desktop/播放器/docs/design/guitar-home/tracks-home.html) 恢复上下分区。
+- 按 [tracks-home.html](docs/design/guitar-home/tracks-home.html) 恢复上下分区。
 - 上区为曲谱集，下区为曲目。
 - 教导主任新建按钮在各区块标题右侧，不在导航右侧。
 - 卡片悬停显示查看详情 / 编辑 / 删除。
@@ -463,12 +504,12 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 文件：
 
-- [knowledge/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/knowledge/page.js)
-- [admin/knowledge/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/knowledge/page.js)
+- [knowledge/page.js](frontend/app/knowledge/page.js)
+- [admin/knowledge/page.js](frontend/app/admin/knowledge/page.js)
 
 已修复：
 
-- 按 [knowledge-home.html](file:///c:/Users/user/Desktop/播放器/docs/design/guitar-home/knowledge-home.html) 跑完和曲目库一致的流程。
+- 按 [knowledge-home.html](docs/design/guitar-home/knowledge-home.html) 跑完和曲目库一致的流程。
 - 上区为知识点集，下区为知识点。
 - 教导主任新建按钮在各区块标题右侧。
 - 卡片悬停显示查看详情 / 编辑 / 删除。
@@ -479,8 +520,8 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 文件：
 
-- [LoginForm.js](file:///c:/Users/user/Desktop/播放器/frontend/app/login/LoginForm.js)
-- [login.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/login/login.module.css)
+- [LoginForm.js](frontend/app/login/LoginForm.js)
+- [login.module.css](frontend/app/login/login.module.css)
 
 当前状态：
 
@@ -496,8 +537,8 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 文件：
 
-- [admin/users/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/users/page.js)
-- [admin/classes/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/admin/classes/page.js)
+- [admin/users/page.js](frontend/app/admin/users/page.js)
+- [admin/classes/page.js](frontend/app/admin/classes/page.js)
 
 当前状态：
 
@@ -512,9 +553,9 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 文件：
 
-- [library/[id]/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/library/[id]/page.js)
-- [library/[id]/library-book.module.css](file:///c:/Users/user/Desktop/播放器/frontend/app/library/[id]/library-book.module.css)
-- [library/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/library/page.js)
+- [library/[id]/page.js](frontend/app/library/[id]/page.js)
+- [library/[id]/library-book.module.css](frontend/app/library/[id]/library-book.module.css)
+- [library/page.js](frontend/app/library/page.js)
 
 已修复：
 
@@ -526,10 +567,10 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 文件：
 
-- [VideoPlayer.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoPlayer.js)
-- [design-system.css](file:///c:/Users/user/Desktop/播放器/frontend/app/design-system.css)
-- [tracks/[id]/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/tracks/[id]/page.js)
-- [knowledge/[id]/page.js](file:///c:/Users/user/Desktop/播放器/frontend/app/knowledge/[id]/page.js)
+- [VideoPlayer.js](frontend/components/VideoPlayer.js)
+- [design-system.css](frontend/app/design-system.css)
+- [tracks/[id]/page.js](frontend/app/tracks/[id]/page.js)
+- [knowledge/[id]/page.js](frontend/app/knowledge/[id]/page.js)
 
 当前状态：
 
@@ -593,7 +634,11 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 M5 已完成，后续修 bug 时不要破坏这些规则：
 
-- 作业使用 `object_type / object_id / part_id`。
+- 作业绑定稳定身份 `object_type + object_id`；分 P 使用真实 `part_id`，兼容旧数据 `COALESCE(part_id, object_id)`。P 序号和 URL 都不是作业身份，不能存“P2”或播放地址代替 ID。
+- 今日作业与老师回填显示目标的当前名称、封面、P 序号；改名、换封面、移动 P 不影响关联。
+- 目标删除或改私密：今日作业保留原位灰框，标题精确为“此资料已经被老师更改”，无封面、无导航；点击完全无响应，无 Toast、无弹窗。
+- 老师“回填上次作业”使用 `/api/admin/users/:userId/assignments/latest` 按稳定 ID 回填，过滤失效目标；整批目标失效仍保留该批练习/提交要求，不回退旧批次。恢复公开后，下次查询恢复显示和回填。
+- Web focus / visibilitychange、小程序 onShow 刷新状态；可用卡片点击另走导航复核，异步回调需做页面存活及请求版本保护。
 - 支持合集、单对象、单 P。
 - 单 P 标题必须是：`单课名-P名` / `单知识点名-P名`。
 - 分隔符是半角 `-`。
@@ -616,11 +661,11 @@ M5 已完成，后续修 bug 时不要破坏这些规则：
 
 保留但不要误删：
 
-- [VideoPlayer.js](file:///c:/Users/user/Desktop/播放器/frontend/components/VideoPlayer.js)
+- [VideoPlayer.js](frontend/components/VideoPlayer.js)
   - 这是曲目 P / 知识点 P 的复用播放器组件。
-- [uploadVideo.js](file:///c:/Users/user/Desktop/播放器/frontend/components/uploadVideo.js)
+- [uploadVideo.js](frontend/components/uploadVideo.js)
   - 这是 P 分段上传 helper。
-- [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js)
+- [videos.routes.js](backend/src/videos.routes.js)
   - 后端视频上传、存储、清晰度、转码基础设施仍被 P 分段使用。
 
 不要把“旧 `/videos` 前端页面”与“仍需要的视频基础能力”混为一谈。
@@ -635,10 +680,10 @@ M5 已完成，后续修 bug 时不要破坏这些规则：
 4. 注意：CSS 数学函数里不能照抄 `min(..., 1fr)`。`1fr` 不能出现在 `min()` 内，会导致浏览器丢弃整条声明并破坏布局；详情页两列布局应使用 `minmax(0, calc(...)) 260px`。
 5. 不要自己发明 UI、文案、按钮位置。
 6. 新页面私有样式用 CSS Module。
-7. 不要继续往 [globals.css](file:///c:/Users/user/Desktop/播放器/frontend/app/globals.css) 堆页面样式。
-8. 跨页面复用样式才放 [design-system.css](file:///c:/Users/user/Desktop/播放器/frontend/app/design-system.css)。
-9. 不要重写分片上传，调用 [uploadVideo.js](file:///c:/Users/user/Desktop/播放器/frontend/components/uploadVideo.js) 现有能力。
-10. 不要修改 [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) 的核心对象存储流程，除非 PRD 明确要求。
+7. 不要继续往 [globals.css](frontend/app/globals.css) 堆页面样式。
+8. 跨页面复用样式才放 [design-system.css](frontend/app/design-system.css)。
+9. 不要重写分片上传，调用 [uploadVideo.js](frontend/components/uploadVideo.js) 现有能力。
+10. 不要修改 [storage.js](backend/src/storage.js) 的核心对象存储流程，除非 PRD 明确要求。
 11. 保留存量数据；字段升级先备份及隔离演练再迁移，不沿用M0清空重建约定。
 12. 写接口必须后端鉴权，前端隐藏入口不算安全。
 13. 后续启动端口固定：后端 `3000`，前端 `3001`。
@@ -695,7 +740,7 @@ POST /api/admin/login
 
 ```bash
 cd /root/player
-docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml ps
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.production.yml ps
 docker logs --tail=150 video_player_backend
 docker logs --tail=150 video_player_frontend
 ```
@@ -734,7 +779,7 @@ docker ps --filter publish=3000 --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
 
 完整排障手册（DNS、Certbot、CORS、端口冲突、www 跳转）：
 
-- [debug复盘/2026-09-20-服务器部署问题复盘.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-09-20-服务器部署问题复盘.md)
+- [debug复盘/2026-09-20-服务器部署问题复盘.md](debug复盘/2026-09-20-服务器部署问题复盘.md)
 
 ---
 
@@ -786,9 +831,9 @@ docker ps --filter publish=3000 --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
 
 | 文件 | 职责 |
 |---|---|
-| [transcode.js](file:///c:/Users/user/Desktop/播放器/backend/src/transcode.js) | `parseCiWorkflowCallbackPayload` 解析工作流完成回调真实结构 `WorkflowExecution.Tasks[].ResultInfo.ObjectInfo[]`；`resolveTranscodeQuality` 按产物路径 / 画面长边判定档位；`isAllowedCiOutputKey` 校验产物必须与源视频同目录且文件名为 `原名-720p/-1080p`；`findVideoIdBySourceKey` 用源 key 反查 `videos.id`；`verifyCiCallbackRequest` 校验回调身份 |
-| [videos.routes.js](file:///c:/Users/user/Desktop/播放器/backend/src/videos.routes.js) | `POST /api/videos/transcode/callback`：验签 → 解析工作流任务 → 反查视频 → HeadObject 确认产物存在 → 写档位状态；失败写 `failed`，无效产物返回 400 便于排查 |
-| [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) | `publicKeyPrefixes` 允许 `tracks/` / `knowledge/` / `transcoded/` 等公开视频 key 生成公开地址 |
+| [transcode.js](backend/src/transcode.js) | `parseCiWorkflowCallbackPayload` 解析工作流完成回调真实结构 `WorkflowExecution.Tasks[].ResultInfo.ObjectInfo[]`；`resolveTranscodeQuality` 按产物路径 / 画面长边判定档位；`isAllowedCiOutputKey` 校验产物必须与源视频同目录且文件名为 `原名-720p/-1080p`；`findVideoIdBySourceKey` 用源 key 反查 `videos.id`；`verifyCiCallbackRequest` 校验回调身份 |
+| [videos.routes.js](backend/src/videos.routes.js) | `POST /api/videos/transcode/callback`：验签 → 解析工作流任务 → 反查视频 → HeadObject 确认产物存在 → 写档位状态；失败写 `failed`，无效产物返回 400 便于排查 |
+| [storage.js](backend/src/storage.js) | `publicKeyPrefixes` 允许 `tracks/` / `knowledge/` / `transcoded/` 等公开视频 key 生成公开地址 |
 
 回调安全策略（重要）：
 
@@ -804,20 +849,40 @@ docker ps --filter publish=3000 --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
 ```bash
 cd /root/player
 
-docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml logs --tail=300 backend | grep -i ci-callback
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.production.yml logs --tail=300 backend | grep -i ci-callback
 
-docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml exec postgres \
+docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.production.yml exec postgres \
 psql -U postgres -d video_player -c "SELECT video_id, quality, status, video_url, file_size, updated_at FROM video_renditions WHERE video_id = <视频ID> ORDER BY quality;"
 ```
 
 控制台逐步操作指南与问题复盘：
 
-- [debug复盘/2026-10-01-腾讯云数据万象转码接入操作指南.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-10-01-腾讯云数据万象转码接入操作指南.md)
-- [debug复盘/2026-10-04-数据万象工作流回调与清晰度不显示复盘.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-10-04-数据万象工作流回调与清晰度不显示复盘.md)
+- [debug复盘/2026-10-01-腾讯云数据万象转码接入操作指南.md](debug复盘/2026-10-01-腾讯云数据万象转码接入操作指南.md)
+- [debug复盘/2026-10-04-数据万象工作流回调与清晰度不显示复盘.md](debug复盘/2026-10-04-数据万象工作流回调与清晰度不显示复盘.md)
 
 ---
 
-## 18. 近期变更记录
+## 18. CDN / COS 交接与故障定位
+
+- 数据库存 COS 源地址，响应额外提供 CDN 播放字段；默认 COS 域名 `gy-nodejs-study-1423556188.cos.ap-nanjing.myqcloud.com`，CDN 域名 `media.nxhguitar.com`。`backend/src/playback-url.js` 仅精确转换默认源，保留路径/查询；带签名参数或其他域名不盲目改写。
+- `MEDIA_CDN_ENABLED` 默认开启，false/0/no/off 关闭转换；本地 MinIO 不会因此自动走线上 CDN。
+- Web/小程序优先 CDN，出错回退同一视频、同一清晰度 COS，保留播放位置/播放状态，避免循环回退。不要覆盖数据库源地址或回退到无关档位。
+- 已移除视频 TypeA 短签及 `MEDIA_CDN_AUTH_*` 启动强校验；兼容 play-url 端点做权限检查但返回正常源。附件/图书馆下载签名仍保留，不能混为一谈。
+- 业务私密不要求桶私有化、CDN 鉴权、文件加密或旧直链撤回。已知直链和下载不可追回；不能因页面隐藏就承诺文件级保密。
+- 云端配置不会随代码自动变化：若控制台仍强制旧 TypeA，普通地址可能 403。核对后再调整，不声称本轮已核验控制台，也不要盲目私有化整桶导致封面/PDF/附件失效。
+
+排障顺序：
+
+1. 对比接口 COS/CDN 完整路径、档位与 HTTP 状态；不要把签名参数、回调 token 或密钥写入公开问题单。
+2. COS 也 404：检查 key、上传结果、CI 转码和数据库档位。COS 正常而 CDN 403/404：检查 CDN HTTPS 证书、源站/回源权限、防盗链、残留 TypeA、边缘负缓存，必要时精确刷新故障 URL。
+3. COS 403：核对桶/对象策略、签名和请求要求，不用切 development 掩盖。
+4. 浏览器独有问题：查 HTTPS 混合内容、COS/CDN CORS、Content-Type、Range/206；COS CORS 放行 `https://nxhguitar.com`，以实际上传/播放请求核对。
+5. 小程序独有问题：查 request/downloadFile 合法域名、CDN 与 COS 回退域名、证书和真机网络。关闭开发工具校验不能代替正式配置。
+6. 播放有原画但无清晰度：查 CI 回调和 video_renditions，见第 17 节，不直接归因 CDN。
+
+更多实现位置与测试约束见 [backend/README.md](backend/README.md)。小程序默认连线上，本地 3000/真机局域网联调及独立上传发布流程见 [README-miniprogram.md](README-miniprogram.md)。Docker 更新不会自动发布小程序。
+
+## 18A. 近期变更记录
 
 | 日期 | 内容 |
 |---|---|
@@ -829,10 +894,11 @@ psql -U postgres -d video_player -c "SELECT video_id, quality, status, video_url
 | 2026-10-04 | 数据万象转码产物改为输出到源目录同级（`${InputPath}` + `${InputName}-720p/-1080p.${ext}`），修复工作流完成回调真实结构 `WorkflowExecution.Tasks[].ResultInfo.ObjectInfo[]` 解析，解决 COS 已生成转码文件但前端只显示原画的问题 |
 | 2026-10-28 | 分 P 公开/私密权限（后端 A–E 阶段）：`visibility` 字段与 `CONTENT_PRIVACY_MODE` 开关、课程公开性派生、前置/作业的私密资格校验、视频短期签名授权、`visibility_revocations` 撤销审计表。详见第 19 节 |
 | 2026-10-29 | 分 P 公开/私密权限（前端 F 阶段）：管理端曲目/知识点编辑页新增「公开/私密」切换按钮（分 P + 附件），报错提示带内容标题，修复合集封面叠层装饰误叠加、开关双重线框与高饱和配色问题 |
-| 2026-10-30 | 业务可见性细化：已布置/已有前置目标允许改私密（取消引用阻断）；学生前置隐藏、失效作业点击不跳转并 Toast「此课程已被老师更改」约 1600ms；附件独立私密、图书馆无私密；交付整改方案 MD（未实施代码） |
+| 2026-10-30 | 业务可见性方案收敛：已布置/已有前置目标允许改私密；附件独立私密、图书馆无私密（旧交互方案已被最新静默灰框规则替代） |
 | 2026-10-31 | 轻量实现阶段 A：新增合集 `visibility` 列 + 八表迁移 + schema 门禁，课程→合集派生刷新 helper；私密写入不再依赖 `CONTENT_PRIVACY_MODE`，前置维护允许私密目标 |
-| 2026-11-03 | 阶段 C 双端收尾：媒体改为有权限 P 正常 COS 源 + CDN，移除 TypeA 签名与 db 启动强校验，停止改私密撤销调用；新增 `assignment-navigation.js` 与两端 `/navigation` 实时资格端点；Web 今日页重复提示 1600ms、小程序历史私密 Toast |
-| 2026-11-09 | 密码流程计划：自助改密 + 固定 `Nxh123456` 重置、仅 root/教导主任在班级管理替他人重置、`admin` 禁改、重置即撤销全部 session —— 均仅计划（`docx/用户自助改密与固定密码重置实施计划.md`），未实施代码 |
+| 2026-11-03 | 媒体改为有权限 P 正常 COS 源 + CDN，移除 TypeA 签名及启动强校验，停止改私密撤销调用；新增双端导航资格复核 |
+| 2026-11-17 | 自助改密、固定密码重置、auth_version 会话失效、学员固定初始密码/暂不分班、双端作业稳定关联与静默失效恢复完成；提交 `24c9c32` 同步 Gitee/GitHub |
+| 2026-11-18 | 服务器完成副本迁移演练、八表 visibility 与 auth_version 正式迁移；三文件生产覆盖、后端健康及前端 HTTP 200 检查通过。浏览器/真机交互仍由用户验收 |
 
 > 说明：2026-10-28 / 10-29 两条记录的是**最初「模式门禁」版本**的实现（当时 `CONTENT_PRIVACY_MODE` 仍作为开关、改私密会触发撤销）。2026-10-31 起已收敛为轻量业务可见性：`CONTENT_PRIVACY_MODE` 仅保留兼容、不再门禁，详见第 19 节。
 
@@ -842,7 +908,7 @@ psql -U postgres -d video_player -c "SELECT video_id, quality, status, video_url
 
 > 本节约 2026-10-28/29 最初的「模式门禁」设计做了大幅收敛：公开/私密已是常规业务能力，
 > `CONTENT_PRIVACY_MODE` 仅保留为兼容/诊断变量、不再门禁；有权限内容统一走正常
-> CDN/COS 源，不再强制私密短签 / TypeA / 改私密即撤销。变更时间线见第 18 节。
+> CDN/COS 源，不再强制私密短签 / TypeA / 改私密即撤销。变更时间线见第 18A 节。
 > 下列说明区分可信度：① **本地代码已实现**（单测 / 本地 Docker 验证通过）；
 > ② **本地逻辑/方向约定**（代码已落地但仅本地验证）；③ **线上未独立核验**
 > （COS/CDN/生产库），不能据本地试用声称线上验收通过。
@@ -899,28 +965,24 @@ psql -U postgres -d video_player -c "SELECT video_id, quality, status, video_url
   「公开/私密」切换按钮（通用组件 `frontend/components/VisibilityToggle.js`）；分 P 顶部有
   「全部公开 / 全部私密」批量操作，并实时提示课程派生状态。已实现（阶段 F）。
 - **已布置 / 已有前置目标允许改私密**：不再因引用关系 409 阻断（参考 19.2）。
-- **学生端前置隐藏**：私密或失效的前置/作业目标对学生脱敏（标题「教学内容已调整，请联系老师」，不下发封面/导航/可播放 target）。
-- **失效作业处理（双端）**：学生点击失效作业不跳转，原地 Toast「此课程已被老师更改」约 1600ms 自动消失；
-  今日页保留失效占位并点击时实时复核 `navigation` 端点。
-- 老师端保留真实标题 + `target_private` 标记，提示重新布置。
+- **学生端前置隐藏**：私密或失效前置不作为学生学习入口。
+- **失效作业（双端）**：今日页原位灰框，标题固定“此资料已经被老师更改”，不显示原封面或入口，点击静默无响应（无 Toast / 弹窗 / 跳转）。已知失效不必重复导航请求；原可用项点击实时复核，发现失效后原位变灰。
+- **老师回填**：latest 接口过滤私密/删除目标，按稳定 ID 勾选；恢复公开后下一次查询自动恢复。
+- **历史记录**：只读布置时标题快照，不能因目标私密、删除、改名而改成失效文案，也不提供跳转。
 
 ### 19.5 边界、待办与部署风险（如实提示）
 
 - **本地 MinIO 不能证明线上 CDN**：本地 Docker 试用使用 MinIO 本地源、且 `NODE_ENV=development`、
   CDN 环境变量未注入，端到端通过只代表本地逻辑，**不能据以声称真实 COS/CDN 验收通过**。
-- **`docker-compose.local.yml` 仍写死 `NODE_ENV: development`（第 38 行），会覆盖根 `.env` 的生产设置。**
-  该文件只适合本地开发，**绝不能用于声称「生产模式」已生效**；生产需核对基础Compose及必要的生产覆盖配置，
-  确保最终 `NODE_ENV=production`。不能仅删除local文件而忽略现有服务、存储卷及网络依赖。这是已知待整改项，不是已解决的问题
-  （第 3.2 / 16 节的服务器命令若仍带 `-f docker-compose.local.yml`，在服务器上等同于以 development 运行，
-  导致生产/开发环境语义不一致，使用前须修掉该覆盖；当前业务可见性不应依赖development放行）。
+- **生产配置覆盖已采用三文件组合解决**：local 仍写 development，但服务器最后加载 production 覆盖为 production；第 3.2 / 16 节命令必须保持完整顺序。仅根 `.env` 写 production 或漏掉最后覆盖文件，仍会回到 development。换机必须补齐服务器生产覆盖文件并检查容器实际环境。
 - **八表含两合集迁移先于启动 schema 门禁**：`backend/scripts/migrate-content-visibility.js --apply`
   现在锁定并回填 **8 张表**（含 `track_collections` / `knowledge_collections` 两合集的 `visibility` 列）。
   启动新后端前**必须先跑迁移**，否则后端 `assertVisibilitySchema`（`VISIBILITY_SCHEMA_REQUIRED`）
-  fail-fast 导致线上 502（详见 3.2 节与 [复盘文档](file:///c:/Users/user/Desktop/播放器/docs/debug复盘/2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md)）。
+  fail-fast 导致线上 502（详见 3.2 节与 [复盘文档](docs/debug复盘/2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md)）。
 - 按用户确认的边界，本项目只做业务角色可见性，不要求COS/CDN文件级保密；不把桶私有化、CDN鉴权或旧直链撤销作为本功能验收前提。本轮未核实线上桶策略。
   已知公开直链 / 已转发内容仍可能直接访问，**不要把业务隐藏描述为文件加密或文件级保密**。
 - 已签发的短期 URL 在其有效期内、以及已下载到客户端的内容**无法追回**；`visibility_revocations`
   表保留为历史审计，但不据其声称已删除/撤回。
 - 无归属独立旧视频的布置策略尚未收紧（沿用「无宿主按公开」），正式发布前需审计。
 - **登录保持时间（当前实现，线上未独立核验）**：Web JWT 有效期 7 天、Cookie `maxAge` 同步；
-  小程序 token 15 天。已新增 `auth_version` 回查：改密/管理重置后，携带旧版本或缺少版本的 Cookie/Bearer 在鉴权时被拒绝，须重新登录；账号停用及角色变更仍有数据库回查。该变更在生产环境需先迁移两个账号表的版本字段再更新服务，本地验证不代表服务器已部署。
+  小程序 token 15 天。已新增 `auth_version` 回查：改密/管理重置后，携带旧版本或缺少版本的 Cookie/Bearer 在鉴权时被拒绝，须重新登录；账号停用及角色变更仍有数据库回查。服务器本次已完成两个账号表版本字段迁移并更新服务；改密具体交互及多设备登录行为仍须人工验收。

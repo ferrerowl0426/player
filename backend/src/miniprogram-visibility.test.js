@@ -111,6 +111,10 @@ test('getTrackDetail：公开曲目对学生返回数据，且 parts 仅公开 P
   // 前置课程查询也应带私密过滤（学生视角）。
   const prereqSql = firstMatching(/FROM prerequisites p/);
   assert.ok(prereqSql && /\$3::boolean = TRUE OR \(/.test(prereqSql), '前置课程应带可见性条件');
+  assert.ok(!/\bl\./.test(prereqSql), '前置查询不得引用未声明的 l 别名');
+  for (const type of ['track_point', 'knowledge_point', 'track_collection', 'knowledge_collection']) {
+    assert.ok(prereqSql.includes(`(p.prerequisite_type = '${type}'`), `前置权限应按目标类型过滤：${type}`);
+  }
 });
 
 test('getTrackDetail：教师可见私密曲目', async () => {
@@ -128,6 +132,9 @@ test('getKnowledgeDetail：公开知识点 parts 仅公开 P', async () => {
   assert.ok(await mod.getKnowledgeDetail('2', STUDENT));
   const partsSql = firstMatching(/SELECT p.id, p.part_no/);
   assert.ok(partsSql && /COALESCE\(NULLIF\(p\.visibility/.test(partsSql), 'knowledge_parts 应过滤私密 P');
+  const prereqSql = firstMatching(/FROM prerequisites p/);
+  assert.ok(prereqSql && !/\bl\./.test(prereqSql), '知识点前置查询不得引用未声明的 l 别名');
+  assert.ok(prereqSql.includes("(p.prerequisite_type = 'knowledge_point'"), '知识点前置权限应按目标类型过滤');
 });
 
 // ---------- 合集详情：无可见子项则整体隐藏 ----------
@@ -155,5 +162,7 @@ test('getLibraryDetail：relatedCourses 对学生过滤私密关联课程', asyn
   const sql = firstMatching(/FROM library_resource_links l/);
   assert.ok(sql, '应查询关联课程');
   assert.ok(/\$2::boolean = TRUE OR \(/.test(sql), '关联课程应带可见性条件');
+  assert.ok(sql.includes("(l.object_type = 'track_point'"), '图书馆关联权限仍应使用 l.object_type');
+  assert.ok(!sql.includes('p.prerequisite_type'), '图书馆关联查询不应使用前置课程字段');
   assert.ok(/EXISTS \(SELECT 1 FROM track_parts pp WHERE pp\.track_id = tp\.id/.test(sql), '曲目关联需查公开 P');
 });

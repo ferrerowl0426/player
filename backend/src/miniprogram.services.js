@@ -52,19 +52,19 @@ function publicCollectionPredicate(contentType) {
 
 // 单个关联课程（前置/相关课程）是否对“非私密查看者”可见：
 // 课程点需 public 且存在公开 P；集合需包含至少一个可见子项。
-function relatedCourseVisibleConditions() {
+function relatedCourseVisibleConditions(typeColumn = 'l.object_type') {
   return `(
-    (l.object_type = 'track_point' AND tp.id IS NOT NULL
+    (${typeColumn} = 'track_point' AND tp.id IS NOT NULL
        AND COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public'
        AND EXISTS (SELECT 1 FROM track_parts pp WHERE pp.track_id = tp.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public'))
-    OR (l.object_type = 'knowledge_point' AND kp.id IS NOT NULL
+    OR (${typeColumn} = 'knowledge_point' AND kp.id IS NOT NULL
        AND COALESCE(NULLIF(kp.visibility, ''), 'public') = 'public'
        AND EXISTS (SELECT 1 FROM knowledge_parts pp WHERE pp.knowledge_point_id = kp.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public'))
-    OR (l.object_type = 'track_collection' AND tc.id IS NOT NULL
+    OR (${typeColumn} = 'track_collection' AND tc.id IS NOT NULL
        AND EXISTS (SELECT 1 FROM track_collection_items ci JOIN track_points ti ON ti.id = ci.track_id WHERE ci.collection_id = tc.id
                    AND COALESCE(NULLIF(ti.visibility, ''), 'public') = 'public'
                    AND EXISTS (SELECT 1 FROM track_parts pp WHERE pp.track_id = ti.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')))
-    OR (l.object_type = 'knowledge_collection' AND kc.id IS NOT NULL
+    OR (${typeColumn} = 'knowledge_collection' AND kc.id IS NOT NULL
        AND EXISTS (SELECT 1 FROM knowledge_collection_items ci JOIN knowledge_points ki ON ki.id = ci.knowledge_point_id WHERE ci.collection_id = kc.id
                    AND COALESCE(NULLIF(ki.visibility, ''), 'public') = 'public'
                    AND EXISTS (SELECT 1 FROM knowledge_parts pp WHERE pp.knowledge_point_id = ki.id AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public')))
@@ -662,7 +662,7 @@ async function getPrerequisites(objectType, objectId, canView = true) {
        LEFT JOIN track_collections tc ON p.prerequisite_type = 'track_collection' AND tc.id = p.prerequisite_id
        LEFT JOIN knowledge_collections kc ON p.prerequisite_type = 'knowledge_collection' AND kc.id = p.prerequisite_id
       WHERE p.object_type = $1 AND p.object_id = $2
-        AND ($3::boolean = TRUE OR ${relatedCourseVisibleConditions()})
+        AND ($3::boolean = TRUE OR ${relatedCourseVisibleConditions('p.prerequisite_type')})
       ORDER BY p.prerequisite_type ASC, p.prerequisite_id ASC`,
     [objectType, objectId, canView]
   );

@@ -1,495 +1,163 @@
-# 能学慧吉他教室 · 小程序端协作 README
+# 能学慧吉他教室 · 微信小程序交接 README
 
-> 本文件面向后续接手微信小程序端的开发者，只记录当前 `miniprogram/` 项目的实际架构、协作约束和注意点。
-> 旧版开发计划、阶段任务、提审清单等过程性内容已移除；后续如发现本文档与实际代码不一致，以当前代码为准更新本文档。
+> 面向接手学生端的程序员。Web/服务器总览见 [README.md](README.md)，后端迁移与媒体排障见 [backend/README.md](backend/README.md)。旧需求文档可能保留历史 Toast、待实施改密、TypeA 短签方案，当前规则以本文与对应代码为准。
 
----
+## 1. 范围与入口
 
-## 1. 项目定位
+- 微信原生小程序，代码 `miniprogram/`；仅学生端，不新增老师后台、注册、支付、广告、会员或 openid 绑定。
+- 功能：账号登录、今日作业、课程/合集、分 P 播放、附件、图书馆 PDF、历史记录、我的/本人改密。
+- 老师、教导主任在 Web 管理；内容公开/私密开关不放到学生端。
+- API 命名空间 `/api/miniprogram`，与 Web 共用 Express 后端、PostgreSQL 和存储。
 
-这是「能学慧吉他教室」的微信小程序学生端，当前定位是：
+## 2. 地址、端口与本地联调
 
-- 面向学生使用；
-- 主要功能包括登录、首页作业、课程浏览、课程播放、图书馆、历史记录、我的页；
-- 老师、教导主任、管理员仍使用网页端后台；
-- 小程序不承担后台管理、注册、支付、广告、会员等能力；
-- 前端代码位于项目根目录下的 `miniprogram/`；
-- 后端接口命名空间统一为 `/api/miniprogram/*`。
+| 用途 | 地址 |
+|---|---|
+| 正式小程序 API | `https://api.nxhguitar.com/api/miniprogram` |
+| 正式 Web | `https://nxhguitar.com` |
+| 本机 Web | `http://localhost:3001` |
+| 本机后端健康检查 | `http://localhost:3000/api/health` |
+| 本机小程序 API | `http://localhost:3000/api/miniprogram` |
 
-当前小程序默认后端地址写在：
+小程序**默认连接线上 API**，本地重建 Docker 不会自动切换它。统一配置位置：
 
-```text
-miniprogram/app.js
-```
+- `miniprogram/app.js` 的 `globalData.apiBaseUrl`（主配置）。
+- `miniprogram/utils/constants.js` 的 `API_BASE_URL`（回退配置）。
 
-实际值为：
+本地开发可临时把上述两处改为本地 API；页面服务只拼相对路径，不再各自硬编码域名。发布前两处恢复 HTTPS 线上地址，避免上传本地配置。
 
-```text
-https://api.nxhguitar.com/api/miniprogram
-```
+### 联调步骤
 
-不要在页面里各自硬编码 API 地址；如需调整环境地址，应优先统一调整全局配置或请求层。
+1. 按根 README 启动本地后端，确认 3000 健康检查成功；3001 是网页，不是 API 代理。
+2. 在微信开发者工具导入项目，项目配置/小程序根目录指向实际 `miniprogram/`，使用已授权的 AppID，不在文档中存放密钥。
+3. 模拟器本机联调可以用 localhost；临时关闭域名/证书校验仅用于开发，不是上线解决方案。
+4. **真机不能用 localhost**（它指向手机）。使用电脑局域网 IP，例如 `http://<电脑局域网IP>:3000/api/miniprogram`，确保手机与电脑网络互通、服务监听可达、防火墙允许；本地 MinIO 返回地址也必须能被手机访问。
+5. 若真机环境不允许本地 HTTP/域名调试，使用受控 HTTPS 测试环境及相应合法域名配置；不要修改生产权限来绕过限制。
+6. 切换环境后退出并清除旧会话/业务缓存再登录，避免拿线上 token 访问本地或反之。
 
----
+## 3. 页面与共享层
 
-## 2. 全局页面架构
+页面注册以 `miniprogram/app.json` 为准，底部 Tab 固定：**首页 / 课程 / 图书馆 / 历史 / 我的**。
 
-页面注册以 `miniprogram/app.json` 为准。
-
-### 2.1 Tab 页面
-
-当前底部 Tab 共 5 个：
-
-| Tab | 页面路径 | 说明 |
+| 页面 | 路径 | 职责 |
 |---|---|---|
-| 首页 | `pages/home/index` | 学生首页、今日作业、今日用到的课件 |
-| 课程 | `pages/courses/index` | 曲目 / 曲目集 / 知识点 / 知识点集入口 |
-| 图书馆 | `pages/library/index` | PDF 资料列表、预览、下载 |
-| 历史 | `pages/history/index` | 历史作业 / 操作记录聚合展示 |
-| 我的 | `pages/mine/index` | 学生信息、账号与退出登录 |
+| 登录 | `pages/login/index` | 学生账号密码登录 |
+| 首页 | `pages/home/index` | 当前作业、学习入口、失效占位 |
+| 课程 | `pages/courses/index` | 曲目、曲谱集、知识点、知识点集 |
+| 图书馆 | `pages/library/index` | PDF 列表与打开 |
+| 历史 | `pages/history/index` | 布置快照只读浏览/搜索 |
+| 我的 | `pages/mine/index` | 学生信息、本人改密、退出 |
+| 曲目/知识点 | `pages/track-detail/index`、`pages/knowledge-detail/index` | 分 P、视频、附件、前置 |
+| 合集 | `pages/track-collection/index`、`pages/knowledge-collection/index` | 合集成员课程 |
+| 文件承载 | `pages/library-detail/index` | 文件详情/预览承载 |
+| 音频 | `pages/audio-player/index` | 附件音频播放 |
 
-Tab 文案必须保持当前代码中的：
+关键共享文件：
 
-```text
-首页 / 课程 / 图书馆 / 历史 / 我的
-```
+- `services/request.js`：统一请求，Base URL、Bearer、15 秒超时、401 清理会话、错误归一化。
+- `services/auth.js`：登录/退出/学生资料/改密、缓存和 `requireLogin()`。
+- `services/homework.js`、`courses.js`、`library.js`、`files.js`：相应业务 API。
+- `utils/format.js`：驼峰/下划线兼容、作业状态/历史快照、课程与图书馆归一化。
+- `utils/navigate.js`：作业 ID 导航复核、目标页面与 P 定位，不允许旧 target 绕过复核。
+- `utils/create-video-detail-page.js`：两类视频详情共享播放器、生命周期与 CDN 回退。
 
-不要再使用旧文档里的“资料”命名。
+新增页面注册到 app.json，接口走统一请求层，不为小程序随意破坏 Web 既有接口。
 
-### 2.2 非 Tab 页面
+## 4. 会话与本人改密
 
-| 页面 | 页面路径 | 说明 |
-|---|---|---|
-| 登录页 | `pages/login/index` | 学生账号登录、开发预览入口 |
-| 曲目播放详情 | `pages/track-detail/index` | 曲目视频播放、分 P、附件、前置知识点 |
-| 曲目合集详情 | `pages/track-collection/index` | 曲目集合内内容列表 |
-| 知识点播放详情 | `pages/knowledge-detail/index` | 知识点视频播放、分 P、附件 |
-| 知识点合集详情 | `pages/knowledge-collection/index` | 知识点集合内内容列表 |
-| 资料详情 / PDF 承载 | `pages/library-detail/index` | 资料预览承载页，PDF 使用微信原生预览 |
-| 音频播放页 | `pages/audio-player/index` | 音频附件播放页 |
+- 默认 token 有效期 15 天；启动从缓存恢复 token/student，不等于已完成服务器权限复核。
+- 缓存键：studentToken、student、studentTokenExpiresAt。业务缓存包括 homeworkTodayCache、homeworkHistoryCache、coursesCache、libraryCache、studentMeCache。
+- `requireLogin()` 同时检查 student/token，缺失清理并 reLaunch 登录页。
+- 退出先尝试服务端 logout，无论结果都执行本地 clearSession，清理会话及业务缓存。
+- “我的”**已实现本人改密**：旧密码、新密码及各自密码可见按钮。旧密码错误行内提示，不能当成会话过期退出。
+- 改密成功提示后清理会话并重新登录；后端递增 auth_version，旧设备 Cookie/Bearer 随后鉴权失效。
+- 旧密码错误使用 400，不使用会触发 request.js 自动清理的 401。
+- 新建学员由 Web 管理端创建，初始密码固定 `Nxh123456`，可暂不分班；旧账号密码不自动重置。
+- 小程序只允许学生本人改密，不提供管理重置入口。
 
-详情页不属于 Tab 页面，不应强行常驻底部 Tab。
+## 5. 作业稳定关联与失效恢复（禁止回到旧 Toast 方案）
 
----
+### 稳定身份
 
-## 3. 全局配置与会话
+作业关联 object_type + object_id，分 P 使用真实 part_id，不是 P2/P3 序号，也不是播放 URL。移动 P、改名、换封面后，同一作业显示**当前**标题、封面和 P 序号。
 
-### 3.1 `app.json`
+### 今日作业
 
-`app.json` 负责：
+- 后端 target_status / targetStatus 区分 available、private、missing。
+- private/missing 保留原位置灰框；标题精确为 **“此资料已经被老师更改”**；清空图片、P 标识和导航 target，不显示“进入详情”。
+- 已知失效卡片点击**完全无响应**：不请求导航、不 Toast、不弹窗、不跳转。
+- available 点击调用 `GET /homework/:id/navigation` 实时复核，仅 available + 有效 target 导航；刚变失效则原位变灰、静默处理。
+- 无 assignment.id 一律按 missing 处理，不能用列表旧 target 旁路跳转。
+- 服务端返回的 target.partId 优先于旧 assignment.partId。
+- `onShow()` 重新查询；恢复公开后下一次查询自动恢复，不永久缓存失效。
+- home 使用 active/loadVersion；导航传 isCurrent，页面隐藏/卸载后的旧响应不能更新 UI、提示或跳转。
+- 今日作业按最新批次完整读取，不能用固定若干行猜批次；message 是历史兼容，不当资料卡。
 
-- 注册页面；
-- 配置全局导航栏；
-- 配置底部 Tab；
-- 指定 tab 图标资源。
+### 历史记录与老师回填
 
-当前全局窗口配置：
+- 历史保留布置时标题快照，即使目标改名/私密/删除也不改成失效标题；条目只读，无点击导航、无私密 Toast。
+- `normalizeAssignment(..., { snapshot: true })` 与今日状态投影分开，不能混用。
+- 老师回填在 Web 实施，后端 latest 接口按稳定 ID 返回当前可用目标；失效过滤、恢复公开可恢复回填；整批失效仍保留最新批次练习/提交要求。
 
-```text
-导航栏标题：能学慧吉他教室
-导航栏背景：#ffffff
-导航栏文字：black
-页面背景：#ffffff
-```
+## 6. 课程权限、CDN 与文件
 
-Tab 图标位于：
+### 可见性
 
-```text
-miniprogram/assets/icons/
-```
+后端负责过滤学生无权记录，前端隐藏不是安全边界。公开 P 派生课程公开、公开课程派生合集公开；附件独立私密，不参与派生；图书馆无私密。私密前置对学生隐藏，已有前置/作业不阻止老师把目标改私密。
 
-当前使用的图标文件包括：
+### 播放地址
 
-```text
-tab-home.png
-tab-home-active.png
-tab-course.png
-tab-course-active.png
-tab-library.png
-tab-library-active.png
-tab-history.png
-tab-history-active.png
-tab-mine.png
-tab-mine-active.png
-```
+- 数据库存 COS 源；授权可见项响应保留 videoUrl/originVideoUrl，playUrl 提供 CDN 地址。
+- 默认源 `gy-nodejs-study-1423556188.cos.ap-nanjing.myqcloud.com`，CDN `media.nxhguitar.com`；转换仅针对精确源域名，签名 URL/其他源不盲目改写。
+- 优先 CDN，失败回退**相同视频、相同清晰度** COS，保留位置和播放状态，避免循环重试。
+- 视频 TypeA 短签已移除，正常播放不依赖兼容 play-url 授权端点。不要重新加回旧 MEDIA_CDN_AUTH 配置或把视频 URL 清空后强制短签。
+- **业务私密不等于文件级保密**：已知公开直链、转发、缓存及已下载文件可能继续访问，不承诺撤回/加密。
+- 附件、图书馆的 signed-url 文件接口仍保留，不能把“移除视频 TypeA”误解为所有文件都不签名。
 
-### 3.2 `app.js`
+### 视频与文件实现约束
 
-`app.js` 是全局会话入口，当前 `globalData` 包含：
+两类详情共享 create-video-detail-page；自定义控制条支持播放、进度、清晰度、倍速、全屏。默认清晰度优先 720p，再 source；Web 默认偏好可能不同，不要为统一文案误改行为。横竖屏/安全区、iOS 原生视频层、拖动手势与退出全屏兜底必须保留。onHide/onUnload 暂停并清理定时器，旧异步回调不得自动续播。
 
-```js
-{
-  student: null,
-  token: '',
-  apiBaseUrl: 'https://api.nxhguitar.com/api/miniprogram'
-}
-```
+`services/files.js` 统一分流 MP3 到音频页、图片到 previewImage、PDF 到 downloadFile/openDocument。音频离页 stop/destroy；iPhone 静音键、Content-Type、Range 和 HTTPS 需真机验证。小程序不新增 P 视频下载入口。
 
-启动时：
+### 微信合法域名与云端排障
 
-- `onLaunch()` 从本地缓存恢复 token；
-- `onLaunch()` 从本地缓存恢复 student；
-- 启动时不会主动请求后端刷新学生资料。
+- request 合法域名包含正式 API；downloadFile 及媒体相关域名按实际请求包含 CDN、COS 和文件下载返回域名。以微信控制台当时可配置的类别和实际网络请求核对，不能只配 API。
+- 开发者工具“不校验合法域名”只对开发有效，体验版/正式版仍须合法域名、HTTPS、有效证书及可达地址。
+- CDN 失败先对比 COS 同档是否正常：COS 也失败查 key/权限/转码；COS 正常而 CDN 失败查域名证书、回源、防盗链、残留 TypeA 和负缓存。
+- 本地 MinIO 成功不能证明真实 CDN 已验收。云端策略要独立核验，不擅自私有化全桶或声称已完成 CDN 控制台配置。
 
-会话写入：
+## 7. 后端接口与部署协作
 
-- `setSession({ token, student, expiresAt })` 更新 `globalData`；
-- token 和 student 都存在时，写入本地缓存。
+相对 `/api/miniprogram`：login、logout、me、homework/today、homework/history、homework/:id/navigation、tracks、knowledge、两类课程/合集详情、library、files/:fileId/signed-url。具体 HTTP 方法及改密路径以 services/auth.js 和后端路由为准，新增接口同步文档。
 
-会话清理：
-
-- `clearSession()` 清空 `globalData.token`；
-- `clearSession()` 清空 `globalData.student`；
-- 同时调用服务层清理本地缓存。
-
-会话缓存与接口实现以 `miniprogram/services/auth.js` 为准。当前实际规则：
-
-- token 缓存 key：`studentToken`；
-- 学生信息缓存 key：`student`；
-- token 过期时间缓存 key：`studentTokenExpiresAt`；
-- 默认会话有效期：15 天；
-- `requireLogin()` 会同时检查 student 和 token，缺任意一个都会清理本地会话并 `reLaunch` 到 `/pages/login/index`；
-- `clearSession()` 不只清登录态，也会清理业务缓存：`homeworkTodayCache`、`homeworkHistoryCache`、`coursesCache`、`libraryCache`、`studentMeCache`；
-- 登录接口：`POST /login`；
-- 登出接口：`POST /logout`；
-- 当前学生信息接口：`GET /me`；
-- 登录返回兼容 `data.student || data.user || data`，后端最好稳定返回 `{ token, student, expiresAt }`。
-
-### 3.3 `services/request.js`（统一请求层）
-
-所有接口请求应走 `miniprogram/services/request.js` 的 `request()`，当前实际行为：
-
-- Base URL 取值顺序：`getApp().globalData.apiBaseUrl` → 回退 `utils/constants.js` 的 `API_BASE_URL`；
-- 自动附加请求头 `Authorization: Bearer <token>`（token 存在时）；
-- `content-type` 默认 `application/json`；
-- 2xx 时 resolve `res.data.data ?? res.data`（兼容 `{ code, data }` 包装与裸数据两种返回）；
-- 401 时自动清理本地会话缓存（与 `clearSession()` 同一组 key）；
-- 网络失败统一抛出「网络连接失败，请稍后重试」，错误对象带 `statusCode` 和 `userMessage` 字段，页面展示错误时优先用 `userMessage`。
-
-新增接口时：在对应服务文件里调 `request()` 拼相对路径即可，不要自己另写 `wx.request`。
-
-### 3.4 `utils/constants.js`（全局常量）
-
-当前维护内容：
-
-- `API_BASE_URL`：`https://api.nxhguitar.com/api/miniprogram`（与 `app.js` 的 `apiBaseUrl` 保持一致，改地址两处要同步）；
-- `OBJECT_TYPE_LABELS`：业务对象类型 → 展示文案（`合集 / 单曲 / P / 知识点集 / 知识 / PDF`）；
-- `OBJECT_TYPE_ACTIONS`：各对象类型的默认点击行为描述（合集进详情、单曲播 P1、分 P 自动定位播放）。
-
-新增对象类型或改文案时在这里加，不要在页面里写死类型映射。
-
-### 3.5 `utils/format.js`（数据归一化层）
-
-页面不直接消费接口原始字段，而是先经过 `format.js` 归一化。当前导出：
-
-- `formatDateText` / `formatTimeText` / `formatWeekText`：日期 → `M 月 D 日` / `HH:mm` / `周X`；
-- `normalizeAssignment`：单条作业归一化，兼容驼峰 / 下划线字段（`objectId || object_id` 等），补齐 `typeLabel`、`partLabel`（`P01` 格式）、`materialMeta`、`materialAction`；
-- `normalizeHomeworkGroup`：首页作业组归一化，输出 `operationId`、`assignmentDateText`、`teacherName`、`assignments`、练习/提交要求；无作业时 `statusText` 为「等待老师布置作业」；
-- `normalizeCourseItems(data, section, keyword)`：课程四分区（`track / knowledge / track-set / knowledge-set`）列表归一化，内置类型 → 页面路径映射和本地搜索过滤；注意里面有 mock 兜底值（如 `index % 4` 生成的 countLabel / 更新日期），接真实接口后应删掉兜底、信任后端字段；
-- `normalizeLibraryItems`：图书馆列表归一化，`getFileType()` 从 URL / MIME / 扩展名推断 `PDF / MP3 / JPG / PNG` 等，输出 `sizeText`、`updateDateText`；
-- `normalizeHomeworkHistory`：历史记录归一化，每条输出一个操作盒（`operationId`、`dateText`、`teacherName`、`assignments`、`deleted`、`deleteReason`）。
-
-协作注意：
-
-- 归一化函数统一做「驼峰 + 下划线」双格式兼容，后端两种命名都能接，但新接口建议统一驼峰；
-- 改动任何 normalize 函数时，要同步检查使用它的页面和 mock 数据结构。
-
----
-
-## 4. 服务层与接口清单
-
-所有接口请求都通过 `services/request.js`。页面不要直接写 `wx.request`。
-
-### 4.1 服务文件
-
-| 文件 | 职责 | 实际端点 |
-|---|---|---|
-| `services/auth.js` | 登录、登出、当前学生、会话守卫 | `POST /login`、`POST /logout`、`GET /me` |
-| `services/homework.js` | 今日作业、历史作业 | `GET /homework/today`、`GET /homework/history?page=&pageSize=` |
-| `services/courses.js` | 课程四分区、详情、合集 | `/tracks`、`/knowledge`、`/tracks/:id`、`/knowledge/:id`、合集详情 |
-| `services/library.js` | 图书馆列表与详情 | `GET /library?keyword=`、`GET /library/:id` |
-| `services/files.js` | 文件预签名 URL、PDF/图片/音频打开 | `GET /files/:fileId/signed-url?source=` |
-
-### 4.2 后端需支持的端点
-
-后端统一挂在 `/api/miniprogram` 下：
+后端服务器 `/root/player`，Compose 项目 `video_player`。发布必须依次加载：
 
 ```text
-POST /login
-POST /logout
-GET  /me
-GET  /homework/today
-GET  /homework/history?page=1&pageSize=20
-GET  /homework/:id/navigation
-GET  /tracks?type=track_point&keyword=&sort=updated_desc&page=1&pageSize=20
-GET  /tracks?type=track_collection&keyword=&sort=updated_desc&page=1&pageSize=20
-GET  /knowledge?type=knowledge_point&keyword=&sort=updated_desc&page=1&pageSize=20
-GET  /knowledge?type=knowledge_collection&keyword=&sort=updated_desc&page=1&pageSize=20
-GET  /tracks/:id
-GET  /tracks/collections/:id
-GET  /knowledge/:id
-GET  /knowledge/collections/:id
-GET  /library?keyword=
-GET  /library/:id
-GET  /files/:fileId/signed-url?source=library|attachment
+docker-compose.yml
+docker-compose.local.yml
+docker-compose.production.yml
 ```
 
-约定：
+production 文件在服务器创建、必须最后加载，覆盖 local 的 development 为 production；不可只修改根 .env 就认为生效。完整命令、备份与回滚见根 README 第 3.2 节。
 
-- 排序参数当前页面使用：`updated_desc`、`updated_asc`、`title`；
-- 课程四分区类型：`track_point`、`track_collection`、`knowledge_point`、`knowledge_collection`；
-- 文件预签名返回兼容 `{ url }` 或 `{ signedUrl }`；
-- 登录返回建议稳定为 `{ token, student, expiresAt }`；
-- 私密内容（`visibility='private'`）由后端 SQL 统一过滤，学生端列表/详情不会返回无权私密项，作业可保留脱敏失效占位；授权可见的视频返回 `playUrl`（CDN 播放地址）与 `videoUrl`（原 COS 地址，作同档回退）二者，学生端优先 CDN、可回退 COS，**不再依赖私密短签授权端点**（`/api/playback/.../play-url` 作为兼容权限检查端点保留，公开视频也可调用；当前小程序正常播放不依赖它）。作业目标点击另走 `/homework/:id/navigation` 实时复核（见 §9.4）。
+首次升级当前后端须备份、隔离副本演练并显式执行八表 visibility / auth_version 迁移，再启动；缺字段会触发 schema 门禁而 502。普通小程序前端更新不需要新建数据库、seed 或清空存量数据。
 
----
+最近服务器已完成提交 24c9c32 的两项迁移、生产覆盖与健康检查；不代表小程序前端已上传，也不代表真机已验收。
 
-## 5. 页面实现要点
+## 8. 小程序上传发布（与 Docker 分开）
 
-### 5.1 登录页
+1. 确认后端已部署且 schema、HTTPS API 健康；核对接口兼容性。
+2. 两处 API 配置恢复线上 HTTPS 地址，检查变更中无本地 IP、调试账号密码、密钥或错误 AppID。
+3. 微信开发者工具编译、预览；用户自行做体验版/真机验收，特别是登录、改密、失效灰框、公开恢复、P 重排定位、历史快照、视频回退及 PDF。
+4. 通过已授权 AppID 上传版本，填写版本号和变更说明；在微信公众平台设置体验版、提交审核并发布，按平台流程操作。
+5. Docker 只更新后端/Web，**不会自动发布小程序**；本地工具编译成功也不等于正式用户已收到新版本。
+6. 记录发布版本、对应 Git 提交和后端版本；回滚小程序与回滚后端分别处理，保持接口兼容。
 
-`pages/login/index.js`
+## 9. 协作与验证边界
 
-- 调 `login({ account, password })`；
-- 成功后 `getApp().setSession(result)`；
-- 跳转 `wx.switchTab({ url: '/pages/home/index' })`；
-- 当前没有注册、openid 绑定、短信验证码逻辑。
-
-### 5.2 首页
-
-`pages/home/index.js`
-
-- `onShow()` 先 `requireLogin()`；
-- 调 `getTodayHomework()`；
-- 用 `normalizeHomeworkGroup()` 归一化；
-- 点击作业内任意内容走 `navigateByAssignment()`，支持六类内容跳转。
-
-### 5.3 课程页
-
-`pages/courses/index.js`
-
-- 默认分区：`knowledge-set`；
-- 四分区：`knowledge-set` / `track-set` / `knowledge` / `track`；
-- 排序项：时间倒序、时间正序、按标题；
-- 搜索框输入后立即重新加载；
-- 返回顶部用 `wx.pageScrollTo`；
-- 页面卡片 URL 由 `normalizeCourseItems()` 生成。
-
-### 5.4 图书馆
-
-`pages/library/index.js`
-
-- 只展示 `fileType === 'PDF'` 的资料；
-- 搜索在接口请求后还会本地过滤标题；
-- 预览与下载当前共用 `previewPdf()`，底层走 `openLibraryFile()`；
-- 如果接口 404，会提示「服务器暂未部署图书馆接口」。
-
-### 5.5 历史页
-
-`pages/history/index.js`
-
-- 固定拉取第一页 20 条；
-- 用 `normalizeHomeworkHistory()` 归一化；
-- 搜索是本地过滤，范围包括老师名、标题、练习要求、提交要求、作业标题和类型；
-- 返回顶部用 `wx.pageScrollTo`。
-
-### 5.6 我的页
-
-`pages/mine/index.js`
-
-- 学生信息来自 `requireLogin()` 的本地 student；
-- 头像首字取 `nickname || username || account || '学'`；
-- 退出时先尝试 `POST /logout`，无论成功失败都会 `getApp().clearSession()` 并 `reLaunch` 到登录页。
-
-### 5.7 合集详情页
-
-`pages/track-collection/index.js`、`pages/knowledge-collection/index.js`
-
-- 调对应合集接口；
-- `raw.items || raw.lessons || []` 作为列表来源；
-- 点击内容跳到对应详情页：曲目进 `track-detail`，知识点进 `knowledge-detail`。
-
----
-
-## 6. 播放器与文件打开
-
-### 6.1 视频播放详情
-
-适用页面：
-
-```text
-pages/track-detail/index
-pages/knowledge-detail/index
-```
-
-两页通过 `utils/create-video-detail-page.js` 复用播放器状态、生命周期和交互逻辑，各自的 `index.js` 只配置详情接口、默认标题和错误文案；`knowledge-detail/index.wxss` 直接 `@import "../track-detail/index.wxss"`。
-
-当前播放器实现：
-
-- `<video id="lessonVideo">` 关闭原生 controls / play button / fullscreen button；
-- 使用 `wx.createVideoContext('lessonVideo', this)` 控制；
-- 自定义控制条支持播放/暂停、进度拖动、当前/总时长、清晰度、倍速、全屏；
-- 清晰度来自 `part.renditions[]`，只保留有 `videoUrl` 且 `status` 为空或 `ready` 的项；
-- 默认清晰度优先级：`720p` → `source` → 第一项；
-- 倍速档位使用微信 `video` 真机支持的值：`[0.5, 0.8, 1, 1.25, 1.5, 2]`；
-- `bindloadedmetadata` 根据视频宽高决定全屏方向，横屏用 `direction: 90`，竖屏用 `direction: 0`；
-- 进度条是“大热区 + 视觉轨道 + 滑块 + 拖动时间气泡”；
-- 原生 `enable-progress-gesture` 已关闭，进度热区使用拦截型触摸事件，避免 iOS 原生视频手势抢占自定义拖动；
-- 拖动开始时缓存视觉轨道尺寸，拖动中不重复查询节点；释放时只 seek 一次，拖动期间 `isSeeking` 会阻止 timeupdate 覆盖 UI；
-- 全屏状态以 `bindfullscreenchange` 的 `event.detail.fullScreen` 为准，并记录 `fullscreenDirection`；
-- 全屏控制条保持常驻，避免 iOS 原生全屏层在控制条隐藏后无法再次把点击派发给页面；
-- 全屏进度拖动按屏幕宽度和安全区计算轨道范围，不依赖 iOS 原生视频层中可能失效的节点测量；
-- 退出全屏通过 `exitFullscreenWithFallback()` 执行，500ms 后仍未同步时会兜底重置本地全屏状态；
-- 控制条已拆成“进度条层 + 控制按钮层”，小窗、横屏全屏、竖屏全屏共用同一套结构；
-- 横屏全屏控制层使用固定像素尺寸并适配左右及底部安全区域；小窗可自动隐藏，全屏始终保留可操作控制层；
-- 播放、暂停和全屏图标使用本地 PNG，不依赖 iOS / Android 字体或 `cover-view` 的复杂边框绘制；
-- 倍速按钮在小窗和全屏都显示，点击后通过播放器内弹窗选择具体档位；
-- 视频画面统一使用 `contain`，避免异形屏横屏全屏时拉伸；
-- 视频缓冲通过 `bindwaiting` 显示“视频加载中…”；
-- 视频失败通过 `binderror` 显示友好错误态；
-- 清晰度切换会记录原清晰度、原时间和原 detail，切换失败时自动恢复原画面；
-- 单一视频源不显示清晰度切换按钮；
-- 页面首次加载后主动播放一次，返回页面不会重新请求或自动恢复播放；异步回调仅在页面可见时允许播放；
-- `onHide` / `onUnload` 会暂停当前视频，并清理控制条、拖动气泡和全屏兜底定时器。
-
-### 6.2 音频播放页
-
-`pages/audio-player/index.js`
-
-- 通过 URL query 接收 `fileId`、`fileSource`、`title`、`source`、`coverUrl`、`format`；
-- 先调 `getSignedUrl()` 获取音频地址，再 `wx.createInnerAudioContext()`；
-- 不在 onLoad 自动播放，首次点击播放时如果实例不存在会先 prepare 再 play；
-- 播放前会调用 `wx.setInnerAudioOption({ obeyMuteSwitch: false })`，降低 iPhone 静音键导致无声的风险；
-- 会校验音频 URL：空地址、非 HTTPS、包含空格都会提示用户；
-- 倍速档位：`[0.5, 0.75, 1]`；
-- 播放进度使用自定义轨道和拖动热区，避免原生 `slider` 在 iOS / Android 上外观和触摸反馈不一致；
-- 快进/快退步长按音频长度动态计算：≤30s 为 5s，≤90s 为 10s，更长为 15~30s；
-- 循环开关直接设置 `audio.loop`；
-- 已补齐 `onCanplay`、`onPlay`、`onPause`、`onStop`、`onTimeUpdate`、`onEnded`、`onWaiting`、`onError` 状态同步；
-- 页面会显示“音频加载中…”和错误提示；
-- `onHide` / `onUnload` 会 stop + destroy，销毁过程带异常兜底。
-
-### 6.3 文件打开
-
-`services/files.js` 的 `openLibraryFile(file)` 负责统一分流：
-
-```text
-MP3       → navigateTo /pages/audio-player/index
-JPG/PNG   → wx.previewImage
-PDF/其他  → getSignedUrl → wx.downloadFile → wx.openDocument(showMenu: true)
-```
-
-`downloadAndOpenDocument()` 失败时会提示「文件下载失败，请检查开发者工具是否关闭域名校验」。真机调试还要确认 downloadFile 合法域名。
-
----
-
-## 7. UI 与协作红线
-
-当前小程序已经经过多轮视觉校对，后续开发不要轻易改整体风格。
-
-统一视觉方向：
-
-- 主色：深棕 `#5d4326`；
-- 辅助棕：`#7a6a52`；
-- 页面背景以白色和浅棕格子底为主；
-- 避免廉价渐变；
-- 避免高饱和黄色 / 橙色角标；
-- 封面卡片上不再显示 `P`、`知识`、`PDF` 等橘色角标；
-- 长标题必须单行省略；
-- 搜索框、按钮、返回顶部按钮保持页面间统一。
-
-协作红线：
-
-1. 小程序端只改 `miniprogram/` 内相关文件；
-2. 不为小程序随意修改网页端页面或网页端既有接口返回结构；
-3. 页面内不要散落硬编码后端域名；
-4. 不新增注册、微信 openid 绑定、支付、广告、会员能力；
-5. 不把 UI 同事写给开发者的提示文案展示给学生；
-6. 不恢复旧版“资料”Tab 命名，当前统一叫“图书馆”；
-7. 新增页面必须在 `app.json` 注册；
-8. 新增接口必须走 `services/request.js`；
-9. 新增业务对象类型时同步改 `utils/constants.js` 和 `utils/navigate.js`。
-
----
-
-## 8. 已知技术债
-
-- `normalizeCourseItems()` 里仍有部分 mock 兜底值（例如用 index 生成内容数和更新日期），接真实后端字段后应移除；
-- iPhone 音频无声已做前端兜底，但仍需真机验证签名 URL、Content-Type、Range 支持和微信合法域名配置；
-- `library-detail` 仍保留 `preview=pdf` 的占位承载逻辑，当前主流程图书馆预览直接走 `openLibraryFile()`；
-- `services/files.js` 的下载错误提示仍带「开发者工具是否关闭域名校验」，真机问题需要结合合法域名排查。
-
----
-
-## 9. 私密内容与学生端行为
-
-当前本地后端代码已实现「分 P / 课程 / 知识点 / 合集 / 附件 公开·私密」能力（不代表服务器已部署本次全部变更）（`visibility` 字段，`public` / `private`）。小程序作为**纯学生端**，结论仍是：**前端无需新增过滤逻辑即可正确呈现私密边界**；但下列行为与约定已随后端多轮整改更新，前端开发须按最新口径对齐，勿沿用旧文档的“授权端点”叙述。
-
-### 9.1 学生端权限过滤（后端 SQL 统一过滤）
-
-课程四分区列表、合集详情、单课/单知识点详情、分 P、附件由后端按公开可见性过滤（包括「存在公开 P」「合集含至少一个可见课程」的派生口径）。今日/历史作业允许保留失效占位，对私密目标脱敏并下发 `targetPrivate` 等状态，不下发真实导航信息。前端消费后端结果展示提示，不能用前端隐藏代替后端授权。
-
-### 9.2 媒体分发：授权可见内容走正常 CDN，原 COS 地址保留作回退
-
-对授权可见（对学生公开）的内容，后端（`miniprogram.services.js`）返回：
-
-- `videoUrl`：经 `normalizePublicUrl` 处理的**原 COS 公开播放地址**（保留 COS 原值）；
-- `playUrl`：同一档（`source` / 原画）经 `toPlaybackUrl` 转换的 **CDN 播放地址**。
-
-前端播放器优先使用 `playUrl`（CDN），`videoUrl`（COS 原值）作为同档回退；**不再强制私密短签**（兼容的 `/api/playback/.../play-url` 端点仍保留可见性检查，但不再返回私密短签；当前小程序正常播放不依赖它）。私密内容已被 9.1 的 SQL 过滤掉，学生端根本不收到私密记录，因此也无需适配授权端点。
-
-### 9.3 附件独立私密、图书馆无私密
-
-- 附件（`source=attachment`）走 `/files/:fileId/signed-url`，后端按附件自身 `visibility` 与父课程可见性双重校验，私密 / 无权附件对学生返回 404（附件**独立私密**，不参与课程/合集派生）；
-- 图书馆（`source=library`）无任何私密字段，仅按 id 取详情后签发 10 分钟下载直链（**图书馆无私密**）；
-- 未知 `source` 一律 400 拒绝，不回退到 library。
-
-### 9.4 作业导航资格接口与今日/历史 Toast
-
-作业目标可能中途被老师改为私密或已删除。首页今日作业通过共享导航函数在点击时实时请求：
-
-```text
-GET /homework/:id/navigation   →  { status: available | private | missing, url?, target? }
-```
-
-- 仅 `available` 返回真实导航地址与目标；`private` / `missing` 一律脱敏（不下发标题/封面/链接）。
-- 首页（今日作业）点击走 `utils/navigate.js` 的 `navigateByAssignment`：实时请求上述接口，状态非 `available` 时 `wx.showToast` 提示——`private` 显示「此课程已被老师更改」、`missing` 显示「此作业内容已不存在」，时长约 1600ms，仅 `available` 才跳转。历史页 `onAssignmentTap` 则直接按列表下发的 `target_private` 标志 Toast「此课程已被老师更改」（列表已由后端对私密目标脱敏），不另发实时请求。
-- 归属非本人、已删除、目标已删除一律判 `missing`（绝不暴露为 private，防止越权探测）。
-
-### 9.5 前置与已布置私密规则（学生端表现为隐藏）
-
-- 前置维护允许私密目标，已有前置目标也可改私密；私密前置在学生端隐藏，不把作业导航接口误用为前置点击接口；
-- 已布置 / 已有前置的目标**允许改私密**（后端不再做引用 409 阻断），学生端通过脱敏与 Toast 表现，不影响其它公开作业。
-
-### 9.6 八表新合集 schema：部署新后端前必须先迁移
-
-可见性字段已扩展到**八张表**：`track_points`、`knowledge_points`、`track_parts`、`knowledge_parts`、`content_attachments`、`video_attachments`、`track_collections`、`knowledge_collections`（合集表原本**没有** `visibility`，由本次迁移补齐）。迁移脚本 `backend/scripts/migrate-content-visibility.js`（带 `--apply`）会加列、按「任一成员 P 公开则父/合集公开、否则私密」回填派生可见性并加 `NOT NULL` / 检查约束。
-
-> **上线门禁**：服务器部署新后端前**必须先跑迁移**（或等价 SQL）补齐合集 `visibility`，否则新后端启动会因 `VISIBILITY_SCHEMA_REQUIRED` 直接崩溃循环。迁移失败即停止发布，先过 schema 与派生数据校验再切服务。
-
-### 9.7 本地试用 ≠ 线上验收
-
-本地 Docker 试用目前仍是 `development` 模式、CDN 环境变量未注入、使用 MinIO 本地源；**不能以本地试用通过就声称真实 COS/CDN 验收通过**。后续仍需真实CDN播放/同档回退、完整并发与端到端复验，以及生产环境配置核对；不要求文件级保密，不把桶私有化或CDN鉴权作为业务可见性验收条件。
-
-### 9.8 「我的」暂无本人改密功能
-
-当前 `pages/mine/index` 仅有学生信息展示与退出登录，**不含修改密码入口**。本人改密（旧密码+新密码弹窗、各自独立眼睛、成功提示保留 1 秒后清理会话退出、全设备会话撤销）属于**待实施计划**，详见 `docx/用户自助改密与固定密码重置实施计划.md`（状态：仅计划，未改代码/库/部署）。维护时若新增改密入口，须从 Web 头像下拉与小程序「我的」同步接入，并避免旧密码错误返回 401 触发小程序误退出。
-
-### 9.9 Web 端 P 下载不属于小程序
-
-网页端「分 P 下载」能力与小程序无关，且当前**未实施**；小程序侧不需要、也不应接入 P 视频下载。小程序文件打开仅覆盖图书馆 PDF/图片/音频与课程附件授权下载（`services/files.js`）。
-
-协作约束（保留）：
-
-- 小程序端**不新增管理入口**（公开/私密开关在网页端 `/admin/tracks`、`/admin/knowledge` 编辑页）；
-- 若未来需要在学生端展示「老师端才可见」的私密标识，必须先与网页端口径对齐，不要在页面里自行判断 `visibility` 字段；
-- 学生端历史作业中「教学内容已调整」文案由后端对私密目标脱敏后下发，前端只负责展示。
-
----
-
-## 10. 后续修改 README 的规则
-
-- 每次新增页面、接口、服务文件、对象类型或播放器行为，都同步更新本文档；
-- 不要把开发计划、阶段表、待办清单写回这里；
-- 待办和调研方案放到 `docs/miniprogram代办清单/`；
-- 本 README 只保留当前架构、接口契约、协作注意点和已知技术债。
+- 视觉保持深棕、白色/浅棕格纹、低饱和；长标题省略，复用现有控件；不恢复旧“资料”Tab。
+- 修改 format/navigate/播放器共享层必须检查所有调用页与相应测试。
+- 历史测试结果：相关小程序测试 51 项通过，不是本次文档更新重新执行；浏览器/开发工具/真机交互由用户验收。
+- 已知需继续核对的技术债：课程归一化 mock 兜底、library-detail 占位路径、文件下载错误提示中的开发工具文案；不得把旧假数据文案当作正式接口字段。
+- 本次仅文档更新，不操作服务器/数据库、不上传小程序。

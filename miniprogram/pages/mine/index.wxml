@@ -19,7 +19,7 @@
 
   <view wx:if="{{showPasswordForm}}" class="password-mask" catchtouchmove="stopPropagation" bindtap="closePasswordForm">
     <view class="password-panel" catchtap="stopPropagation">
-      <view class="password-heading"><text>重置密码</text><button disabled="{{passwordBusy || passwordSuccess}}" class="password-close" bindtap="closePasswordForm" aria-label="关闭">×</button></view>
+      <view class="password-heading"><text>重置密码</text></view>
       <view wx:if="{{passwordSuccess}}" class="password-success">密码修改成功，请重新登录</view>
       <block wx:else>
         <view class="password-hint">请输入原密码以设置新密码</view>

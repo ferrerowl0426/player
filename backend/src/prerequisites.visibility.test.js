@@ -1,11 +1,11 @@
 // Real HTTP transport against prerequisites router; controlled DB/identity boundaries.
-// Verifies a private target can never be saved as a prerequisite, even by a director.
+// Verifies a private target CAN be saved as a prerequisite (teachers may maintain
+// private prerequisites), and that only the real existence of the target matters
+// (canMaintainPrerequisite, not the visibility-gated canAssignContentObject).
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 
-// assignable(prerequisiteType, prerequisiteId) => bool, controlled per test.
-let assignableResult = true;
 const dbRows = (type, id) => {
   if (type === 'track_point') return { rows: [{ id, name: 'course', cover: '' }], rowCount: 1 };
   if (type === 'track_part') return { rows: [{ id, title: 'part', track_id: 1 }], rowCount: 1 };
@@ -20,6 +20,7 @@ mock.module(new URL('./db.js', import.meta.url).href, {
           if (/INSERT INTO prerequisites/.test(sql)) return { rows: [], rowCount: 1 };
           if (/DELETE FROM prerequisites/.test(sql)) return { rows: [], rowCount: 1 };
           if (/FROM prerequisites/.test(sql)) return { rows: [], rowCount: 0 };
+          if (/SELECT 1 FROM \w+ WHERE id\s*=\s*\$1/.test(sql)) return { rows: [{ '?column?': 1 }], rowCount: 1 };
           return { rows: [], rowCount: 0 };
         },
         release() {}
@@ -43,10 +44,21 @@ mock.module(new URL('./auth.js', import.meta.url).href, {
     requireSuperAdmin(req, res, next) { req.admin = { adminId: 1 }; next(); }
   }
 });
+// canMaintainPrerequisite 在本测试中由真实存在性检查驱动（委托给被 mock 的 client）。
 mock.module(new URL('./content-object-access.js', import.meta.url).href, {
   namedExports: {
     canReadContentObject: async () => true,
-    canAssignContentObject: async () => assignableResult
+    canMaintainPrerequisite: async (client, type, id) => {
+      const table = {
+        track_point: 'track_points', knowledge_point: 'knowledge_points',
+        track_part: 'track_parts', knowledge_part: 'knowledge_parts',
+        track_collection: 'track_collections', knowledge_collection: 'knowledge_collections',
+        video: 'videos'
+      }[type];
+      if (!table) return false;
+      const result = await client.query(`SELECT 1 FROM ${table} WHERE id=$1`, [id]);
+      return result.rowCount > 0;
+    }
   }
 });
 
@@ -57,20 +69,16 @@ let server, base;
 test.before(async () => { server = app.listen(0, '127.0.0.1'); await new Promise((r) => server.once('listening', r)); base = `http://127.0.0.1:${server.address().port}`; });
 test.after(async () => { await new Promise((r) => server.close(r)); mock.reset(); });
 
-test('private prerequisite target is rejected with 409 even for director', async () => {
-  assignableResult = false;
+test('private prerequisite target is accepted (teachers may maintain private prerequisites)', async () => {
   const res = await fetch(`${base}/prerequisites`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ objectType: 'track_point', objectId: 1, prerequisites: [{ objectType: 'track_point', objectId: 2 }] })
   });
-  assert.equal(res.status, 409);
-  const body = await res.json();
-  assert.match(body.message, /私密/);
+  assert.equal(res.status, 200);
 });
 
 test('public prerequisite target is accepted', async () => {
-  assignableResult = true;
   const res = await fetch(`${base}/prerequisites`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -80,7 +88,6 @@ test('public prerequisite target is accepted', async () => {
 });
 
 test('self prerequisite is rejected', async () => {
-  assignableResult = true;
   const res = await fetch(`${base}/prerequisites`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

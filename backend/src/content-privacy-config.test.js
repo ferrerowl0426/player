@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { VisibilityError } from './content-visibility.js';
 
 const CONFIG_PATH = new URL('./content-privacy-config.js', import.meta.url).href;
 
@@ -18,27 +19,31 @@ async function loadConfig(mode, nodeEnv) {
   return mod;
 }
 
-test('默认模式为 off', async () => {
+test('CONTENT_PRIVACY_MODE 仍导出（兼容旧调用），且私密为常规业务默认 business', async () => {
   const { CONTENT_PRIVACY_MODE } = await loadConfig(undefined, undefined);
-  assert.equal(CONTENT_PRIVACY_MODE, 'off');
+  assert.equal(CONTENT_PRIVACY_MODE, 'business');
 });
 
-test('business 模式允许生产私密新建和公开转私密', async () => {
-  const mod = await loadConfig('business', 'production');
+test('validatePrivacyConfiguration 固定返回 business（无模式开关）', async () => {
+  const mod = await loadConfig('off');
+  assert.equal(mod.validatePrivacyConfiguration(), 'business');
+  assert.equal(mod.validatePrivacyConfiguration({ CONTENT_PRIVACY_MODE: 'weird' }), 'business');
+  assert.equal(mod.validatePrivacyConfiguration({ CONTENT_PRIVACY_MODE: 'enforced' }), 'business');
+  assert.equal(mod.validatePrivacyConfiguration({}), 'business');
   assert.equal(mod.validatePrivacyConfiguration({ CONTENT_PRIVACY_MODE: 'business', NODE_ENV: 'production' }), 'business');
-  for (const previous of [undefined, null, '', 'public', 'private']) {
-    assert.doesNotThrow(() => mod.assertPrivateWriteAllowed('private', previous));
-  }
 });
 
-test('business 模式仍拒绝存在前置引用的课程转私密', async () => {
-  const mod = await loadConfig('business', 'production');
-  const client = { query: async (sql) => sql.includes('UPDATE')
-    ? { rows: [{ id: 1, visibility: 'private' }] }
-    : { rows: [{}], rowCount: 1 } };
-  await assert.rejects(() => mod.finalizeCourseVisibility(client, 'track_point', 1, 'public'),
-    (error) => error.code === 'PREREQUISITE_CONFLICT' && error.status === 409);
-});
+// 核心：各模式（含 off / enforced / 未知 / 缺省）在生产/非生产下均不再拦截私密写入。
+for (const mode of ['business', 'off', 'local-preview', 'enforced', 'weird', '', undefined]) {
+  for (const nodeEnv of ['production', 'development', undefined]) {
+    test(`mode=${mode ?? '缺省'} / env=${nodeEnv ?? '缺省'}：私密附件始终可保存（不拦截）`, async () => {
+      const { assertPrivateWriteAllowed } = await loadConfig(mode, nodeEnv);
+      for (const previous of [undefined, null, '', 'public', 'private']) {
+        assert.doesNotThrow(() => assertPrivateWriteAllowed('private', previous));
+      }
+    });
+  }
+}
 
 test('非 private 写入始终放行', async () => {
   const { assertPrivateWriteAllowed } = await loadConfig('off');
@@ -47,56 +52,50 @@ test('非 private 写入始终放行', async () => {
   }
 });
 
-test('已为 private 的遗漏不被重置（保留旧 private）', async () => {
+test('previous=private 时 private/public 输入均放行（不重置旧 private）', async () => {
   const { assertPrivateWriteAllowed } = await loadConfig('off');
-  for (const next of ['private', undefined, '']) {
+  for (const next of ['private', 'public']) {
     assert.doesNotThrow(() => assertPrivateWriteAllowed(next, 'private'));
   }
+  // 遗漏（undefined/''）属调用方 resolveVisibilityInput 的“保留旧值”职责，
+  // 不应作为合法 next 进入本校验，此处确认其被本层拒绝。
+  for (const bad of [undefined, '']) {
+    assert.throws(() => assertPrivateWriteAllowed(bad, 'private'));
+  }
 });
 
-test('off 模式拦截所有新的私密写入', async () => {
-  const { assertPrivateWriteAllowed, PrivateWriteDisabledError } = await loadConfig('off');
-  for (const prev of [undefined, null, '', 'public']) {
-    await assert.rejects(async () => assertPrivateWriteAllowed('private', prev), (err) => {
-      assert.ok(err instanceof PrivateWriteDisabledError);
-      assert.equal(err.status, 403);
-      assert.equal(err.code, 'PRIVATE_WRITE_DISABLED');
+test('非法 nextVisibility（含 undefined / 空串 / 未知值）被拒绝', async () => {
+  const { assertPrivateWriteAllowed } = await loadConfig('off', 'production');
+  for (const bad of ['secret', 'internal', undefined, null, '']) {
+    assert.throws(() => assertPrivateWriteAllowed(bad, 'public'), (err) => {
+      assert.ok(err instanceof VisibilityError);
+      assert.equal(err.code, 'INVALID_VISIBILITY');
       return true;
     });
   }
 });
 
-test('local-preview 仅非生产环境放行新的私密写入', async () => {
-  const dev = await loadConfig('local-preview', 'development');
-  const env = process.env.NODE_ENV;
-  // 非生产环境放行
-  assert.doesNotThrow(() => dev.assertPrivateWriteAllowed('private', 'public'));
-  // 生产环境下本函数动态读取 NODE_ENV，临时置为 production 验证被拦截
-  process.env.NODE_ENV = 'production';
-  try {
-    await assert.rejects(async () => dev.assertPrivateWriteAllowed('private', 'public'), (err) => {
-      assert.ok(err instanceof dev.PrivateWriteDisabledError);
+test('非法 previousVisibility 被拒绝（undefined / null / 空串仍允许）', async () => {
+  const { assertPrivateWriteAllowed } = await loadConfig('off', 'production');
+  for (const bad of ['secret', 'internal', 123]) {
+    assert.throws(() => assertPrivateWriteAllowed('private', bad), (err) => {
+      assert.ok(err instanceof VisibilityError);
+      assert.equal(err.code, 'INVALID_VISIBILITY');
       return true;
     });
-  } finally {
-    process.env.NODE_ENV = env;
+  }
+  for (const ok of [undefined, null, '', 'public', 'private']) {
+    assert.doesNotThrow(() => assertPrivateWriteAllowed('public', ok));
   }
 });
 
-test('enforced 暂禁：仍按未开放处理', async () => {
-  const { assertPrivateWriteAllowed, PrivateWriteDisabledError } = await loadConfig('enforced');
-  await assert.rejects(async () => assertPrivateWriteAllowed('private', 'public'), (err) => {
-    assert.ok(err instanceof PrivateWriteDisabledError);
-    return true;
-  });
-});
-
-test('未知模式按 off 处理', async () => {
-  const { assertPrivateWriteAllowed, PrivateWriteDisabledError } = await loadConfig('weird');
-  await assert.rejects(async () => assertPrivateWriteAllowed('private', 'public'), (err) => {
-    assert.ok(err instanceof PrivateWriteDisabledError);
-    return true;
-  });
+test('business 模式：新变私密且存在前置引用不再被 PREREQUISITE_CONFLICT 阻断', async () => {
+  const mod = await loadConfig('business', 'production');
+  const client = { query: async (sql) => sql.includes('UPDATE')
+    ? { rows: [{ id: 1, visibility: 'private' }] }
+    : { rows: [] } };
+  const refreshed = await mod.finalizeCourseVisibility(client, 'track_point', 1, 'public');
+  assert.equal(refreshed.visibility, 'private');
 });
 
 test('courseBecamePrivate 仅在“新变私密”时为真', async () => {
@@ -121,41 +120,31 @@ test('hasPrerequisiteReferences 查真实 prerequisites 表', async () => {
   assert.deepEqual(call.values, ['track_point', 7]);
 });
 
-test('finalizeCourseVisibility：新变私密且无前置引用时放行（仍执行前置引用检查）', async () => {
+test('finalizeCourseVisibility：新变私密且无需前置引用检查，直接放行返回 private', async () => {
   const mod = await loadConfig('local-preview', 'development');
-  const calls = [];
   const client = {
     query: async (sql) => {
-      calls.push(sql);
       if (sql.includes('UPDATE')) return { rows: [{ id: 1, visibility: 'private' }] };
-      if (sql.includes('prerequisites')) return { rowCount: 0 }; // 无冲突
       return { rows: [] };
     }
   };
   const refreshed = await mod.finalizeCourseVisibility(client, 'track_point', 1, 'public');
   assert.equal(refreshed.visibility, 'private');
-  // 新变私密必须执行前置引用检查
-  assert.ok(calls.some((s) => s.includes('prerequisites')));
 });
 
-test('finalizeCourseVisibility：新变私密但存在前置引用时 409 回滚', async () => {
+test('finalizeCourseVisibility：新变私密但存在前置引用也不再被 PREREQUISITE_CONFLICT 阻断', async () => {
   const mod = await loadConfig('local-preview', 'development');
   const client = {
     query: async (sql) => {
       if (sql.includes('UPDATE')) return { rows: [{ id: 1, visibility: 'private' }] };
-      if (sql.includes('prerequisites')) return { rows: [{ '?column?': 1 }], rowCount: 1 };
       return { rows: [] };
     }
   };
-  await assert.rejects(() => mod.finalizeCourseVisibility(client, 'track_point', 1, 'public'), (err) => {
-    assert.ok(err instanceof mod.PrerequisiteConflictError);
-    assert.equal(err.status, 409);
-    assert.equal(err.code, 'PREREQUISITE_CONFLICT');
-    return true;
-  });
+  const refreshed = await mod.finalizeCourseVisibility(client, 'track_point', 1, 'public');
+  assert.equal(refreshed.visibility, 'private');
 });
 
-test('finalizeCourseVisibility：off 模式拦截新私密写入', async () => {
+test('finalizeCourseVisibility：off 模式也不再拦截新私密写入（私密为常规业务）', async () => {
   const mod = await loadConfig('off');
   const client = {
     query: async (sql) => {
@@ -163,10 +152,8 @@ test('finalizeCourseVisibility：off 模式拦截新私密写入', async () => {
       return { rows: [] };
     }
   };
-  await assert.rejects(() => mod.finalizeCourseVisibility(client, 'track_point', 1, 'public'), (err) => {
-    assert.ok(err instanceof mod.PrivateWriteDisabledError);
-    return true;
-  });
+  const refreshed = await mod.finalizeCourseVisibility(client, 'track_point', 1, 'public');
+  assert.equal(refreshed.visibility, 'private');
 });
 
 test('findPrivatePartPrerequisiteConflicts 查 P 级前置引用', async () => {

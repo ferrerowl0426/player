@@ -112,7 +112,9 @@ export function pickActiveSource(selectedSource, sourceKey, fallbackSet, fallbac
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
-export default function VideoPlayer({ src, playSrc, poster, renditions = [], onPrev, onNext, videoId, requiresAuthorization = false }) {
+export default function VideoPlayer({ src, playSrc, poster, renditions = [], onPrev, onNext, videoId }) {
+  // Visibility is enforced by content APIs; all returned media uses normal CDN sources.
+  const requiresAuthorization = false;
   const videoRef = useRef(null);
   const progressRef = useRef(null);
   const restoreRef = useRef({ time: 0, playing: false });

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canDownloadAttachment, normalizeStoredVisibility, resolveVisibilityInput, canViewContent, isPublicTarget, deriveCourseVisibility, publicCoursePredicate, lockCourse, refreshCourseVisibility } from './content-visibility.js';
+import { canDownloadAttachment, normalizeStoredVisibility, resolveVisibilityInput, canViewContent, isPublicTarget, deriveCourseVisibility, publicCoursePredicate, lockCourse, refreshCourseVisibility, deriveCollectionVisibility, publicCollectionPredicate, refreshCollectionVisibility, refreshCollectionsForCourse } from './content-visibility.js';
+import { PUBLIC, PRIVATE, VisibilityError } from './content-visibility.js';
 import { migrateContentVisibility, VISIBILITY_MIGRATION_SQL } from '../scripts/migrate-content-visibility.js';
 
 test('legacy missing values become public; explicit private remains private', () => {
@@ -103,4 +104,95 @@ test('migration SQL contract: backfill missing only, protect invalid states, con
   assert.match(VISIBILITY_MIGRATION_SQL, /IF NOT EXISTS/);
   assert.match(VISIBILITY_MIGRATION_SQL, /SET NOT NULL/);
   assert.match(VISIBILITY_MIGRATION_SQL, /CHECK \(visibility IN/);
+});
+
+// ---- Collection visibility (Stage A) ----
+test('deriveCollectionVisibility uses refreshed course flags without requiring loaded parts', () => {
+  assert.equal(deriveCollectionVisibility([]), PRIVATE);
+  assert.equal(deriveCollectionVisibility([{ visibility: 'private', parts: [{ visibility: 'public' }] }]), PRIVATE);
+  assert.equal(deriveCollectionVisibility([{ visibility: 'public' }]), PUBLIC);
+  assert.equal(deriveCollectionVisibility([{ visibility: 'public', parts: [{ visibility: 'private' }] }]), PUBLIC);
+  assert.equal(deriveCollectionVisibility([{ visibility: 'public', parts: [{ visibility: 'private' }, { visibility: 'public' }] }]), PUBLIC);
+  // Legacy empty course visibility follows the existing public normalization.
+  assert.equal(deriveCollectionVisibility([{ visibility: '', parts: [{ visibility: 'public' }] }]), PUBLIC);
+  assert.equal(deriveCollectionVisibility([{ visibility: '', parts: [{ visibility: 'private' }] }]), PUBLIC);
+});
+
+test('collection SQL binding: whitelisted relations per type, bound $1, rejects invalid type', () => {
+  const trackSql = publicCollectionPredicate('track_collection');
+  assert.match(trackSql, /track_collection_items/);
+  assert.match(trackSql, /track_points/);
+  assert.match(trackSql, /track_parts/);
+  assert.match(trackSql, /track_id/);
+  assert.match(trackSql, /collection_id/);
+  assert.match(trackSql, /EXISTS/);
+  const knowledgeSql = publicCollectionPredicate('knowledge_collection');
+  assert.match(knowledgeSql, /knowledge_collection_items/);
+  assert.match(knowledgeSql, /knowledge_points/);
+  assert.match(knowledgeSql, /knowledge_parts/);
+  assert.match(knowledgeSql, /knowledge_point_id/);
+  assert.match(knowledgeSql, /collection_id/);
+  assert.throws(() => publicCollectionPredicate('track_collection; DROP TABLE videos'));
+});
+
+test('refreshCollectionVisibility binds parameters and stays within caller transaction', async () => {
+  const calls = [];
+  const client = { query: async (sql, values) => { calls.push({ sql, values }); return { rows: [{ id: 7, visibility: 'private' }] }; } };
+  // empty membership -> private
+  const row = await refreshCollectionVisibility(client, 'track_collection', 7);
+  assert.equal(row.visibility, PRIVATE);
+  assert.match(calls[0].sql, /track_collections/);
+  assert.match(calls[0].sql, /track_collection_items/);
+  assert.match(calls[0].sql, /track_points/);
+  assert.match(calls[0].sql, /track_parts/);
+  assert.match(calls[0].sql, /EXISTS/);
+  assert.deepEqual(calls[0].values, [7]);
+  assert.equal(calls.some(({ sql }) => sql === 'COMMIT'), false);
+});
+
+test('refreshCollectionVisibility rejects invalid type and id without issuing SQL', async () => {
+  const client = { query: async () => { throw new Error('must not query'); } };
+  await assert.rejects(() => refreshCollectionVisibility(client, 'knowledge_collection; DROP', 1), { code: 'INVALID_CONTENT_TYPE' });
+  for (const id of [0, -1, 1.5, '1 OR 1=1', null, '']) {
+    await assert.rejects(() => refreshCollectionVisibility(client, 'knowledge_collection', id), { code: 'INVALID_CONTENT_ID' });
+  }
+});
+
+test('refreshCollectionsForCourse locks in fixed id order, refreshes, returns array, never commits', async () => {
+  const calls = [];
+  const lockRows = [{ id: 3 }, { id: 1 }, { id: 2 }]; // deliberately unsorted
+  const client = {
+    query: async (sql, values) => {
+      calls.push({ sql, values });
+      if (sql.includes('FOR UPDATE')) return { rows: lockRows };
+      return { rows: [{ id: values[0], visibility: 'public' }] };
+    }
+  };
+  const updated = await refreshCollectionsForCourse(client, 'track_point', 9);
+  assert.equal(updated.length, 3);
+  assert.deepEqual(updated.map((u) => u.id), [1, 2, 3]); // fixed id order despite unsorted input
+  assert.match(calls[0].sql, /track_collections/);
+  assert.match(calls[0].sql, /track_collection_items/);
+  assert.match(calls[0].sql, /track_id = \$1/);
+  assert.match(calls[0].sql, /ORDER BY id/);
+  assert.match(calls[0].sql, /FOR UPDATE/);
+  assert.deepEqual(calls[0].values, [9]);
+  assert.equal(calls.filter(({ sql }) => sql.includes('FOR UPDATE')).length, 1);
+  assert.equal(calls.some(({ sql }) => sql === 'COMMIT'), false);
+  // knowledge course maps to knowledge collection
+  const calls2 = [];
+  const client2 = { query: async (sql, values) => { calls2.push({ sql, values }); if (sql.includes('FOR UPDATE')) return { rows: [{ id: 4 }] }; return { rows: [{ id: 4, visibility: 'private' }] }; } };
+  const updated2 = await refreshCollectionsForCourse(client2, 'knowledge_point', 5);
+  assert.equal(updated2[0].visibility, PRIVATE);
+  assert.match(calls2[0].sql, /knowledge_collections/);
+  assert.match(calls2[0].sql, /knowledge_collection_items/);
+  assert.match(calls2[0].sql, /knowledge_point_id = \$1/);
+});
+
+test('refreshCollectionsForCourse rejects invalid course type and id', async () => {
+  const client = { query: async () => { throw new Error('must not query'); } };
+  await assert.rejects(() => refreshCollectionsForCourse(client, 'track_collection', 1), { code: 'INVALID_CONTENT_TYPE' });
+  for (const id of [0, -1, '9 OR 1=1', null]) {
+    await assert.rejects(() => refreshCollectionsForCourse(client, 'track_point', id), { code: 'INVALID_CONTENT_ID' });
+  }
 });

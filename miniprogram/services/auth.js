@@ -113,6 +113,10 @@ async function logout() {
   }
 }
 
+async function changePassword({ oldPassword, newPassword }) {
+  return request({ url: '/change-password', method: 'POST', data: { oldPassword, newPassword } });
+}
+
 async function getMe() {
   return request({ url: '/me' });
 }
@@ -128,5 +132,6 @@ module.exports = {
   requireLogin,
   login,
   logout,
-  getMe
+  getMe,
+  changePassword
 };

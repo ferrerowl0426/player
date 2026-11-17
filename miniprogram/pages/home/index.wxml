@@ -33,15 +33,15 @@
     </view>
 
     <block wx:for="{{homework.assignments}}" wx:key="id">
-      <view class="material-card" data-item="{{item}}" bindtap="openAssignment">
-        <view class="material-cover">
+      <view class="material-card {{item.unavailable ? 'material-card-disabled' : ''}}" data-item="{{item}}" bindtap="openAssignment">
+        <view class="material-cover {{item.unavailable ? 'material-cover-disabled' : ''}}">
           <image wx:if="{{item.coverUrl}}" class="material-cover-img" src="{{item.coverUrl}}" mode="aspectFill" />
           <text wx:if="{{item.partLabel}}" class="material-part">{{item.partLabel}}</text>
         </view>
         <view class="material-info">
           <view class="material-name">{{item.title}}</view>
-          <view class="material-meta">{{item.materialMeta || item.actionText}}</view>
-          <view class="material-action">{{item.materialAction || '进入详情'}}</view>
+          <view wx:if="{{!item.unavailable}}" class="material-meta">{{item.materialMeta || item.actionText}}</view>
+          <view wx:if="{{!item.unavailable}}" class="material-action">{{item.materialAction || '进入详情'}}</view>
         </view>
       </view>
     </block>

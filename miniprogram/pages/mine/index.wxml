@@ -13,7 +13,24 @@
     <view class="info-row"><text>账号状态</text><text>{{student.status === 'disabled' ? '已停用' : '正常'}}</text></view>
     <view class="info-row"><text>所属班级</text><text>{{student.className || '暂无班级'}}</text></view>
     <view class="info-row"><text>资料修改</text><text>请联系老师</text></view>
+    <view wx:if="{{student.status !== 'disabled'}}" class="info-row" bindtap="openPasswordForm"><text>重置密码</text><text>修改本人密码 ›</text></view>
     <view class="info-row" bindtap="confirmLogout"><text>切换账号</text><text>退出登录</text></view>
+  </view>
+
+  <view wx:if="{{showPasswordForm}}" class="password-mask" catchtouchmove="stopPropagation" bindtap="closePasswordForm">
+    <view class="password-panel" catchtap="stopPropagation">
+      <view class="password-heading"><text>重置密码</text><button disabled="{{passwordBusy || passwordSuccess}}" class="password-close" bindtap="closePasswordForm" aria-label="关闭">×</button></view>
+      <view wx:if="{{passwordSuccess}}" class="password-success">密码修改成功，请重新登录</view>
+      <block wx:else>
+        <view class="password-hint">请输入原密码以设置新密码</view>
+        <view class="password-label">原密码</view>
+        <view class="password-input-row"><input value="{{oldPassword}}" password="{{!showOld}}" focus="{{oldFocus}}" disabled="{{passwordBusy}}" maxlength="-1" bindinput="inputOldPassword" placeholder="请输入原密码" adjust-position="{{true}}"/><button class="password-eye" disabled="{{passwordBusy}}" bindtap="toggleOldPassword" aria-label="{{showOld ? '隐藏原密码' : '显示原密码'}}"><view class="eye-shape {{showOld ? 'eye-visible' : ''}}"><view class="eye-pupil"/></view></button></view>
+        <view class="password-label">新密码</view>
+        <view class="password-input-row"><input value="{{newPassword}}" password="{{!showNew}}" disabled="{{passwordBusy}}" maxlength="30" bindinput="inputNewPassword" placeholder="请输入5—30个字符" adjust-position="{{true}}"/><button class="password-eye" disabled="{{passwordBusy}}" bindtap="toggleNewPassword" aria-label="{{showNew ? '隐藏新密码' : '显示新密码'}}"><view class="eye-shape {{showNew ? 'eye-visible' : ''}}"><view class="eye-pupil"/></view></button></view>
+        <view class="password-error">{{passwordError}}</view>
+        <view class="password-actions"><button class="password-cancel" disabled="{{passwordBusy}}" bindtap="closePasswordForm">取消</button><button class="password-submit" loading="{{passwordBusy}}" disabled="{{passwordBusy}}" bindtap="submitPassword">确认修改</button></view>
+      </block>
+    </view>
   </view>
 
   <view class="card help-card">

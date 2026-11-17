@@ -14,8 +14,8 @@ import {
   fetchClasses,
   fetchManagedAdmins,
   fetchManagedUsers,
-  resetManagedAdminPassword,
   resetManagedUserPassword,
+  resetManagedAdminPassword,
   transferUserClass,
   updateClass,
   updateClassStatus,
@@ -24,6 +24,7 @@ import {
   updateManagedUser,
   updateManagedUserStatus
 } from '../../../lib/api.js';
+import { buildManageResetConfirm, FIXED_RESET_PASSWORD, shouldShowManageReset } from '../../../lib/passwordResetLogic.js';
 import styles from './page.module.css';
 
 function initial(name) {
@@ -187,7 +188,7 @@ export default function ClassesPage() {
   const canManageDeans = admin?.username === 'admin' || admin?.account === 'admin';
 
   function openCreateAccount(role = 'student') {
-    setCreateAccount({ role, username: '', nickname: '', classId: selectedClassForCreate?.id || activeClasses[0]?.id || '', password: makePassword() });
+    setCreateAccount({ role, username: '', nickname: '', classId: selectedClassForCreate?.id || activeClasses[0]?.id || '', password: role === 'student' ? FIXED_RESET_PASSWORD : makePassword() });
   }
 
   async function submitCreateAccount() {
@@ -216,11 +217,7 @@ export default function ClassesPage() {
         return;
       }
       if (createAccount.role === 'student') {
-        if (!createAccount.classId) {
-          showToast('请选择初始班级');
-          return;
-        }
-        await createManagedUser({ username, nickname, password: createAccount.password, classId: Number(createAccount.classId) });
+        await createManagedUser({ username, nickname, password: FIXED_RESET_PASSWORD, classId: createAccount.classId ? Number(createAccount.classId) : null });
       } else {
         await createManagedAdmin({ username, nickname, password: createAccount.password, role: createAccount.role });
       }
@@ -314,8 +311,6 @@ export default function ClassesPage() {
       type,
       nickname: target.nickname || '',
       classId: type === 'user' ? (target.class_id || UNASSIGNED_CLASS_ID) : '',
-      resetPassword: false,
-      password: makePassword(),
       ownedClasses: owned
     });
   }
@@ -327,10 +322,6 @@ export default function ClassesPage() {
       showToast('昵称需为 1-10 位中文、字母、数字或下划线');
       return;
     }
-    if (editAccount.resetPassword && (editAccount.password.length < 5 || editAccount.password.length > 30)) {
-      showToast('密码长度必须是 5 到 30 个字符');
-      return;
-    }
     try {
       if (editAccount.type === 'admin') {
         if (editAccount.target.role === 'super_admin' && !canManageDeans) {
@@ -338,14 +329,12 @@ export default function ClassesPage() {
           return;
         }
         await updateManagedAdmin({ id: editAccount.target.id, nickname });
-        if (editAccount.resetPassword) await resetManagedAdminPassword({ id: editAccount.target.id, password: editAccount.password });
       } else {
         await updateManagedUser({ id: editAccount.target.id, nickname });
         const targetClassId = editAccount.classId === UNASSIGNED_CLASS_ID ? null : Number(editAccount.classId);
         if ((editAccount.target.class_id || null) !== targetClassId) {
           await transferUserClass({ id: editAccount.target.id, classId: targetClassId });
         }
-        if (editAccount.resetPassword) await resetManagedUserPassword({ id: editAccount.target.id, password: editAccount.password });
       }
       setEditAccount(null);
       await reload();
@@ -371,13 +360,28 @@ export default function ClassesPage() {
     }
   }
 
+  // 管理重置：仅学生(user)目标可重置；服务端固定将密码重置为 Nxh123456，前端不传新密码。
+  function requestResetPassword(target, type = 'user') {
+    if (!shouldShowManageReset({ target, operator: admin, type })) return;
+    const displayName = target.nickname || target.username;
+    askConfirm({
+      title: '重 置 密 码',
+      text: buildManageResetConfirm(displayName),
+      successText: `密码已重置为 ${FIXED_RESET_PASSWORD}`,
+      onConfirm: async () => {
+        if (type === 'admin') await resetManagedAdminPassword({ id: target.id });
+        else await resetManagedUserPassword({ id: target.id });
+      }
+    });
+  }
+
   if (!admin) return <p className="empty-text">正在加载班级管理...</p>;
 
   const accountName = admin.nickname || admin.username;
 
   return (
     <>
-      <AppNav role="super_admin" accountName={accountName} homeHref="/tracks" actions={<span className="role-tag">教导主任 · {accountName}</span>} />
+      <AppNav role="super_admin" accountName={accountName} username={admin?.username} homeHref="/tracks" actions={<span className="role-tag">教导主任 · {accountName}</span>} />
       <main className={`${styles.page} home class-manage`}>
         <div className="grid4 rise d1">
           <AccountZone title="教导主任" meta={`共 ${deans.length} 人`} action={canManageDeans ? <button type="button" className="zbtn mini" onClick={() => openCreateAccount('super_admin')}>＋ 新建教导主任</button> : <span className="meta readonly">仅超级管理员可操作</span>}>
@@ -443,7 +447,7 @@ export default function ClassesPage() {
       <CreateAccountModal data={createAccount} classes={classes} onChange={setCreateAccount} onClose={() => setCreateAccount(null)} onSubmit={submitCreateAccount} onCopy={copyText} scopeClass={styles.page} />
       <ClassFormModal data={classForm} teachers={teachers} onChange={setClassForm} onClose={() => setClassForm(null)} onSubmit={submitCreateClass} scopeClass={styles.page} />
       <AssignClassModal data={classAssign} classes={classes} onChange={setClassAssign} onClose={() => setClassAssign(null)} onSubmit={submitAssignClasses} scopeClass={styles.page} />
-      <EditAccountModal data={editAccount} classes={classes} onChange={setEditAccount} onClose={() => setEditAccount(null)} onSubmit={submitEditAccount} onCopy={copyText} scopeClass={styles.page} />
+      <EditAccountModal operator={admin} data={editAccount} classes={classes} onChange={setEditAccount} onClose={() => setEditAccount(null)} onSubmit={submitEditAccount} onResetPassword={requestResetPassword} scopeClass={styles.page} />
       <ConfirmModal data={confirmAction} onClose={() => setConfirmAction(null)} onSubmit={runConfirm} scopeClass={styles.page} />
       <div className={`${styles.page} dean-toast${toast ? ' show' : ''}`}>{toast}</div>
     </>
@@ -550,20 +554,20 @@ function CreateAccountModal({ data, classes, onChange, onClose, onSubmit, onCopy
         <div className="f-row">
           <label>初始班级</label>
           <select value={data.classId} onChange={(event) => onChange({ ...data, classId: event.target.value })} aria-label="选择初始班级">
-            <option value="">请选择班级</option>
+            <option value="">暂不分班</option>
             {classes.filter((cls) => cls.is_active !== false).map((cls) => <option value={cls.id} key={cls.id}>{cls.name}</option>)}
           </select>
-          <div className="f-tip">学员只能属于一个班级，可创建后再调整。</div>
+          <div className="f-tip">可选择暂不分班，创建后再分配；每位学员最多属于一个班级。</div>
         </div>
       ) : null}
       <div className="f-row">
         <label>初始密码</label>
         <div className="pwd-row">
-          <input type="text" value={data.password} onChange={(event) => onChange({ ...data, password: event.target.value })} />
-          <button type="button" className="mbtn" onClick={() => onChange({ ...data, password: makePassword() })}>随机生成</button>
-          <button type="button" className="mbtn" onClick={() => onCopy(data.password, '初始密码已复制')}>复制</button>
+          <input type="text" aria-label="初始密码" value={data.role === 'student' ? FIXED_RESET_PASSWORD : data.password} readOnly={data.role === 'student'} onChange={(event) => onChange({ ...data, password: event.target.value })} />
+          {data.role !== 'student' ? <button type="button" className="mbtn" onClick={() => onChange({ ...data, password: makePassword() })}>随机生成</button> : null}
+          <button type="button" className="mbtn" onClick={() => onCopy(data.role === 'student' ? FIXED_RESET_PASSWORD : data.password, '初始密码已复制')}>复制</button>
         </div>
-        <div className="f-tip">可手动输入 5-30 位密码，也可随机生成；请线下告知本人。</div>
+        <div className="f-tip">{data.role === 'student' ? `学员初始密码固定为 ${FIXED_RESET_PASSWORD}，不可修改；请线下告知本人。` : '可手动输入 5-30 位密码，也可随机生成；请线下告知本人。'}</div>
       </div>
       <div className="modal-ops">
         <button type="button" className="mbtn" onClick={onClose}>取 消</button>
@@ -634,11 +638,13 @@ function AssignClassModal({ data, classes, onChange, onClose, onSubmit, scopeCla
   );
 }
 
-function EditAccountModal({ data, classes, onChange, onClose, onSubmit, onCopy, scopeClass }) {
+function EditAccountModal({ operator, data, classes, onChange, onClose, onSubmit, onResetPassword, scopeClass }) {
   if (!data) return null;
   const target = data.target;
   const displayName = target.nickname || target.username;
   const activeClasses = classes.filter((cls) => cls.is_active !== false || cls.id === target.class_id);
+  // 仅学生(user)目标显示重置入口；老师/管理员目标与本人隐藏重置入口。
+  const canManageReset = shouldShowManageReset({ target, operator, type: data.type });
   return (
     <Modal show scopeClass={scopeClass} title="编 辑 资 料" onClose={onClose}>
       <div className="f-row">
@@ -669,19 +675,16 @@ function EditAccountModal({ data, classes, onChange, onClose, onSubmit, onCopy, 
           <div className="f-tip">学员只能属于一个班级，也可转入未分班学员。</div>
         </div>
       ) : null}
-      <div className="f-row">
-        <label>密码</label>
-        {!data.resetPassword ? (
-          <div className="pwd-row"><input type="text" value="已设置 · 不保存明文" readOnly /><button type="button" className="mbtn" onClick={() => onChange({ ...data, resetPassword: true, password: makePassword() })}>重置密码</button></div>
-        ) : (
+      {canManageReset ? (
+        <div className="f-row">
+          <label>密码</label>
           <div className="pwd-row">
-            <input type="text" value={data.password} onChange={(event) => onChange({ ...data, password: event.target.value })} />
-            <button type="button" className="mbtn" onClick={() => onChange({ ...data, password: makePassword() })}>随机生成</button>
-            <button type="button" className="mbtn" onClick={() => onCopy(data.password, '新密码已复制')}>复制</button>
+            <input type="text" value="已设置 · 不保存明文" readOnly />
+            <button type="button" className="mbtn" onClick={() => onResetPassword(target, data.type)}>重置密码</button>
           </div>
-        )}
-        <div className="f-tip">密码不会显示明文；如需更换，请重置后线下告知本人。</div>
-      </div>
+          <div className="f-tip">点击重置后，该账号密码将固定为 {FIXED_RESET_PASSWORD}。</div>
+        </div>
+      ) : null}
       <div className="modal-ops">
         <button type="button" className="mbtn" onClick={onClose}>取 消</button>
         <button type="button" className="mbtn primary" onClick={onSubmit}>保 存</button>

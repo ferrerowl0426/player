@@ -220,6 +220,7 @@ POST /logout
 GET  /me
 GET  /homework/today
 GET  /homework/history?page=1&pageSize=20
+GET  /homework/:id/navigation
 GET  /tracks?type=track_point&keyword=&sort=updated_desc&page=1&pageSize=20
 GET  /tracks?type=track_collection&keyword=&sort=updated_desc&page=1&pageSize=20
 GET  /knowledge?type=knowledge_point&keyword=&sort=updated_desc&page=1&pageSize=20
@@ -239,7 +240,7 @@ GET  /files/:fileId/signed-url?source=library|attachment
 - 课程四分区类型：`track_point`、`track_collection`、`knowledge_point`、`knowledge_collection`；
 - 文件预签名返回兼容 `{ url }` 或 `{ signedUrl }`；
 - 登录返回建议稳定为 `{ token, student, expiresAt }`；
-- 私密内容（`visibility='private'`）由后端过滤，学生端列表/详情/作业不会返回私密项；私密视频不下发永久地址，改下发 `authorizeEndpoint`（`/api/playback/videos/:id/play-url`），学生端无需处理。
+- 私密内容（`visibility='private'`）由后端 SQL 统一过滤，学生端列表/详情不会返回无权私密项，作业可保留脱敏失效占位；授权可见的视频返回 `playUrl`（CDN 播放地址）与 `videoUrl`（原 COS 地址，作同档回退）二者，学生端优先 CDN、可回退 COS，**不再依赖私密短签授权端点**（`/api/playback/.../play-url` 作为兼容权限检查端点保留，公开视频也可调用；当前小程序正常播放不依赖它）。作业目标点击另走 `/homework/:id/navigation` 实时复核（见 §9.4）。
 
 ---
 
@@ -422,13 +423,63 @@ PDF/其他  → getSignedUrl → wx.downloadFile → wx.openDocument(showMenu: t
 
 ## 9. 私密内容与学生端行为
 
-后端已上线「分 P 公开/私密」能力（`visibility` 字段，`public` / `private`），小程序作为**纯学生端**的结论是：**前端无需额外改动即可正确过滤私密内容**。原因如下：
+当前本地后端代码已实现「分 P / 课程 / 知识点 / 合集 / 附件 公开·私密」能力（不代表服务器已部署本次全部变更）（`visibility` 字段，`public` / `private`）。小程序作为**纯学生端**，结论仍是：**前端无需新增过滤逻辑即可正确呈现私密边界**；但下列行为与约定已随后端多轮整改更新，前端开发须按最新口径对齐，勿沿用旧文档的“授权端点”叙述。
 
-- 课程四分区列表、合集详情、单课/单知识点详情、附件、作业的**后端 SQL 均已按「公开」过滤**（`COALESCE(NULLIF(visibility,''),'public') = 'public'` 及「存在公开 P」派生口径），学生端拿到的都是公开数据。
-- 私密 P 不会下发永久视频地址，而是下发 `authorizeEndpoint`（`/api/playback/videos/:id/play-url`）占位；但学生端根本看不到私密 P，因此详情页只需消费公开 P 的 `videoUrl` / `playUrl`，无需适配授权端点。
-- 附件下载已统一走 `/files/:fileId/signed-url`（`services/files.js` 的 `getSignedUrl()`），非永久直链，符合「下载前授权」要求。
+### 9.1 学生端权限过滤（后端 SQL 统一过滤）
 
-协作约束：
+课程四分区列表、合集详情、单课/单知识点详情、分 P、附件由后端按公开可见性过滤（包括「存在公开 P」「合集含至少一个可见课程」的派生口径）。今日/历史作业允许保留失效占位，对私密目标脱敏并下发 `targetPrivate` 等状态，不下发真实导航信息。前端消费后端结果展示提示，不能用前端隐藏代替后端授权。
+
+### 9.2 媒体分发：授权可见内容走正常 CDN，原 COS 地址保留作回退
+
+对授权可见（对学生公开）的内容，后端（`miniprogram.services.js`）返回：
+
+- `videoUrl`：经 `normalizePublicUrl` 处理的**原 COS 公开播放地址**（保留 COS 原值）；
+- `playUrl`：同一档（`source` / 原画）经 `toPlaybackUrl` 转换的 **CDN 播放地址**。
+
+前端播放器优先使用 `playUrl`（CDN），`videoUrl`（COS 原值）作为同档回退；**不再强制私密短签**（兼容的 `/api/playback/.../play-url` 端点仍保留可见性检查，但不再返回私密短签；当前小程序正常播放不依赖它）。私密内容已被 9.1 的 SQL 过滤掉，学生端根本不收到私密记录，因此也无需适配授权端点。
+
+### 9.3 附件独立私密、图书馆无私密
+
+- 附件（`source=attachment`）走 `/files/:fileId/signed-url`，后端按附件自身 `visibility` 与父课程可见性双重校验，私密 / 无权附件对学生返回 404（附件**独立私密**，不参与课程/合集派生）；
+- 图书馆（`source=library`）无任何私密字段，仅按 id 取详情后签发 10 分钟下载直链（**图书馆无私密**）；
+- 未知 `source` 一律 400 拒绝，不回退到 library。
+
+### 9.4 作业导航资格接口与今日/历史 Toast
+
+作业目标可能中途被老师改为私密或已删除。首页今日作业通过共享导航函数在点击时实时请求：
+
+```text
+GET /homework/:id/navigation   →  { status: available | private | missing, url?, target? }
+```
+
+- 仅 `available` 返回真实导航地址与目标；`private` / `missing` 一律脱敏（不下发标题/封面/链接）。
+- 首页（今日作业）点击走 `utils/navigate.js` 的 `navigateByAssignment`：实时请求上述接口，状态非 `available` 时 `wx.showToast` 提示——`private` 显示「此课程已被老师更改」、`missing` 显示「此作业内容已不存在」，时长约 1600ms，仅 `available` 才跳转。历史页 `onAssignmentTap` 则直接按列表下发的 `target_private` 标志 Toast「此课程已被老师更改」（列表已由后端对私密目标脱敏），不另发实时请求。
+- 归属非本人、已删除、目标已删除一律判 `missing`（绝不暴露为 private，防止越权探测）。
+
+### 9.5 前置与已布置私密规则（学生端表现为隐藏）
+
+- 前置维护允许私密目标，已有前置目标也可改私密；私密前置在学生端隐藏，不把作业导航接口误用为前置点击接口；
+- 已布置 / 已有前置的目标**允许改私密**（后端不再做引用 409 阻断），学生端通过脱敏与 Toast 表现，不影响其它公开作业。
+
+### 9.6 八表新合集 schema：部署新后端前必须先迁移
+
+可见性字段已扩展到**八张表**：`track_points`、`knowledge_points`、`track_parts`、`knowledge_parts`、`content_attachments`、`video_attachments`、`track_collections`、`knowledge_collections`（合集表原本**没有** `visibility`，由本次迁移补齐）。迁移脚本 `backend/scripts/migrate-content-visibility.js`（带 `--apply`）会加列、按「任一成员 P 公开则父/合集公开、否则私密」回填派生可见性并加 `NOT NULL` / 检查约束。
+
+> **上线门禁**：服务器部署新后端前**必须先跑迁移**（或等价 SQL）补齐合集 `visibility`，否则新后端启动会因 `VISIBILITY_SCHEMA_REQUIRED` 直接崩溃循环。迁移失败即停止发布，先过 schema 与派生数据校验再切服务。
+
+### 9.7 本地试用 ≠ 线上验收
+
+本地 Docker 试用目前仍是 `development` 模式、CDN 环境变量未注入、使用 MinIO 本地源；**不能以本地试用通过就声称真实 COS/CDN 验收通过**。后续仍需真实CDN播放/同档回退、完整并发与端到端复验，以及生产环境配置核对；不要求文件级保密，不把桶私有化或CDN鉴权作为业务可见性验收条件。
+
+### 9.8 「我的」暂无本人改密功能
+
+当前 `pages/mine/index` 仅有学生信息展示与退出登录，**不含修改密码入口**。本人改密（旧密码+新密码弹窗、各自独立眼睛、成功提示保留 1 秒后清理会话退出、全设备会话撤销）属于**待实施计划**，详见 `docx/用户自助改密与固定密码重置实施计划.md`（状态：仅计划，未改代码/库/部署）。维护时若新增改密入口，须从 Web 头像下拉与小程序「我的」同步接入，并避免旧密码错误返回 401 触发小程序误退出。
+
+### 9.9 Web 端 P 下载不属于小程序
+
+网页端「分 P 下载」能力与小程序无关，且当前**未实施**；小程序侧不需要、也不应接入 P 视频下载。小程序文件打开仅覆盖图书馆 PDF/图片/音频与课程附件授权下载（`services/files.js`）。
+
+协作约束（保留）：
 
 - 小程序端**不新增管理入口**（公开/私密开关在网页端 `/admin/tracks`、`/admin/knowledge` 编辑页）；
 - 若未来需要在学生端展示「老师端才可见」的私密标识，必须先与网页端口径对齐，不要在页面里自行判断 `visibility` 字段；

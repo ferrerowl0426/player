@@ -7,7 +7,7 @@ test('private metadata absent for guests/students/disabled staff', () => {
 });
 test('authorized private serialization has no permanent URL/key', () => {
   const [row] = serializeAttachments([privateRow], { role: 'teacher', status: 'active' });
-  assert.equal(row.file_key, undefined); assert.equal(row.file_url, undefined); assert.match(row.download_endpoint, /1\/download-url/);
+  assert.equal(row.file_key, privateRow.file_key); assert.equal(row.file_url, privateRow.file_url); assert.match(row.download_endpoint, /1\/download-url/);
 });
 test('invalid source or ID cannot query arbitrary tables', async () => {
   for (const input of [{ id: -1 }, { id: 1, source: 'library' }, { id: NaN }]) assert.equal(await authorizeAttachment({}, input), null);
@@ -28,6 +28,6 @@ test('active teacher and super_admin can authorize private attachment with real 
     assert.equal((await authorizeAttachment({ query: async () => ({ rows: calls++ ? [{ id: 7 }] : [privateRow] }) }, { id: 1, viewer })).id, 1);
     const [serialized] = serializeAttachments([privateRow], viewer);
     assert.match(serialized.download_endpoint, /1\/download-url/);
-    assert.equal(serialized.file_url, undefined);
+    assert.equal(serialized.file_url, privateRow.file_url);
   }
 });

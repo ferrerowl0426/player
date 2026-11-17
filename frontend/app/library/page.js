@@ -134,7 +134,7 @@ export default function LibraryPage() {
 
   return (
     <>
-      <AppNav role={viewer?.role || 'guest'} accountName={accountName} />
+      <AppNav role={viewer?.role || 'guest'} accountName={accountName} username={viewer?.username} />
       <main className={`${styles.library} home`}>
         <div className="toolrow rise">
           <label className={`searchbar${keyword ? ' filtering' : ''}`}>

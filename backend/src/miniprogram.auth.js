@@ -27,6 +27,7 @@ export async function loadStudentById(userId) {
             u.nickname,
             u.status,
             u.is_active,
+            u.auth_version,
             u.class_id,
             c.name AS class_name
        FROM users u
@@ -94,6 +95,17 @@ export async function requireMiniStudent(req, res, next) {
       clearUserCookie(res);
       sendMiniError(res, 401, 'UNAUTHORIZED', '登录已过期，请重新登录');
       return;
+    }
+
+    // 改密 / 管理重置会递增 auth_version，使旧 token 立即失效。
+    // 缺版本（迁移前旧 token）或版本不匹配一律拒绝，强制重新登录。
+    const dbVersion = student.auth_version;
+    if (dbVersion !== undefined && dbVersion !== null) {
+      if (payload.authVersion === undefined || Number(payload.authVersion) !== Number(dbVersion)) {
+        clearUserCookie(res);
+        sendMiniError(res, 401, 'UNAUTHORIZED', '登录已过期，请重新登录');
+        return;
+      }
     }
 
     const serialized = serializeStudent(student);

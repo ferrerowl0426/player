@@ -32,7 +32,7 @@ export default function LibraryBookPage() {
   if (status) {
     return (
       <>
-        <AppNav role={admin?.role || 'guest'} accountName={accountName} />
+        <AppNav role={admin?.role || 'guest'} accountName={accountName} username={admin?.username} />
         <main className={styles.wrap}><p className="empty-text">{status}</p></main>
       </>
     );
@@ -40,7 +40,7 @@ export default function LibraryBookPage() {
 
   return (
     <>
-      <AppNav role={admin?.role || 'guest'} accountName={accountName} />
+      <AppNav role={admin?.role || 'guest'} accountName={accountName} username={admin?.username} />
       <main className={styles.wrap}>
         <div className="crumb rise"><Link href="/library">← 返回图书馆</Link></div>
         <section className={`${styles.bookDetail} rise d1`}>

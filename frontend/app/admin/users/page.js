@@ -11,6 +11,7 @@ import {
   fetchClasses,
   fetchKnowledgeLibrary,
   fetchKnowledgePointById,
+  fetchLatestUserAssignment,
   fetchManagedUsers,
   fetchTrackById,
   fetchTrackLibrary,
@@ -18,6 +19,12 @@ import {
   updateManagedUserMark,
   clearManagedUserMarks
 } from '../../../lib/api.js';
+import {
+  buildSelectionFromLatest,
+  isResponseCurrent,
+  latestRequirements,
+  mergeContentOptionsWithSelection
+} from '../../../lib/assignmentViewLogic.js';
 
 const REQUIREMENT_MAX_LENGTH = 1000;
 const MAX_ASSIGNMENTS = 5;
@@ -97,6 +104,12 @@ export default function AdminUsersPage() {
   const historyListRef = useRef(null);
   const [status, setStatus] = useState('正在检查老师登录状态...');
   const [busy, setBusy] = useState(false);
+  const [fillBusy, setFillBusy] = useState(false);
+
+  // 竞态保护：切学员或重复回填/加载时旧响应必须丢弃，不能覆盖当前学员状态。
+  const selectedUserIdRef = useRef(null);
+  const assignmentsRequestRef = useRef({ userId: null, version: 0 });
+  const fillRequestRef = useRef({ userId: null, version: 0 });
 
   const isSuperAdmin = admin?.role === 'super_admin';
 
@@ -145,7 +158,11 @@ export default function AdminUsersPage() {
 
   async function loadAssignments(userId) {
     if (!userId) return;
+    const version = ++assignmentsRequestRef.current.version;
+    assignmentsRequestRef.current.userId = userId;
     const result = await fetchUserAssignments(userId);
+    // 每次加载都递增版本，切学员后旧请求版本落后，不得回写学员/历史/要求状态。
+    if (version !== assignmentsRequestRef.current.version) return;
     setSelectedUser(result.data.user);
     setOperations(result.data.operations || []);
     setPracticeRequirement('');
@@ -224,6 +241,7 @@ export default function AdminUsersPage() {
   }, [users]);
 
   useEffect(() => {
+    selectedUserIdRef.current = selectedUserId;
     if (selectedUserId) {
       loadAssignments(selectedUserId).catch((error) => setStatus(error.message));
       setSelectedObjects([]);
@@ -317,25 +335,46 @@ export default function AdminUsersPage() {
     });
   }
 
-  function fillLastAssignment() {
-    const last = operations.filter((operation) => !operation.is_deleted).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
-    if (!last) {
-      setStatus('暂无可回填的作业数据');
-      return;
+  async function fillLastAssignment() {
+    if (!selectedUserId || busy || fillBusy) return;
+    const userId = selectedUserId;
+    const version = ++fillRequestRef.current.version;
+    fillRequestRef.current.userId = userId;
+    setFillBusy(true);
+    try {
+      setStatus('正在回填上次作业...');
+      const result = await fetchLatestUserAssignment(userId);
+      // 回填期间切换学员或重复点击产生旧响应，一律丢弃。
+      if (!isResponseCurrent({ requestVersion: version, currentVersion: fillRequestRef.current.version, requestedUserId: userId, currentUserId: selectedUserIdRef.current })) return;
+      const data = result.data || {};
+      const selected = buildSelectionFromLatest(data.objects || [], MAX_ASSIGNMENTS);
+      const requirements = latestRequirements(data);
+
+      // 按稳定 ID 直接构造勾选项并补入候选；当前标题/序号不被旧候选同名覆盖。
+      setSelectedObjects(selected);
+      setContentOptions((current) => mergeContentOptionsWithSelection(current, selected));
+      setPracticeRequirement(requirements.practiceRequirement);
+      setSubmitRequirement(requirements.submitRequirement);
+
+      if (!data.operationId) {
+        setStatus('暂无可回填的作业数据');
+        return;
+      }
+      const when = `${dayLabel(data.assignmentDate)} ${timeLabel(data.assignmentDate)}`;
+      if (selected.length === 0) {
+        // 最新批次目标全部失效：不回退旧批次，仍回填该批次要求。
+        setStatus(`已回填上次作业（${when} 布置）的练习/提交要求，原资源当前不可访问`);
+      } else {
+        setStatus(`已回填上次作业（${when} 布置，${selected.length} 项），可修改后再推送`);
+      }
+    } catch (error) {
+      if (isResponseCurrent({ requestVersion: version, currentVersion: fillRequestRef.current.version, requestedUserId: userId, currentUserId: selectedUserIdRef.current })) {
+        setStatus(error?.message || '回填上次作业失败');
+      }
+    } finally {
+      // 只有当前版本的回填能解除 busy；旧版本不得清空新请求的 busy 状态。
+      if (version === fillRequestRef.current.version) setFillBusy(false);
     }
-    const matched = [];
-    for (const video of last.videos || []) {
-      if (matched.length >= MAX_ASSIGNMENTS) break;
-      const option = contentOptions.find((item) => item.title === video.title);
-      if (!option) continue;
-      const key = objectKey(option);
-      if (matched.some((item) => objectKey(item) === key)) continue;
-      matched.push(option);
-    }
-    setSelectedObjects(matched);
-    setPracticeRequirement(last.practice_requirement || '');
-    setSubmitRequirement(last.submit_requirement || '');
-    setStatus(`已回填上次作业（${dayLabel(last.created_at)} ${timeLabel(last.created_at)} 布置），可修改后再推送`);
   }
 
   async function submitAssignment(event) {
@@ -579,7 +618,7 @@ export default function AdminUsersPage() {
                   <textarea className="msg-box" disabled={isSelectedUserDisabled} maxLength={REQUIREMENT_MAX_LENGTH} value={submitRequirement} onChange={(event) => setSubmitRequirement(event.target.value)} placeholder="视频提交要求（选填）…" aria-label="视频提交要求" />
                 </div>
                 <div className="push-foot">
-                  <button type="button" className="btn-shortcut" disabled={busy || isSelectedUserDisabled || !selectedUser} onClick={fillLastAssignment}>上次作业</button>
+                  <button type="button" className="btn-shortcut" disabled={busy || fillBusy || isSelectedUserDisabled || !selectedUser} onClick={fillLastAssignment}>{fillBusy ? '回填中' : '上次作业'}</button>
                   <button className="btn-main" type="submit" disabled={busy || noClass || !selectedUserId || isSelectedUserDisabled}>{busy ? '推送作业中' : '推送作业'}</button>
                   {status ? <span className="tip">{status}</span> : null}
                 </div>

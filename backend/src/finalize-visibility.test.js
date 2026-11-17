@@ -38,14 +38,12 @@ test('refresh 后仍为公开：直接返回，且不查前置引用', async () 
   assert.ok(!client._calls.some((s) => /FROM prerequisites/.test(s)), '公开时不应查 prerequisites');
 });
 
-test('off 模式：新变私密被拦截（403 PRIVATE_WRITE_DISABLED），不查前置引用', async () => {
+test('off 模式：新变私密不再被拦截（私密为常规业务），直接返回 private', async () => {
   const { finalizeCourseVisibility } = await loadConfigWithMode('off');
   const client = makeClient({ refreshedVisibility: 'private', prereqRowCount: 1 });
-  await assert.rejects(
-    () => finalizeCourseVisibility(client, 'track_point', 1, 'public'),
-    { code: 'PRIVATE_WRITE_DISABLED', status: 403 }
-  );
-  assert.ok(!client._calls.some((s) => /FROM prerequisites/.test(s)), '被开关拦截后不应查 prerequisites');
+  const refreshed = await finalizeCourseVisibility(client, 'track_point', 1, 'public');
+  assert.equal(refreshed.visibility, 'private');
+  assert.ok(!client._calls.some((s) => /FROM prerequisites/.test(s)), '不应查 prerequisites');
 });
 
 test('旧 private 遗漏不被重置：previous 已 private 时即使 refresh 仍 private 也不拦截', async () => {
@@ -56,15 +54,13 @@ test('旧 private 遗漏不被重置：previous 已 private 时即使 refresh �
   assert.ok(!client._calls.some((s) => /FROM prerequisites/.test(s)), '旧 private 不触发前置引用检查');
 });
 
-test('local-preview 非生产：新变私密且有前置引用 -> 409 PREEREQUISITE_CONFLICT', async () => {
-  delete process.env.NODE_ENV; // 非 production -> local-preview 放行到前置引用检查
+test('local-preview 非生产：新变私密且有前置引用也不再被 PREREQUISITE_CONFLICT 阻断', async () => {
+  delete process.env.NODE_ENV; // 非 production
   const { finalizeCourseVisibility } = await loadConfigWithMode('local-preview');
   const client = makeClient({ refreshedVisibility: 'private', prereqRowCount: 1 });
-  await assert.rejects(
-    () => finalizeCourseVisibility(client, 'knowledge_point', 1, 'public'),
-    { code: 'PREREQUISITE_CONFLICT', status: 409 }
-  );
-  assert.ok(client._calls.some((s) => /FROM prerequisites/.test(s)), '应查 prerequisites');
+  const refreshed = await finalizeCourseVisibility(client, 'knowledge_point', 1, 'public');
+  assert.equal(refreshed.visibility, 'private');
+  assert.ok(!client._calls.some((s) => /FROM prerequisites/.test(s)), '不再查 prerequisites');
 });
 
 test('local-preview 非生产：新变私密且无前置引用 -> 放行返回 private', async () => {
@@ -75,11 +71,9 @@ test('local-preview 非生产：新变私密且无前置引用 -> 放行返回 p
   assert.equal(refreshed.visibility, 'private');
 });
 
-test('enforced 模式：新变私密仍按未开放拦截（403）', async () => {
+test('enforced 模式：新变私密也不再按未开放拦截（私密为常规业务）', async () => {
   const { finalizeCourseVisibility } = await loadConfigWithMode('enforced');
   const client = makeClient({ refreshedVisibility: 'private', prereqRowCount: 0 });
-  await assert.rejects(
-    () => finalizeCourseVisibility(client, 'track_point', 1, 'public'),
-    { code: 'PRIVATE_WRITE_DISABLED', status: 403 }
-  );
+  const refreshed = await finalizeCourseVisibility(client, 'track_point', 1, 'public');
+  assert.equal(refreshed.visibility, 'private');
 });

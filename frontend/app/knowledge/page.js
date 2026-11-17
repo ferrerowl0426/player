@@ -250,7 +250,7 @@ export default function KnowledgePage() {
 
   return (
     <>
-      <AppNav role={navRole} accountName={accountName} />
+      <AppNav role={navRole} accountName={accountName} username={admin?.username} />
       <main className="home knowledge-home">
         <form className="toolrow rise" onSubmit={handleSubmit}>
           <div className={`searchbar${isFiltering ? ' filtering' : ''}`}>

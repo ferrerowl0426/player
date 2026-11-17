@@ -32,17 +32,7 @@ export async function assertVideoAttachmentWriteAllowed({
   if (visibility !== PRIVATE) return;
 
   // 新的私密写入受部署开关保护；已私密则放行（遗漏保留不被重置）。
+  // 注意：不再因“共用 key”而禁止设为私密——附件 visibility 独立、不影响父级，
+  // 共用文件的私密化不再视为冲突（保留正常删除/引用保护由调用方负责）。
   assertPrivateWriteAllowed(PRIVATE, previousVisibility);
-
-  // 共用 key 禁止单独设私密：避免把别人也能下载的文件变成仅自己可见。
-  const shared = await client.query(
-    `SELECT 1 FROM content_attachments WHERE file_key = $1 LIMIT 1
-     UNION ALL SELECT 1 FROM library_resources WHERE file_key = $1 LIMIT 1
-     UNION ALL SELECT 1 FROM video_attachments WHERE file_key = $1 AND video_id <> $2 LIMIT 1`,
-    [fileKey, videoId]
-  );
-
-  if (shared.rows.length) {
-    throw new VisibilityError('共用文件不能单独设为私密，请上传独立文件', 'SHARED_ATTACHMENT');
-  }
 }

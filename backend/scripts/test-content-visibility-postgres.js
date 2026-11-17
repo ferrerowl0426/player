@@ -35,6 +35,20 @@ INSERT INTO knowledge_points VALUES (1),(2),(3);
 INSERT INTO track_parts VALUES (1,1,NULL),(2,1,''),(3,2,'private');
 INSERT INTO knowledge_parts VALUES (1,1,NULL),(2,1,'public'),(3,2,'private');
 `;
+// Collections are created WITHOUT foreign keys and seeded once, so the later DROP of the
+// six base tables (which does not include collections) does not fail on a dependency.
+// track/knowledge_points 1,2 are public and 3 is private after backfill; collections 1
+// holds points 1,2 (public) and collection 2 holds point 3 (private).
+const collectionSeed = `
+CREATE TABLE track_collections (id INTEGER PRIMARY KEY);
+CREATE TABLE knowledge_collections (id INTEGER PRIMARY KEY);
+CREATE TABLE track_collection_items (collection_id INTEGER, track_id INTEGER);
+CREATE TABLE knowledge_collection_items (collection_id INTEGER, knowledge_point_id INTEGER);
+INSERT INTO track_collections VALUES (1),(2);
+INSERT INTO knowledge_collections VALUES (1),(2);
+INSERT INTO track_collection_items VALUES (1,1),(1,2),(2,3);
+INSERT INTO knowledge_collection_items VALUES (1,1),(1,2),(2,3);
+`;
 const migrate = `BEGIN; SET LOCAL lock_timeout = '10s'; ${VISIBILITY_MIGRATION_SQL} COMMIT;`;
 try {
   // --pull=never avoids implicit downloads; failure is explicit if no local image exists.
@@ -48,13 +62,18 @@ try {
   }
   if (!ready) throw new Error('Isolated PostgreSQL did not become ready');
   sql(seed);
+  sql(collectionSeed);
   sql(migrate);
   check("SELECT string_agg(visibility, ',' ORDER BY id) FROM track_parts;", 'public,public,private', 'legacy NULL/empty filled, private preserved');
   check("SELECT string_agg(visibility, ',' ORDER BY id) FROM knowledge_parts;", 'public,public,private', 'knowledge P compatibility');
   check("SELECT string_agg(visibility, ',' ORDER BY id) FROM track_points;", 'public,private,private', 'mixed/private/empty track courses');
   check("SELECT string_agg(visibility, ',' ORDER BY id) FROM knowledge_points;", 'public,private,private', 'knowledge course derivation');
+  check("SELECT string_agg(visibility, ',' ORDER BY id) FROM track_collections;", 'public,private', 'track collection derived from member points (P)');
+  check("SELECT string_agg(visibility, ',' ORDER BY id) FROM knowledge_collections;", 'public,private', 'knowledge collection derived from member points (P)');
   sql(migrate);
   check("SELECT string_agg(visibility, ',' ORDER BY id) FROM track_parts;", 'public,public,private', 'repeat migration preserves private');
+  check("SELECT string_agg(visibility, ',' ORDER BY id) FROM track_collections;", 'public,private', 'repeat migration preserves collection visibility');
+  check("SELECT string_agg(visibility, ',' ORDER BY id) FROM knowledge_collections;", 'public,private', 'repeat migration preserves knowledge collection visibility');
   for (const table of ['content_attachments', 'video_attachments']) {
     check(`SELECT string_agg(visibility, ',' ORDER BY id) FROM ${table};`, 'public,public,private', `${table} legacy values and private preserved after repeat migration`);
     sql(`INSERT INTO ${table} (id) VALUES (4);`);
@@ -63,6 +82,16 @@ try {
       assert.throws(() => sql(`UPDATE ${table} SET visibility=${value} WHERE id=1;`)); checks++;
     }
   }
+  // Collections: default private, derived backfill preserved, constraints enforced.
+  sql('INSERT INTO track_collections (id) VALUES (3); INSERT INTO knowledge_collections (id) VALUES (3);');
+  check('SELECT visibility FROM track_collections WHERE id=3;', 'private', 'new track collection default private');
+  check('SELECT visibility FROM knowledge_collections WHERE id=3;', 'private', 'new knowledge collection default private');
+  for (const table of ['track_collections', 'knowledge_collections']) {
+    for (const value of ["'invalid'", 'NULL', "''"]) {
+      assert.throws(() => sql(`UPDATE ${table} SET visibility=${value} WHERE id=1;`)); checks++;
+    }
+  }
+  check("SELECT count(*) FROM pg_constraint WHERE conname IN ('track_collections_visibility_check','knowledge_collections_visibility_check');", '2', 'collection visibility check constraints created');
   sql('INSERT INTO track_parts (id,track_id) VALUES (4,3); INSERT INTO track_points(id) VALUES(4);');
   check('SELECT visibility FROM track_parts WHERE id=4;', 'public', 'new P default public');
   check('SELECT visibility FROM track_points WHERE id=4;', 'private', 'new empty course default private');
@@ -92,6 +121,11 @@ try {
     sql(`UPDATE ${table} SET visibility='private' WHERE id=1;`);
     sql(migrate);
   }
+  // 合集缺列时迁移补齐列并回填派生值。
+  sql('ALTER TABLE track_collections DROP COLUMN visibility; ALTER TABLE knowledge_collections DROP COLUMN visibility;');
+  sql(migrate);
+  check("SELECT string_agg(visibility, ',' ORDER BY id) FROM track_collections;", 'public,private,private', 'missing collection column backfilled and derived');
+  check("SELECT string_agg(visibility, ',' ORDER BY id) FROM knowledge_collections;", 'public,private,private', 'missing knowledge collection column backfilled and derived');
   // Real concurrent sessions: second editor must observe first editor's committed state.
   function session() {
     return { query(text, values = []) {
@@ -127,7 +161,7 @@ try {
     CREATE TABLE user_assignments (id SERIAL PRIMARY KEY, user_id INTEGER, object_type VARCHAR(30), object_id INTEGER, part_id INTEGER, is_deleted BOOLEAN DEFAULT FALSE);
   `);
 
-  // 设前置的“资格校验”SQL：课程必须有公开 P 才可作为前置目标。
+  // 作业布置的资格SQL（不是前置维护资格）：课程须有公开P。
   const courseAssignable = (id) => `SELECT 1 FROM track_points c WHERE c.id=${id} AND COALESCE(NULLIF(c.visibility,''),'public')='public' AND EXISTS (SELECT 1 FROM track_parts p WHERE p.track_id=c.id AND COALESCE(NULLIF(p.visibility,''),'public')='public')`;
 
   // 显式把课程2 设为私密（无公开 P），作为“私密不可作前置”的确定性前提。
@@ -138,24 +172,24 @@ try {
 
   // 设前置事务锁课程行；改私密事务锁同一课程行，二者串行化。
   // 场景1：课程2 公开时设前置 vs 并发改私密。
-  // 设前置先拿锁并写入引用；改私密后拿锁，检查到前置引用 → 回滚（409），课程2 保持公开。
+  // 前置先写入后，内容仍允许改私密；关系保留，学生读取时另行过滤。
   sql("UPDATE track_parts SET visibility='public' WHERE id=3; UPDATE track_points SET visibility='public' WHERE id=2;");
   check(courseAssignable(2), '1', 'course 2 now public after P3 made public');
   const setPrereq = session().query("BEGIN; SELECT id FROM track_points WHERE id=2 FOR UPDATE; SELECT pg_sleep(0.3); INSERT INTO prerequisites (object_type, object_id, prerequisite_type, prerequisite_id) VALUES ('track_point', 1, 'track_point', 2); COMMIT;");
-  // 模拟 finalizeCourseVisibility：锁后若存在前置引用则不改私密（用条件 UPDATE 表达“冲突即回滚/不生效”）。
-  const makePrivate = session().query("BEGIN; SELECT pg_sleep(0.1); SELECT id FROM track_points WHERE id=2 FOR UPDATE; UPDATE track_parts SET visibility='private' WHERE track_id=2 AND NOT EXISTS (SELECT 1 FROM prerequisites WHERE prerequisite_type='track_point' AND prerequisite_id=2); UPDATE track_points SET visibility='private' WHERE id=2 AND NOT EXISTS (SELECT 1 FROM prerequisites WHERE prerequisite_type='track_point' AND prerequisite_id=2); COMMIT;");
+  // SQL并发演练：引用存在不再阻止状态写入；真实业务helper另有单元测试。
+  const makePrivate = session().query("BEGIN; SELECT pg_sleep(0.1); SELECT id FROM track_points WHERE id=2 FOR UPDATE; UPDATE track_parts SET visibility='private' WHERE track_id=2; UPDATE track_points SET visibility='private' WHERE id=2; COMMIT;");
   await Promise.all([makePrivate, setPrereq]);
-  // 因前置引用冲突，改私密被拒绝，课程2 保持公开且引用保留。
-  check("SELECT visibility FROM track_points WHERE id=2;", 'public', 'make-private blocked by prerequisite reference (course stays public)');
+  // 状态更新成功且引用保留。
+  check("SELECT visibility FROM track_points WHERE id=2;", 'private', 'referenced course may become private');
   check("SELECT count(*) FROM prerequisites WHERE prerequisite_type='track_point' AND prerequisite_id=2;", '1', 'prerequisite reference preserved when make-private is blocked');
 
-  // 场景2：改私密先提交后，设前置应在锁后复核失败（真实路由拒绝）。
-  // 用“锁后带条件 INSERT”（复核课程仍公开才写入）模拟路由语义，断言不会写入私密课程引用。
+  // 场景2：改私密先提交，老师仍可维护存在的私密前置对象。
+  // 只复核真实对象存在性，不把作业布置资格误用于前置维护。
   sql("UPDATE track_parts SET visibility='public' WHERE track_id=2; UPDATE track_points SET visibility='public' WHERE id=2; DELETE FROM prerequisites;");
   const makePrivate2 = session().query("BEGIN; SELECT id FROM track_points WHERE id=2 FOR UPDATE; SELECT pg_sleep(0.3); UPDATE track_parts SET visibility='private' WHERE track_id=2; UPDATE track_points SET visibility='private' WHERE id=2; COMMIT;");
-  const setPrereq2 = session().query("BEGIN; SELECT pg_sleep(0.1); SELECT id FROM track_points WHERE id=2 FOR UPDATE; INSERT INTO prerequisites (object_type, object_id, prerequisite_type, prerequisite_id) SELECT 'track_point', 1, 'track_point', 2 WHERE EXISTS (SELECT 1 FROM track_points c WHERE c.id=2 AND COALESCE(NULLIF(c.visibility,''),'public')='public' AND EXISTS (SELECT 1 FROM track_parts p WHERE p.track_id=c.id AND COALESCE(NULLIF(p.visibility,''),'public')='public')); COMMIT;");
+  const setPrereq2 = session().query("BEGIN; SELECT pg_sleep(0.1); SELECT id FROM track_points WHERE id=2 FOR UPDATE; INSERT INTO prerequisites (object_type, object_id, prerequisite_type, prerequisite_id) SELECT 'track_point', 1, 'track_point', 2 WHERE EXISTS (SELECT 1 FROM track_points c WHERE c.id=2); COMMIT;");
   await Promise.all([makePrivate2, setPrereq2]);
-  check("SELECT count(*) FROM prerequisites WHERE prerequisite_type='track_point' AND prerequisite_id=2;", '0', 'prerequisite insert re-checked against private course');
+  check("SELECT count(*) FROM prerequisites WHERE prerequisite_type='track_point' AND prerequisite_id=2;", '1', 'private prerequisite relationship may be maintained');
 
   // 作业布置资格：公开 P 且父课程公开才可布置。
   check(`SELECT 1 FROM track_parts x JOIN track_points c ON c.id=x.track_id WHERE x.id=1 AND COALESCE(NULLIF(x.visibility,''),'public')='public' AND COALESCE(NULLIF(c.visibility,''),'public')='public' AND EXISTS (SELECT 1 FROM track_parts p WHERE p.track_id=c.id AND COALESCE(NULLIF(p.visibility,''),'public')='public')`, '1', 'public P assignable as assignment target');

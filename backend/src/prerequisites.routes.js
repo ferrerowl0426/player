@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { pool } from './db.js';
 import { requireSuperAdmin, optionalContentViewer } from './auth.js';
-import { canReadContentObject, canAssignContentObject } from './content-object-access.js';
+import { canReadContentObject, canMaintainPrerequisite } from './content-object-access.js';
 import { lockCourse } from './content-visibility.js';
 
 const prerequisiteRouter = Router();
@@ -175,12 +175,13 @@ prerequisiteRouter.put('/', requireSuperAdmin, async (req, res, next) => {
     // 锁并复核每个前置目标：锁顺序与“改私密/删 P”一致，避免并发产生私密前置。
     for (const item of normalized) {
       await lockPrerequisiteTarget(client, item.prerequisiteType, item.prerequisiteId);
-      if (!(await canAssignContentObject(client, item.prerequisiteType, item.prerequisiteId))) {
+      // 前置维护资格：仅要求目标真实存在（允许私密内容），不做角色 bypass。
+      // 与作业资格 canAssignContentObject（拒绝私密）区分；私密前置可由老师维护。
+      if (!(await canMaintainPrerequisite(client, item.prerequisiteType, item.prerequisiteId))) {
         await client.query('ROLLBACK');
-        // 带上私密内容标题，方便老师定位是哪一项不可用作前置。
         const titleResult = await findObject(item.prerequisiteType, item.prerequisiteId);
         const title = titleResult.rows[0]?.title || `${item.prerequisiteType} ${item.prerequisiteId}`;
-        res.status(409).json({ message: `前置项不可为私密内容：\n${title}` });
+        res.status(409).json({ message: `前置项不存在：${title}` });
         return;
       }
     }

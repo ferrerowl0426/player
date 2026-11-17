@@ -4,11 +4,13 @@ import bcrypt from 'bcryptjs';
 import { pool } from './db.js';
 import { createDownloadUrl } from './storage.js';
 import { clearUserCookie, getUserCookieOptions, signUserToken } from './auth.js';
+import { changeOwnPassword, changePasswordRateLimiter, changePasswordRateLimitKey } from './password-service.js';
 
 const MINI_TOKEN_EXPIRES_IN_SECONDS = 15 * 24 * 60 * 60;
 import { requireMiniStudent, sendMiniError, sendMiniSuccess, serializeStudent, studentToViewer } from './miniprogram.auth.js';
 import { normalizeStoredVisibility, PRIVATE } from './content-visibility.js';
 import { issueMiniSts } from './miniprogram.sts.js';
+import { loadAssignmentNavigation } from './assignment-navigation.js';
 import {
   getHomeworkHistory,
   getKnowledgeCollectionDetail,
@@ -57,6 +59,7 @@ miniprogramRouter.post('/login', asyncHandler(async (req, res) => {
             u.password_hash,
             u.status,
             u.is_active,
+            u.auth_version,
             u.class_id,
             c.name AS class_name
        FROM users u
@@ -89,6 +92,36 @@ miniprogramRouter.post('/logout', (req, res) => {
   sendMiniSuccess(res, {});
 });
 
+// POST /api/miniprogram/change-password
+// 小程序学员本人改密（Bearer 鉴权）；成功后旧 token 因 auth_version 递增立即失效，需重新登录。
+miniprogramRouter.post('/change-password', requireMiniStudent, asyncHandler(async (req, res) => {
+  if (typeof req.body?.oldPassword !== 'string' || typeof req.body?.newPassword !== 'string') {
+    return res.status(400).json({ code: 'INVALID_PASSWORD_INPUT', message: '旧密码和新密码必须为文本' });
+  }
+  const { oldPassword, newPassword } = req.body;
+
+  const limitKey = changePasswordRateLimitKey('mini', req.ip, req.student.id);
+  if (!changePasswordRateLimiter.allow(limitKey)) {
+    sendMiniError(res, 429, 'RATE_LIMITED', '操作过于频繁，请稍后再试');
+    return;
+  }
+
+  const result = await changeOwnPassword({
+    pool,
+    table: 'users',
+    id: Number(req.student.id),
+    oldPassword,
+    newPassword
+  });
+
+  if (!result.ok) {
+    sendMiniError(res, result.status, result.code, result.message);
+    return;
+  }
+
+  sendMiniSuccess(res, {}, '密码修改成功，请重新登录');
+}));
+
 miniprogramRouter.get('/me', requireMiniStudent, (req, res) => {
   sendMiniSuccess(res, { student: req.student });
 });
@@ -99,6 +132,17 @@ miniprogramRouter.get('/homework/today', requireMiniStudent, asyncHandler(async 
 
 miniprogramRouter.get('/homework/history', requireMiniStudent, asyncHandler(async (req, res) => {
   sendMiniSuccess(res, await getHomeworkHistory(req.student, req.query));
+}));
+
+// GET /api/miniprogram/homework/:id/navigation
+// 单个作业点击导航状态（available / private / missing），供小程序端点击复核。
+// 仅当 available 才下发真实导航地址与目标；private / missing 一律脱敏（不泄露私密标题/封面/链接）。
+// 归属非本人、已删除、目标已删除 -> missing（绝不暴露为 private，防止越权探测）；
+// 目标存在但对学生不可公开可见 -> private；目标公开可见 -> available。
+// 网络 / 数据库异常与 private 严格区分：异常由 asyncHandler 透传为 500，不伪装成 private。
+miniprogramRouter.get('/homework/:id/navigation', requireMiniStudent, asyncHandler(async (req, res) => {
+  const navigation = await loadAssignmentNavigation(pool, req.params.id, { userId: Number(req.student.id) });
+  sendMiniSuccess(res, { id: String(req.params.id), ...navigation });
 }));
 
 miniprogramRouter.get('/tracks', requireMiniStudent, asyncHandler(async (req, res) => {

@@ -1,0 +1,183 @@
+/* 本人自助改密弹窗（AppNav 局部样式），复用设计系统 token。 */
+.mask {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(60, 42, 20, 0.38);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.panel {
+  width: 330px;
+  max-width: calc(100vw - 32px);
+  background: var(--white);
+  border: 1.5px solid var(--coffee);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(60, 42, 20, 0.18);
+  padding: 20px 22px 18px;
+  animation: reset-pop 0.25s var(--ease);
+}
+
+@keyframes reset-pop {
+  from {
+    transform: scale(0.94);
+    opacity: 0;
+  }
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--coffee);
+  margin: 0 0 4px;
+  padding-bottom: 9px;
+  border-bottom: 1px dashed var(--hair-2);
+}
+
+.subtitle {
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--ink-3);
+  margin: 0 0 14px;
+  letter-spacing: 0.3px;
+}
+
+.field {
+  margin-bottom: 12px;
+}
+
+.label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--ink-2);
+  margin-bottom: 5px;
+}
+
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--hair-2);
+  border-radius: 5px;
+  background: var(--white);
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+
+.inputWrap:focus-within {
+  border-color: var(--orange);
+  box-shadow: 0 2px 8px rgba(93, 67, 38, 0.12);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--ink);
+  letter-spacing: 0.4px;
+  padding: 9px 10px;
+}
+
+/* 焦点由外层 focus-within 统一显示，避免全局 input:focus-visible 叠加黑框。 */
+.input:focus,
+.input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.input::placeholder {
+  color: #b3a58c;
+}
+
+.eye {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+
+.eye:hover,
+.eye:focus-visible {
+  color: var(--coffee);
+}
+
+.eye svg {
+  width: 17px;
+  height: 17px;
+}
+
+.error {
+  min-height: 16px;
+  margin: 2px 0 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  letter-spacing: 0.3px;
+  color: #b4452e;
+}
+
+.success {
+  margin: 6px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  background: rgba(79, 125, 58, 0.08);
+  font-size: 12.5px;
+  line-height: 1.7;
+  letter-spacing: 0.4px;
+  color: var(--coffee);
+  text-align: center;
+}
+
+.ops {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.btn {
+  font-size: 11.5px;
+  letter-spacing: 1px;
+  padding: 6px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--hair-2);
+  color: var(--ink-3);
+  background: var(--white);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--coffee);
+  color: var(--coffee);
+}
+
+.btn.primary {
+  color: var(--white);
+  background: var(--coffee);
+  border-color: var(--coffee);
+}
+
+.btn.primary:hover {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: var(--white);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

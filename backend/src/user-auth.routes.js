@@ -3,82 +3,26 @@ import bcrypt from 'bcryptjs';
 import { pool } from './db.js';
 import { config } from './config.js';
 import { clearUserCookie, getUserCookieOptions, requireUser, signUserToken } from './auth.js';
+import { loadAssignmentNavigation } from './assignment-navigation.js';
+import { changeOwnPassword, changePasswordRateLimiter, changePasswordRateLimitKey } from './password-service.js';
+import {
+  assignmentTargetJoins,
+  assignmentTargetPrivateExpr,
+  assignmentSnapshotTitleExpr,
+  assignmentTargetProjection
+} from './assignment-targets.js';
 
 function normalizeLoginText(value) {
   return String(value ?? '').trim();
 }
 
-function assignmentTitleExpression() {
-  return `COALESCE(NULLIF(ua.assigned_object_title, ''), NULLIF(ua.assigned_video_title, ''), v.title, t.name, c.name, kp.name, kpc.name, parent_t.name, parent_kp.name, '')`;
-}
+// 当前显示 / 存在性 / 公开资格一律复用共享解析层，不再手写漂移的 video CASE。
+// 历史快照标题单独投影，读取/改名/调序/隐私切换都不改快照列。
 
+// 历史接口专用：布置时标题快照（缺失固定文案，不用当前名称伪造旧标题）。
 function assignmentSnapshotTitleExpression() {
-  return `COALESCE(NULLIF(ua.assigned_object_title, ''), NULLIF(ua.assigned_video_title, ''), '已删除内容')`;
+  return assignmentSnapshotTitleExpr();
 }
-
-function assignmentCoverExpression() {
-  return `COALESCE(v.cover_url, t.cover, c.cover, kp.cover, kpc.cover, parent_t.cover, parent_kp.cover, '')`;
-}
-
-function assignmentNavigationExpression() {
-  return `CASE
-           WHEN COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) = 'video' THEN '/videos/' || COALESCE(ua.object_id, ua.video_id)
-           WHEN ua.object_type = 'track_point' THEN '/tracks/' || ua.object_id
-           WHEN ua.object_type = 'track_collection' THEN '/tracks/collections/' || ua.object_id
-           WHEN ua.object_type = 'knowledge_point' THEN '/knowledge/' || ua.object_id
-           WHEN ua.object_type = 'knowledge_collection' THEN '/knowledge/collections/' || ua.object_id
-           WHEN ua.object_type = 'track_part' THEN '/tracks/' || parent_t.id || '?part=' || COALESCE(ua.part_id, ua.object_id)
-           WHEN ua.object_type = 'knowledge_part' THEN '/knowledge/' || parent_kp.id || '?part=' || COALESCE(ua.part_id, ua.object_id)
-           ELSE NULL
-         END`;
-}
-
-function assignmentJoins() {
-  return `LEFT JOIN videos v ON v.id = COALESCE(ua.object_id, ua.video_id) AND COALESCE(ua.object_type, 'video') = 'video'
-       LEFT JOIN track_points t ON t.id = ua.object_id AND ua.object_type = 'track_point'
-       LEFT JOIN track_collections c ON c.id = ua.object_id AND ua.object_type = 'track_collection'
-       LEFT JOIN knowledge_points kp ON kp.id = ua.object_id AND ua.object_type = 'knowledge_point'
-       LEFT JOIN knowledge_collections kpc ON kpc.id = ua.object_id AND ua.object_type = 'knowledge_collection'
-       LEFT JOIN track_parts tp ON tp.id = COALESCE(ua.part_id, ua.object_id) AND ua.object_type = 'track_part'
-       LEFT JOIN track_points parent_t ON parent_t.id = tp.track_id
-       LEFT JOIN knowledge_parts kpp ON kpp.id = COALESCE(ua.part_id, ua.object_id) AND ua.object_type = 'knowledge_part'
-       LEFT JOIN knowledge_points parent_kp ON parent_kp.id = kpp.knowledge_point_id
-       LEFT JOIN admins a ON a.id = ua.assigned_by_admin_id`;
-}
-
-function liveAssignmentFilter() {
-  return `(COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) = 'message'
-           OR (COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) = 'video' AND v.id IS NOT NULL)
-           OR (ua.object_type = 'track_point' AND t.id IS NOT NULL)
-           OR (ua.object_type = 'track_collection' AND c.id IS NOT NULL)
-           OR (ua.object_type = 'knowledge_point' AND kp.id IS NOT NULL)
-           OR (ua.object_type = 'knowledge_collection' AND kpc.id IS NOT NULL)
-           OR (ua.object_type = 'track_part' AND tp.id IS NOT NULL AND parent_t.id IS NOT NULL)
-           OR (ua.object_type = 'knowledge_part' AND kpp.id IS NOT NULL AND parent_kp.id IS NOT NULL))`;
-}
-
-// 作业目标当前是否“私密不可见”。私密目标对学生脱敏：标题改“教学内容已调整”，
-// 不下发封面、导航地址或可播放入口。message 类型不受影响。
-// 语义与 content-object-access.js 的公开判断一致。
-function assignmentTargetPrivateExpr() {
-  const coursePublic = (table, parts, parent) =>
-    `(COALESCE(NULLIF(${table}.visibility, ''), 'public') = 'public' AND EXISTS (SELECT 1 FROM ${parts} WHERE ${parts}.${parent} = ${table}.id AND COALESCE(NULLIF(${parts}.visibility, ''), 'public') = 'public'))`;
-  return `CASE COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END)
-    WHEN 'message' THEN FALSE
-    WHEN 'video' THEN NOT (v.id IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM track_parts x JOIN track_points xc ON xc.id = x.track_id WHERE x.video_id = v.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')
-        UNION ALL SELECT 1 FROM knowledge_parts x JOIN knowledge_points xc ON xc.id = x.knowledge_point_id WHERE x.video_id = v.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')))
-    WHEN 'track_point' THEN NOT (t.id IS NOT NULL AND ${coursePublic('t', 'track_parts', 'track_id')})
-    WHEN 'knowledge_point' THEN NOT (kp.id IS NOT NULL AND ${coursePublic('kp', 'knowledge_parts', 'knowledge_point_id')})
-    WHEN 'track_collection' THEN NOT (c.id IS NOT NULL AND EXISTS (SELECT 1 FROM track_collection_items ci JOIN track_points cc ON cc.id = ci.track_id WHERE ci.collection_id = c.id AND ${coursePublic('cc', 'track_parts', 'track_id')}))
-    WHEN 'knowledge_collection' THEN NOT (kpc.id IS NOT NULL AND EXISTS (SELECT 1 FROM knowledge_collection_items ci JOIN knowledge_points cc ON cc.id = ci.knowledge_point_id WHERE ci.collection_id = kpc.id AND ${coursePublic('cc', 'knowledge_parts', 'knowledge_point_id')}))
-    WHEN 'track_part' THEN NOT (tp.id IS NOT NULL AND COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public' AND ${coursePublic('parent_t', 'track_parts', 'track_id')})
-    WHEN 'knowledge_part' THEN NOT (kpp.id IS NOT NULL AND COALESCE(NULLIF(kpp.visibility, ''), 'public') = 'public' AND ${coursePublic('parent_kp', 'knowledge_parts', 'knowledge_point_id')})
-    ELSE TRUE
-  END`;
-}
-
-const ADJUSTED_TITLE = '教学内容已调整，请联系老师';
 
 export const userAuthRouter = Router();
 
@@ -107,7 +51,7 @@ userAuthRouter.post('/login', async (req, res, next) => {
     }
 
     const result = await pool.query(
-      `SELECT id, username, account, nickname, password_hash, status, is_active
+      `SELECT id, username, account, nickname, password_hash, status, is_active, auth_version
        FROM users
        WHERE account = $1 OR username = $1`,
       [username]
@@ -175,6 +119,41 @@ userAuthRouter.post('/logout', (req, res) => {
   res.json({ message: '已退出登录' });
 });
 
+// POST /api/user/change-password
+// 学员本人改密；成功后清空登录 Cookie，旧 token 因 auth_version 递增立即失效。
+userAuthRouter.post('/change-password', requireUser, async (req, res, next) => {
+  try {
+    if (typeof req.body?.oldPassword !== 'string' || typeof req.body?.newPassword !== 'string') {
+      return res.status(400).json({ code: 'INVALID_PASSWORD_INPUT', message: '旧密码和新密码必须为文本' });
+    }
+    const { oldPassword, newPassword } = req.body;
+
+    const limitKey = changePasswordRateLimitKey('user', req.ip, req.user.userId);
+    if (!changePasswordRateLimiter.allow(limitKey)) {
+      res.status(429).json({ message: '操作过于频繁，请稍后再试' });
+      return;
+    }
+
+    const result = await changeOwnPassword({
+      pool,
+      table: 'users',
+      id: req.user.userId,
+      oldPassword,
+      newPassword
+    });
+
+    if (!result.ok) {
+      res.status(result.status).json({ message: result.message, code: result.code });
+      return;
+    }
+
+    clearUserCookie(res);
+    res.json({ message: '密码修改成功，请重新登录' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/user/assignments/today
 // 学员首页作业：只展示最新一次作业推送 operation 的整批内容。
 // 不按自然日过滤；有些学员可能两天交一次作业，上一批作业在老师重新布置前应继续显示。
@@ -186,7 +165,7 @@ userAuthRouter.get('/assignments/today', requireUser, async (req, res, next) => 
        WHERE user_id = $1
          AND is_deleted = FALSE
        GROUP BY operation_id
-       ORDER BY MAX(created_at) DESC
+       ORDER BY MAX(created_at) DESC, operation_id DESC
        LIMIT 1`,
       [req.user.userId]
     );
@@ -198,6 +177,9 @@ userAuthRouter.get('/assignments/today', requireUser, async (req, res, next) => 
       return;
     }
 
+    // 删除/私密目标不再通过 liveAssignmentFilter 丢弃整行：同一批次的行全部保留、
+    // 保持原排序；目标状态由共享投影实时推导，private/missing 返回统一灰框 DTO。
+    // message 行只承载要求，不渲染资源卡（前端按 object_type 处理），此处仍保留字段兼容。
     const assignmentsResult = await pool.query(
       `SELECT ua.id, ua.operation_id, ua.message, ua.created_at,
          COALESCE(NULLIF(ua.practice_requirement, ''), CASE WHEN ua.object_type = 'message' THEN ua.message ELSE '' END) AS practice_requirement,
@@ -205,18 +187,13 @@ userAuthRouter.get('/assignments/today', requireUser, async (req, res, next) => 
          COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) AS object_type,
          COALESCE(ua.object_id, ua.video_id) AS object_id,
          ua.part_id,
-         CASE WHEN ${assignmentTargetPrivateExpr()} THEN '${ADJUSTED_TITLE}' ELSE ${assignmentTitleExpression()} END AS title,
-         CASE WHEN ${assignmentTargetPrivateExpr()} THEN '' ELSE ${assignmentCoverExpression()} END AS cover_url,
-         v.description AS video_description,
-         CASE WHEN ${assignmentTargetPrivateExpr()} THEN NULL ELSE ${assignmentNavigationExpression()} END AS navigation_url,
-         ${assignmentTargetPrivateExpr()} AS target_private,
+         ${assignmentTargetProjection().join(',\n         ')},
          COALESCE(a.nickname, a.username, a.account, '老师') AS teacher_name
        FROM user_assignments ua
-       ${assignmentJoins()}
+       ${assignmentTargetJoins()}
        WHERE ua.user_id = $1
          AND ua.operation_id = $2
          AND ua.is_deleted = FALSE
-         AND ${liveAssignmentFilter()}
        ORDER BY ua.created_at ASC, ua.id ASC`,
       [req.user.userId, latestOperation.operation_id]
     );
@@ -251,11 +228,11 @@ userAuthRouter.get('/assignments/history', requireUser, async (req, res, next) =
            COALESCE(json_agg(json_build_object(
              'id', ua.id,
              'object_type', COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END),
-             'title', CASE WHEN ${assignmentTargetPrivateExpr()} THEN '${ADJUSTED_TITLE}' ELSE ${assignmentSnapshotTitleExpression()} END,
+             'title', ${assignmentSnapshotTitleExpression()},
              'target_private', ${assignmentTargetPrivateExpr()}
            ) ORDER BY ua.created_at ASC) FILTER (WHERE COALESCE(ua.object_type, CASE WHEN ua.video_id IS NOT NULL THEN 'video' ELSE 'message' END) <> 'message'), '[]'::json) AS items
          FROM user_assignments ua
-         ${assignmentJoins()}
+         ${assignmentTargetJoins()}
          WHERE ua.user_id = $1 AND ua.is_deleted = FALSE
          GROUP BY ua.operation_id
        ), op_requirements AS (
@@ -285,6 +262,21 @@ userAuthRouter.get('/assignments/history', requireUser, async (req, res, next) =
     );
 
     res.json({ data: { operations: result.rows } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/user/assignments/:id/navigation
+// 单个作业点击导航状态（available / private / missing），供 Web 端点击复核。
+// 仅当 available 才下发真实导航地址与目标；private / missing 一律脱敏（不泄露私密标题/封面/链接）。
+// 归属非本人、已删除、目标已删除 -> missing（绝不暴露为 private，防止越权探测）；
+// 目标存在但对学生不可公开可见 -> private；目标公开可见 -> available。
+// 网络 / 数据库异常与 private 严格区分：异常由全局错误处理返回 500，不伪装成 private。
+userAuthRouter.get('/assignments/:id/navigation', requireUser, async (req, res, next) => {
+  try {
+    const navigation = await loadAssignmentNavigation(pool, req.params.id, { userId: req.user.userId });
+    res.json({ data: { id: String(req.params.id), ...navigation } });
   } catch (error) {
     next(error);
   }

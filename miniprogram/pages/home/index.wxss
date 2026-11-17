@@ -151,6 +151,23 @@
   overflow: hidden;
 }
 
+/* 失效目标灰框：浅灰无图、无按压可用态、不响应点击。 */
+.material-card.material-card-disabled {
+  background: rgba(244, 244, 244, 0.92);
+  border-color: #dcdcdc;
+  pointer-events: none;
+}
+
+.material-cover.material-cover-disabled {
+  background-color: #d8d8d8;
+  background-image: none;
+}
+
+.material-card-disabled .material-name {
+  color: #9a9a9a;
+  font-weight: 500;
+}
+
 .material-cover {
   flex: none;
   width: 120rpx;

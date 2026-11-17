@@ -756,7 +756,7 @@ function AdminKnowledgeContent() {
 
   return (
     <>
-      <AppNav role="super_admin" accountName={accountName} homeHref="/admin" actions={<span className="role-tag">教导主任工作台 · {accountName}</span>} />
+      <AppNav role="super_admin" accountName={accountName} username={admin?.username} homeHref="/admin" actions={<span className="role-tag">教导主任工作台 · {accountName}</span>} />
       {mode === 'collection' ? (
         <main className="admin-wrap">
           <div className="wizard rise">

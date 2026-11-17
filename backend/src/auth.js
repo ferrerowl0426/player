@@ -7,7 +7,7 @@ const resolveContentViewer = createContentViewerResolver({
   verifyToken: (token) => jwt.verify(token, config.auth.jwtSecret),
   loadAdmin: loadCurrentAdmin,
   loadUser: async (userId) => {
-    const result = await pool.query('SELECT id, status FROM users WHERE id = $1', [userId]);
+    const result = await pool.query('SELECT id, status, auth_version FROM users WHERE id = $1', [userId]);
     return result.rows[0] || null;
   }
 });
@@ -19,8 +19,9 @@ export const optionalContentViewer = createContentViewerMiddleware(resolveConten
 });
 
 // 管理端鉴权必须回查数据库当前状态，不能只信 token 里的快照。
-// 原因：JWT 有效期 7 天，老师被停用（或角色被升降）后，旧 token 里的
-// role / status 仍是登录那一刻的值，只信 token 会导致停用老师 7 天内仍能管理学员。
+// 原因：JWT 有效期 7 天，老师被停用（或角色被升降、改密）后，旧 token 里的
+// role / status / auth_version 仍是登录那一刻的值，只信 token 会导致停用老师
+// 7 天内仍能管理学员，或改密后旧 token 仍可用。
 async function loadCurrentAdmin(adminId) {
   const numericId = Number(adminId);
   if (!Number.isInteger(numericId) || numericId <= 0) {
@@ -28,11 +29,22 @@ async function loadCurrentAdmin(adminId) {
   }
 
   const result = await pool.query(
-    'SELECT id, username, account, nickname, role, status FROM admins WHERE id = $1',
+    'SELECT id, username, account, nickname, role, status, auth_version FROM admins WHERE id = $1',
     [numericId]
   );
 
   return result.rows[0] || null;
+}
+
+// 当前会话的 auth_version 必须与数据库一致，否则该 token 视为失效。
+// - 数据库缺列（auth_version 为 undefined）：仅在未迁移/测试中出现；
+//   生产库经启动门禁保证该列恒存在，此处放行不会削弱安全性。
+// - token 缺 authVersion（迁移前签发的旧 token）：一律拒绝，强制重新登录。
+function authVersionMatches(payload, current) {
+  if (!current) return false;
+  if (current.auth_version === undefined || current.auth_version === null) return true;
+  if (payload.authVersion === undefined) return false;
+  return Number(payload.authVersion) === Number(current.auth_version);
 }
 
 function getTokenMaxAgeMs() {
@@ -74,7 +86,8 @@ export function signAdminToken(admin) {
     adminId: admin.id,
     username: admin.username,
     role: admin.role,
-    status: admin.status || 'active'
+    status: admin.status || 'active',
+    authVersion: admin.auth_version ?? 0
   });
 }
 
@@ -83,7 +96,8 @@ export function signUserToken(user, options = {}) {
     type: 'user',
     userId: user.id,
     role: user.role || 'user',
-    status: user.status || 'active'
+    status: user.status || 'active',
+    authVersion: user.auth_version ?? 0
   }, options.expiresIn);
 }
 
@@ -129,7 +143,7 @@ function readAdminPayload(req, res) {
 
 // 解析 token 并回查数据库，返回“以数据库为准”的管理员会话信息。
 // 返回 null 表示已经写过响应，调用方直接 return 即可。
-async function resolveAdminSession(req, res, next, { allowDisabled = false } = {}) {
+export async function resolveAdminSession(req, res, next, { allowDisabled = false } = {}) {
   const payload = readAdminPayload(req, res);
   if (!payload) {
     return null;
@@ -155,6 +169,14 @@ async function resolveAdminSession(req, res, next, { allowDisabled = false } = {
     return null;
   }
 
+  // 改密 / 管理重置会递增 auth_version，使旧 token 立即失效。
+  // 缺版本（迁移前旧 token）或版本不匹配一律拒绝。
+  if (!authVersionMatches(payload, current)) {
+    clearAdminCookie(res);
+    res.status(401).json({ message: '登录已过期，请重新登录' });
+    return null;
+  }
+
   // 角色、状态一律以数据库为准：降权 / 停用 / 复权都能立刻生效。
   return {
     ...payload,
@@ -163,7 +185,8 @@ async function resolveAdminSession(req, res, next, { allowDisabled = false } = {
     account: current.account,
     nickname: current.nickname,
     role: current.role,
-    status: current.status
+    status: current.status,
+    authVersion: current.auth_version
   };
 }
 
@@ -208,7 +231,21 @@ export const requireTeacherOrSuperAdmin = requireAdmin;
 
 export const requireSuperAdmin = requireRole('super_admin');
 
-export function requireUser(req, res, next) {
+async function loadCurrentUser(userId) {
+  const numericId = Number(userId);
+  if (!Number.isInteger(numericId) || numericId <= 0) {
+    return null;
+  }
+
+  const result = await pool.query(
+    'SELECT id, status, is_active, auth_version FROM users WHERE id = $1',
+    [numericId]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function requireUser(req, res, next) {
   const token = readToken(req, config.auth.userCookieName);
 
   if (!token) {
@@ -216,19 +253,47 @@ export function requireUser(req, res, next) {
     return;
   }
 
+  let payload;
   try {
-    const payload = jwt.verify(token, config.auth.jwtSecret);
+    payload = jwt.verify(token, config.auth.jwtSecret);
 
     if (payload.type !== 'user') {
       res.status(401).json({ message: '学员登录状态无效' });
+      return;
+    }
+  } catch (error) {
+    clearUserCookie(res);
+    res.status(401).json({ message: '登录已过期，请重新登录' });
+    return;
+  }
+
+  // 回查数据库：学员被停用 / 改密后，旧 token 必须立即失效。
+  try {
+    const current = await loadCurrentUser(payload.userId);
+
+    if (!current) {
+      clearUserCookie(res);
+      res.status(401).json({ message: '登录已过期，请重新登录' });
+      return;
+    }
+
+    const active = current.status === 'active' && current.is_active !== false;
+    if (!active) {
+      clearUserCookie(res);
+      res.status(403).json({ message: '此账号已停用，无法继续访问' });
+      return;
+    }
+
+    if (!authVersionMatches(payload, current)) {
+      clearUserCookie(res);
+      res.status(401).json({ message: '登录已过期，请重新登录' });
       return;
     }
 
     req.user = payload;
     next();
   } catch (error) {
-    clearUserCookie(res);
-    res.status(401).json({ message: '登录已过期，请重新登录' });
+    next(error);
   }
 }
 
@@ -238,27 +303,47 @@ export function requireUserOrAdmin(req, res, next) {
 
   // 视频列表和详情页学员、老师都会访问，所以这里允许两种 Cookie。
   // 具体上传、删除等后台操作仍然只使用 requireAdmin。
-  for (const token of [userToken, adminToken]) {
-    if (!token) {
-      continue;
-    }
+  // 两种身份都回查数据库当前状态与 auth_version，缺版本 / 不匹配的旧 token 一律拒绝。
+  const tryAdmin = async () => {
+    const payload = jwt.verify(adminToken, config.auth.jwtSecret);
+    if (payload.type !== 'admin') return false;
+    const current = await loadCurrentAdmin(payload.adminId);
+    if (!current || current.status !== 'active') return false;
+    if (!authVersionMatches(payload, current)) return false;
+    req.admin = { ...payload, adminId: current.id, role: current.role, status: current.status, authVersion: current.auth_version };
+    return true;
+  };
 
-    try {
-      const payload = jwt.verify(token, config.auth.jwtSecret);
+  const tryUser = async () => {
+    const payload = jwt.verify(userToken, config.auth.jwtSecret);
+    if (payload.type !== 'user') return false;
+    const current = await loadCurrentUser(payload.userId);
+    if (!current) return false;
+    const active = current.status === 'active' && current.is_active !== false;
+    if (!active) return false;
+    if (!authVersionMatches(payload, current)) return false;
+    req.user = payload;
+    return true;
+  };
 
-      if (payload.type === 'user') {
-        req.user = payload;
-        return next();
+  const attempt = async () => {
+    // 优先以学员身份放行（与原逻辑一致），其次老师。
+    if (userToken) {
+      try {
+        if (await tryUser()) return next();
+      } catch {
+        // 该身份无效，尝试另一种。
       }
-
-      if (payload.type === 'admin') {
-        req.admin = payload;
-        return next();
-      }
-    } catch (error) {
-      // 如果一个 Cookie 过期了，继续尝试另一个身份的 Cookie。
     }
-  }
+    if (adminToken) {
+      try {
+        if (await tryAdmin()) return next();
+      } catch {
+        // 该身份无效。
+      }
+    }
+    res.status(401).json({ message: '请先登录' });
+  };
 
-  res.status(401).json({ message: '请先登录' });
+  attempt().catch((error) => next(error));
 }

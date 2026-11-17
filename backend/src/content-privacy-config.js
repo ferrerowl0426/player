@@ -1,15 +1,13 @@
-// 私密内容开关的共享配置（由另一代理实现，这里集中维护）。
-// 读 process.env.CONTENT_PRIVACY_MODE，默认 off（私密写入不放行）。
-import { PRIVATE, normalizeStoredVisibility, refreshCourseVisibility } from './content-visibility.js';
+// 私密内容（公开/私密）已是常规业务功能，不再有部署模式门禁。
+// 私密写入由角色/权限校验与对象存储边界负责访问控制；本模块只提供：
+//   - 可见性取值的兼容性校验入口（assertPrivateWriteAllowed）：不再拦截 private。
+//   - 派生可见性刷新（finalizeCourseVisibility）与 P 级前置引用查询（删除保护）。
+// 旧的 CONTENT_PRIVACY_MODE 模式开关逻辑（off / business / local-preview / enforced）
+// 已统一移除，见 finalizeCourseVisibility 注释。
+import { PRIVATE, normalizeStoredVisibility, VisibilityError, refreshCourseVisibility, refreshCollectionsForCourse } from './content-visibility.js';
 
-// 部署模式：
-//   off          : 任何“新的私密写入”都被拒绝（默认，显式关闭开关）。
-//   business     : 生产可用的业务角色可见性；不承诺 COS/CDN 旧直链保密。
-//   local-preview: 仅非生产环境允许私密写入，用于本地联调。
-//   enforced     : 强制模式（暂禁，目前仍按未开放处理）。
-const RESOLVED_MODE = String(process.env.CONTENT_PRIVACY_MODE || 'off').toLowerCase();
-
-export const CONTENT_PRIVACY_MODE = RESOLVED_MODE;
+// 保留旧导出以避免无关调用方炸掉：仅作诊断/兼容用途，不再参与任何门禁。
+export const CONTENT_PRIVACY_MODE = String(process.env.CONTENT_PRIVACY_MODE || 'business').toLowerCase();
 
 export class PrivateWriteDisabledError extends Error {
   constructor(message = '私密内容功能暂未开放') {
@@ -29,50 +27,36 @@ export class PrerequisiteConflictError extends Error {
   }
 }
 
-const normalizeVisibility = normalizeStoredVisibility;
+const VALID_VISIBILITY = Object.freeze(new Set([PRIVATE, 'public']));
 
-export function validatePrivacyConfiguration(env = process.env) {
-  const mode = env.CONTENT_PRIVACY_MODE || 'off';
-  if (!['off', 'business', 'local-preview', 'enforced'].includes(mode)) throw new Error('Invalid CONTENT_PRIVACY_MODE');
-  if (mode === 'local-preview' && env.NODE_ENV === 'production') throw new Error('local-preview is forbidden in production');
-  if (mode === 'enforced') throw new Error('enforced requires cloud authorization acceptance and is not available yet');
-  return mode;
+function assertLegalVisibility(value, label) {
+  if (!VALID_VISIBILITY.has(value)) {
+    throw new VisibilityError(`可见性取值非法：${label} 必须为 public 或 private`);
+  }
 }
 
-function isProduction() {
-  return process.env.NODE_ENV === 'production';
+// previous 允许 undefined / null / ''（等同 public，由调用方归一化）；其余必须为合法可见性。
+function assertLegalPrevious(value, label) {
+  if (value === undefined || value === null || value === '') return;
+  if (!VALID_VISIBILITY.has(value)) {
+    throw new VisibilityError(`可见性取值非法：${label} 必须为 public 或 private`);
+  }
 }
 
-// 保护“新的私密写入”。
-//   nextVisibility     : 即将落库的值（public / private）。
-//   previousVisibility : 改动前已存储的值（新行可为 undefined / null）。
-// 规则：
-//   - 非 private：始终放行。
-//   - 已经是 private（含编辑时遗漏 visibility 而保留的旧 private）：不算新的私密写入，放行，不被重置。
-//   - 新的 private 写入：按部署模式决定是否放行。
+// 兼容入口：公开/私密已是常规业务，私密写入不再受部署模式门禁限制，也永不在本层阻止 private。
+// 仅做可见性取值的合法性校验，确保 next 为合法可见性、previous 为合法可见性或缺失值。
+// 非法的可见性值（如 'secret'、undefined 的 next）仍在此层拒绝，交由调用方统一错误映射处理。
+// 调用方负责 BEGIN / ROLLBACK / COMMIT 与角色/权限校验。
 export function assertPrivateWriteAllowed(nextVisibility, previousVisibility) {
-  if (nextVisibility !== PRIVATE) return;
-  if (normalizeVisibility(previousVisibility) === PRIVATE) return;
-  // 写入资格由路由的管理员权限校验负责；读取仍走 canViewPrivate 等角色校验。
-  // business 只承诺应用接口内的访问控制，不改变对象存储/CDN 策略。
-  if (RESOLVED_MODE === 'business') return;
-  if (RESOLVED_MODE === 'off') throw new PrivateWriteDisabledError();
-  if (RESOLVED_MODE === 'local-preview') {
-    if (isProduction()) throw new PrivateWriteDisabledError('私密内容功能仅本地预览环境开放');
-    return;
-  }
-  if (RESOLVED_MODE === 'enforced') {
-    // enforced 暂禁：暂按未开放处理。
-    throw new PrivateWriteDisabledError('私密内容功能暂未开放');
-  }
-  throw new PrivateWriteDisabledError();
+  assertLegalVisibility(nextVisibility, 'nextVisibility');
+  assertLegalPrevious(previousVisibility, 'previousVisibility');
 }
 
 // 父课程是否因本次改动“新变为”私密（之前不是 private，现在变成 private）。
 export function courseBecamePrivate(nextVisibility, previousVisibility) {
   return (
-    normalizeVisibility(nextVisibility) === PRIVATE &&
-    normalizeVisibility(previousVisibility) !== PRIVATE
+    normalizeStoredVisibility(nextVisibility) === PRIVATE &&
+    normalizeStoredVisibility(previousVisibility) !== PRIVATE
   );
 }
 
@@ -103,15 +87,18 @@ export async function findPrivatePartPrerequisiteConflicts(client, type, partId)
   return result.rows;
 }
 
-// 在父课程锁内、P 保存之后调用：刷新派生可见性，并对“新变私密”做两道保护：
-//   1) 私密写入开关（assertPrivateWriteAllowed）；2) 现有前置引用冲突（409 回滚）。
-// 调用方负责 BEGIN / ROLLBACK（出错时）/ COMMIT。
+// 私密写入开关（assertPrivateWriteAllowed）与前置引用冲突（PREREQUISITE_CONFLICT）已取消：
+// 公开/私密为常规业务，私密变更不再被模式门禁或前置引用阻断（前置维护/作业资格由各自
+// helper 区分，见 content-object-access.js）。本函数仅刷新派生可见性并返回，
+// 由调用方负责 BEGIN / ROLLBACK（出错时）/ COMMIT。previousVisibility 保留以兼容旧调用签名。
 export async function finalizeCourseVisibility(client, type, courseId, previousVisibility) {
-  const refreshed = await refreshCourseVisibility(client, type, courseId);
-  if (!courseBecamePrivate(refreshed.visibility, previousVisibility)) return refreshed;
-  assertPrivateWriteAllowed(PRIVATE, previousVisibility);
-  if (await hasPrerequisiteReferences(client, type, courseId)) {
-    throw new PrerequisiteConflictError();
-  }
-  return refreshed;
+  const course = await refreshCourseVisibility(client, type, courseId);
+  await refreshCollectionsForCourse(client, type, courseId);
+  return course;
+}
+
+// 私密内容（公开/私密）已是常规业务功能，不再有部署模式开关。
+// 固定返回 'business'：表示私密写入作为业务功能开放，访问控制由角色/权限校验负责。
+export function validatePrivacyConfiguration() {
+  return 'business';
 }

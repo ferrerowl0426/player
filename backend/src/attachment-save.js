@@ -22,12 +22,6 @@ export async function saveContentAttachments({ pool, objectType, objectId, value
       if (previous && actualKey !== previous.file_key) throw new VisibilityError('替换文件须作为新附件上传，不可修改已有附件key');
       const visibility = resolveVisibilityInput(input.visibility, previous?.visibility);
       assertPrivateWriteAllowed(visibility, previous?.visibility);
-      if (visibility === 'private') {
-        const shared = await client.query(`SELECT 1 FROM content_attachments WHERE file_key=$1 AND NOT(object_type=$2 AND object_id=$3)
-          UNION ALL SELECT 1 FROM video_attachments WHERE file_key=$1
-          UNION ALL SELECT 1 FROM library_resources WHERE file_key=$1 LIMIT 1`, [actualKey, objectType, objectId]);
-        if (shared.rows.length) throw new VisibilityError('共用文件不能单独设为私密，请上传独立文件', 'SHARED_ATTACHMENT');
-      }
       const name = String(input.fileName ?? input.file_name ?? previous?.file_name ?? '').trim();
       if (!name) throw new VisibilityError('附件名称不能为空');
       const type = String(input.fileType ?? input.file_type ?? previous?.file_type ?? '');

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canReadContentObject, canAssignContentObject } from './content-object-access.js';
+import { canReadContentObject, canAssignContentObject, canMaintainPrerequisite } from './content-object-access.js';
 test('all polymorphic read types use bound IDs and fail closed on missing records', async () => {
   for (const type of ['track_point', 'knowledge_point', 'track_part', 'knowledge_part', 'track_collection', 'knowledge_collection', 'video']) {
     let captured;
@@ -30,4 +30,29 @@ test('canAssignContentObject is independent of caller role (no staff short-circu
   // The guest viewer must be fixed: passing a staff viewer to canReadContentObject
   // short-circuits, but canAssignContentObject must not accept any viewer argument.
   assert.equal(canAssignContentObject.length, 3, 'assignability takes (client, type, id) only');
+});
+
+test('canMaintainPrerequisite checks real object existence per type and allows private (no role bypass)', async () => {
+  const existing = {
+    query: async (sql, params) => {
+      assert.match(sql, /SELECT 1 FROM (track_points|knowledge_points|track_parts|knowledge_parts|track_collections|knowledge_collections|videos) WHERE id=\$1/);
+      assert.deepEqual(params, [7]);
+      return { rows: [{}], rowCount: 1 };
+    }
+  };
+  const missing = { query: async () => ({ rows: [], rowCount: 0 }) };
+  for (const type of ['track_point', 'knowledge_point', 'track_part', 'knowledge_part', 'track_collection', 'knowledge_collection', 'video']) {
+    assert.equal(await canMaintainPrerequisite(existing, type, 7), true, `${type} exists`);
+  }
+  assert.equal(await canMaintainPrerequisite(missing, 'track_point', 7), false, 'missing object -> false');
+  assert.equal(await canMaintainPrerequisite(existing, 'invalid', 7), false, 'unknown type -> false');
+});
+
+test('canMaintainPrerequisite is distinct from canAssignContentObject (no visibility gating)', async () => {
+  // A private object (no public-read rows) is still maintainable, but not assignable.
+  const client = {
+    query: async (sql) => (/SELECT 1 FROM \w+ WHERE id=\$1/.test(sql) ? { rows: [{}], rowCount: 1 } : { rows: [], rowCount: 0 })
+  };
+  assert.equal(await canMaintainPrerequisite(client, 'track_point', 3), true, 'private target is maintainable');
+  assert.equal(await canAssignContentObject(client, 'track_point', 3), false, 'private target is not assignable');
 });

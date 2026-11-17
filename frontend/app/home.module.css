@@ -547,6 +547,35 @@
   color: var(--coffee);
 }
 
+/* 失效占位：静态浅灰框，无封面图/开始学习/hover 上浮/点击态。 */
+.home :global(.hw.hw-disabled) {
+  cursor: default;
+  pointer-events: none;
+  background: #f2f2f0;
+  border-color: #e3e3df;
+  box-shadow: none;
+  transition: none;
+}
+
+.home :global(.hw.hw-disabled:hover) {
+  border-color: #e3e3df;
+  box-shadow: none;
+}
+
+.home :global(.hw-disabled .cover-disabled) {
+  background: #e8e8e5;
+}
+
+.home :global(.hw-disabled .cover-disabled .go),
+.home :global(.hw-disabled .cover-disabled .p-tag),
+.home :global(.hw-disabled .cover-disabled .kind-chip) {
+  display: none;
+}
+
+.home :global(.hw-disabled .nm) {
+  color: var(--ink-3);
+}
+
 .home :global(.hw-empty) {
   grid-column: 1/-1;
   display: flex;

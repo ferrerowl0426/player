@@ -278,40 +278,22 @@ function normalizeMultipartParts(parts) {
 
 function formatVideoResponse(video, options = {}) {
   const videoUrl = normalizePublicUrl(video.video_url);
-  if (options.private) {
-    // 私密视频：不下发永久公开 COS/CDN 地址，改为授权端点占位（阶段 E）。
-    return {
-      ...video,
-      video_url: '',
-      play_url: '',
-      cover_url: normalizePublicUrl(video.cover_url),
-      authorize_endpoint: `/api/playback/videos/${video.id}/play-url?source=video`
-    };
-  }
+  // 可见性仅为业务展示（阶段 A/B 已是实际文件）：始终返回经 CDN 转换后的原 COS 公开播放地址，
+  // 不再按可见性剥离永久 URL。未授权访问由上层 isVideoAccessible 以 404 拦截。
   return {
     ...video,
     video_url: videoUrl,
     cover_url: normalizePublicUrl(video.cover_url),
-    // 兼容式新增：CDN 播放地址；原 video_url 仍保留 COS 原值。
     play_url: toPlaybackUrl(videoUrl)
   };
 }
 
 function formatRenditionResponse(rendition, options = {}) {
   const videoUrl = normalizePublicUrl(rendition.video_url);
-  if (options.private) {
-    // 私密清晰度：不下发永久地址，改为授权端点占位（阶段 E）。
-    return {
-      ...rendition,
-      video_url: '',
-      play_url: '',
-      authorize_endpoint: `/api/playback/videos/${rendition.video_id || ''}/play-url?source=rendition&quality=${encodeURIComponent(rendition.quality || 'source')}`
-    };
-  }
+  // 可见性仅为业务展示：始终返回经 CDN 转换后的原 COS 公开播放地址，不再按可见性剥离永久 URL。
   return {
     ...rendition,
     video_url: videoUrl,
-    // 兼容式新增：CDN 播放地址 play_url；原 video_url 仍保留 COS 原值。
     play_url: toPlaybackUrl(videoUrl)
   };
 }
@@ -968,10 +950,8 @@ videoRouter.get('/:id', optionalContentViewer, requireUserOrAdmin, async (req, r
       res.status(404).json({ message: '视频不存在' });
       return;
     }
-    // 是否公开可达：决定是否对当前访问者下发永久播放地址，还是改为授权端点占位。
-    // fail-closed：视频被任意私密宿主关联时，不再下发永久播放地址（共享视频亦同）。
-    const publiclyReadable = associations.rows.length === 0
-      || associations.rows.every((row) => normalizeStoredVisibility(row.course_visibility) === PUBLIC && normalizeStoredVisibility(row.part_visibility) === PUBLIC);
+    // 可见性仅为业务展示（阶段 A/B 已是实际文件）：授权访问者（已通过上方 isVideoAccessible 校验）
+    // 始终拿到经 CDN 转换后的原 COS 公开播放地址，不再按可见性剥离永久 URL。
 
     const attachmentsResult = await pool.query(
       `SELECT id, file_name, file_url, file_key, file_type, file_size, visibility, created_at
@@ -1015,10 +995,10 @@ videoRouter.get('/:id', optionalContentViewer, requireUserOrAdmin, async (req, r
 
     res.json({
       data: {
-        ...formatVideoResponse(result.rows[0], { private: !publiclyReadable }),
+        ...formatVideoResponse(result.rows[0]),
         attachments: serializeAttachments(attachmentsResult.rows, req.contentViewer, 'video'),
         prerequisites: prerequisitesResult.rows,
-        renditions: renditionsResult.rows.map((row) => formatRenditionResponse(row, { private: !publiclyReadable })),
+        renditions: renditionsResult.rows.map((row) => formatRenditionResponse(row)),
         descendantVideoIds: descendantsResult.rows.map((row) => row.id)
       }
     });

@@ -122,7 +122,7 @@ export default function KnowledgeCollectionPage() {
   if (status) {
     return (
       <>
-        <AppNav role={viewer.role || 'guest'} accountName={accountName} />
+        <AppNav role={viewer.role || 'guest'} accountName={accountName} username={viewer?.username} />
         <main className="home"><p className="empty-text">{status}</p></main>
       </>
     );
@@ -130,7 +130,7 @@ export default function KnowledgeCollectionPage() {
 
   return (
     <>
-      <AppNav role={viewer.role || 'guest'} accountName={accountName} />
+      <AppNav role={viewer.role || 'guest'} accountName={accountName} username={viewer?.username} />
       <main className="home collection-detail-home">
         <div className="crumb rise">
           <Link href="/knowledge">知识点区</Link>

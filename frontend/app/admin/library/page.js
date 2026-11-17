@@ -230,7 +230,7 @@ function AdminLibraryContent() {
 
   return (
     <>
-      <AppNav role="super_admin" accountName={admin?.nickname || admin?.username || '教导主任'} />
+      <AppNav role="super_admin" accountName={admin?.nickname || admin?.username || '教导主任'} username={admin?.username} />
       <main className={styles.adminWrap}>
         <form className="wizard rise" onSubmit={submit} noValidate>
           <div className="wiz-head">

@@ -10,11 +10,11 @@ import {
   normalizeStoredVisibility,
   PRIVATE,
   resolveVisibilityInput,
-  lockCourse,
-  refreshCourseVisibility
+  lockVisibilityFamilies,
+  refreshCourseVisibility,
+  refreshCollectionVisibility
 } from './content-visibility.js';
 import {
-  assertPrivateWriteAllowed,
   finalizeCourseVisibility,
   findPrivatePartPrerequisiteConflicts,
   PrerequisiteConflictError
@@ -32,9 +32,7 @@ import {
 } from './storage.js';
 import { createInitialRenditions, deleteVideoObjects } from './transcode.js';
 import { toPlaybackUrl } from './playback-url.js';
-import { filterPubliclyReadableVideos } from './playback-access.js';
 import { deleteWithReferences } from './deletion.js';
-import { recordVisibilityRevocations, getVideoObjectKeys } from './revocation.js';
 
 function id(value) {
   const number = Number(value);
@@ -144,36 +142,13 @@ async function pointParts(pointId, canView = true) {
     }
   }
 
-  // 共享视频：任一宿主私密即视为私密（fail-closed）。非授权查看者需据此抹掉永久播放地址。
-  // 授权查看者（教师/主任）本就能看私密内容，无需额外拦截。
-  const publiclyReadableVideos = (videoIds.length > 0)
-    ? await filterPubliclyReadableVideos(pool, videoIds)
-    : null;
-
+  // 可见性仅为业务展示（阶段 A/B 已是实际文件）：所有返回的 P 均返回经 CDN 转换后的
+  // 原 COS 公开播放地址，不再按可见性剥离永久 URL。学生等未授权查看者已在上面的
+  // SQL visibilityFilter 中过滤掉私密 P，不会拿到私密记录。
   return rows.map((row) => {
     const renditions = (renditionsByVideoId.get(row.video_id) || []).map((rendition) => ({ ...rendition }));
-    if (isPartPlaybackCleared(row, canView, publiclyReadableVideos)) {
-      // 私密 P / 共享私密宿主：返回 video_id 与 visibility，但清空永久 video_url / play_url
-      // 与转码 URL，交由前端经授权端点（/playback/videos/:id/play-url）播放。
-      return {
-        ...mapPart(row),
-        video_url: '',
-        play_url: '',
-        visibility: PRIVATE,
-        renditions: renditions.map((rendition) => ({ ...rendition, video_url: '', play_url: '' }))
-      };
-    }
     return { ...mapPart(row), renditions };
   });
-}
-
-// 是否应抹掉该 P 的永久播放地址（fail-closed）：
-//   - 私密 P：一律抹掉（教师/主任也走授权端点，由 /playback 端点按角色放行）。
-//   - 公开 P 但所属视频存在任意私密宿主：非授权查看者抹掉（共享视频 fail-closed）。
-function isPartPlaybackCleared(row, canView, publiclyReadableVideos) {
-  if (normalizeStoredVisibility(row.visibility) === PRIVATE) return true;
-  if (publiclyReadableVideos && !publiclyReadableVideos.has(row.video_id)) return true;
-  return false;
 }
 
 async function pointCollections(pointId) {
@@ -402,6 +377,12 @@ knowledgeRouter.get('/collections/:id', optionalContentViewer, async (req, res, 
       pool.query(sql, params),
       linkedLibraryResources('knowledge_collection', collectionId)
     ]);
+    // 学生/游客：合集内无任何可见（公开）知识点即视为无公开课程，按 404 隐藏。
+    // 管理员（可看私密）即便空合集也可读取（管理可读空私密）。
+    if (!canView && points.rows.length === 0) {
+      res.status(404).json({ message: '知识点集不存在' });
+      return;
+    }
     res.json({ data: { ...mapContent(collection), points: points.rows.map(mapContent), attachments: await attachments('knowledge_collection', collectionId, req.contentViewer), library_resources: libraryResources } });
   } catch (error) {
     next(error);
@@ -462,8 +443,8 @@ knowledgeRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       return;
     }
     await client.query('BEGIN');
-    // 锁父（知识点）后保存再刷新派生可见性。
-    await lockCourse(client, 'knowledge_point', pointId);
+    // 阶段B：事务首条即锁 knowledge 全局可见性家族（共享 helper），避免与合集刷新产生锁序死锁。
+    await lockVisibilityFamilies(client, ['knowledge']);
     const previousVisibility = (await client.query('SELECT visibility FROM knowledge_points WHERE id = $1 FOR UPDATE', [pointId])).rows[0]?.visibility;
     const result = await client.query(
       `UPDATE knowledge_points SET name = $1, cover = $2, description = $3, updated_at = CURRENT_TIMESTAMP
@@ -471,7 +452,9 @@ knowledgeRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       [name, text(req.body.cover), text(req.body.description), pointId]
     );
     // 刷新派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
-    await finalizeCourseVisibility(client, 'knowledge_point', pointId, previousVisibility);
+    // 主代理将在 finalize 内统一刷新关联合集，本处不重复刷新。
+    const refreshedCourse = await finalizeCourseVisibility(client, 'knowledge_point', pointId, previousVisibility);
+    if (refreshedCourse?.visibility) result.rows[0].visibility = refreshedCourse.visibility;
     await client.query('COMMIT');
     res.json({ data: mapContent(result.rows[0]) });
   } catch (error) {
@@ -505,10 +488,21 @@ knowledgeRouter.delete('/:id', requireSuperAdmin, async (req, res, next) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // 阶段B：事务首条即锁 knowledge 全局可见性家族（共享 helper）。
+      await lockVisibilityFamilies(client, ['knowledge']);
+      // 删除前（事务内）先收集所有关联合集 ID，供删除后同事务刷新其派生可见性。
+      const relatedCollectionIds = (await client.query(
+        'SELECT DISTINCT collection_id FROM knowledge_collection_items WHERE knowledge_point_id = $1',
+        [pointId]
+      )).rows.map((row) => row.collection_id);
       await deleteWithReferences(client, { objectType: 'knowledge_point', objectId: pointId, objectTitle: point.rows[0].name, adminId: req.admin.adminId });
       await client.query('DELETE FROM knowledge_points WHERE id = $1', [pointId]);
       for (const video of videos.rows) {
         await client.query('DELETE FROM videos WHERE id = $1', [video.id]);
+      }
+      // 删除后同事务刷新所有关联合集的派生可见性（该路径主代理不统一刷新）。
+      for (const collectionId of relatedCollectionIds) {
+        await refreshCollectionVisibility(client, 'knowledge_collection', collectionId);
       }
       await client.query('COMMIT');
     } catch (error) {
@@ -524,43 +518,64 @@ knowledgeRouter.delete('/:id', requireSuperAdmin, async (req, res, next) => {
 });
 
 knowledgeRouter.post('/collections', requireSuperAdmin, async (req, res, next) => {
+  const name = text(req.body.name);
+  if (!name) {
+    res.status(400).json({ message: '请填写知识点集名称' });
+    return;
+  }
+  const client = await pool.connect();
   try {
-    const name = text(req.body.name);
-    if (!name) {
-      res.status(400).json({ message: '请填写知识点集名称' });
-      return;
-    }
-    const result = await pool.query(
+    await client.query('BEGIN');
+    // 阶段B：事务首条即锁 knowledge 全局可见性家族（共享 helper）。
+    await lockVisibilityFamilies(client, ['knowledge']);
+    const result = await client.query(
       `INSERT INTO knowledge_collections (name, cover, description) VALUES ($1, $2, $3)
        RETURNING id, name, cover, description, created_at, updated_at`,
       [name, text(req.body.cover), text(req.body.description)]
     );
+    // 新建空合集无公开知识点，刷新得到派生可见性（应为 private）。
+    await refreshCollectionVisibility(client, 'knowledge_collection', result.rows[0].id);
+    await client.query('COMMIT');
     res.status(201).json({ data: mapContent(result.rows[0]) });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     next(error);
+  } finally {
+    client.release();
   }
 });
 
 knowledgeRouter.patch('/collections/:id', requireSuperAdmin, async (req, res, next) => {
+  const collectionId = id(req.params.id);
+  const name = text(req.body.name);
+  if (!collectionId || !name) {
+    res.status(400).json({ message: '知识点集参数无效' });
+    return;
+  }
+  const client = await pool.connect();
   try {
-    const collectionId = id(req.params.id);
-    const name = text(req.body.name);
-    if (!collectionId || !name) {
-      res.status(400).json({ message: '知识点集参数无效' });
-      return;
-    }
-    const result = await pool.query(
+    await client.query('BEGIN');
+    // 阶段B：事务首条即锁 knowledge 全局可见性家族（共享 helper）。
+    await lockVisibilityFamilies(client, ['knowledge']);
+    const result = await client.query(
       `UPDATE knowledge_collections SET name = $1, cover = $2, description = $3, updated_at = CURRENT_TIMESTAMP
        WHERE id = $4 RETURNING id, name, cover, description, created_at, updated_at`,
       [name, text(req.body.cover), text(req.body.description), collectionId]
     );
     if (!result.rowCount) {
+      await client.query('ROLLBACK');
       res.status(404).json({ message: '知识点集不存在' });
       return;
     }
+    // 编辑不改变成员，但仍统一刷新派生可见性。
+    await refreshCollectionVisibility(client, 'knowledge_collection', collectionId);
+    await client.query('COMMIT');
     res.json({ data: mapContent(result.rows[0]) });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     next(error);
+  } finally {
+    client.release();
   }
 });
 
@@ -579,6 +594,8 @@ knowledgeRouter.delete('/collections/:id', requireSuperAdmin, async (req, res, n
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // 阶段B：事务首条即锁 knowledge 全局可见性家族（共享 helper）。
+      await lockVisibilityFamilies(client, ['knowledge']);
       await deleteWithReferences(client, { objectType: 'knowledge_collection', objectId: collectionId, objectTitle: existing.rows[0].name, adminId: req.admin.adminId });
       await client.query('DELETE FROM knowledge_collections WHERE id = $1', [collectionId]);
       await client.query('COMMIT');
@@ -600,6 +617,8 @@ knowledgeRouter.patch('/collections/:id/points', requireSuperAdmin, async (req, 
     const collectionId = id(req.params.id);
     const pointIds = orderedIds(req.body.pointIds);
     await client.query('BEGIN');
+    // 阶段B：事务首条即锁 knowledge 全局可见性家族（共享 helper）。
+    await lockVisibilityFamilies(client, ['knowledge']);
     if (!(await client.query('SELECT 1 FROM knowledge_collections WHERE id = $1', [collectionId])).rowCount) {
       await client.query('ROLLBACK');
       res.status(404).json({ message: '知识点集不存在' });
@@ -620,6 +639,8 @@ knowledgeRouter.patch('/collections/:id/points', requireSuperAdmin, async (req, 
       );
     }
     await client.query('UPDATE knowledge_collections SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [collectionId]);
+    // 成员替换改变合集可见性派生，刷新关联合集派生可见性。
+    await refreshCollectionVisibility(client, 'knowledge_collection', collectionId);
     await client.query('COMMIT');
     res.json({ data: { collectionId, pointIds } });
   } catch (error) {
@@ -761,13 +782,9 @@ knowledgeRouter.post('/:id/parts', requireSuperAdmin, async (req, res, next) => 
     // 新 P 缺省 public；显式 private 受私密写入开关保护。
     const partVisibility = resolveVisibilityInput(req.body.visibility, undefined);
     await client.query('BEGIN');
-    // 锁父（知识点）后保存并刷新派生可见性。
-    await lockCourse(client, 'knowledge_point', pointId);
+    // 阶段B：事务首条即锁 knowledge 全局可见性家族（共享 helper）。
+    await lockVisibilityFamilies(client, ['knowledge']);
     const previousVisibility = (await client.query('SELECT visibility FROM knowledge_points WHERE id = $1 FOR UPDATE', [pointId])).rows[0]?.visibility;
-    // 新私密写入（之前不存在该 P）需经开关保护。
-    if (partVisibility === PRIVATE) {
-      assertPrivateWriteAllowed(PRIVATE, undefined);
-    }
     const videoHead = await ensureObjectExists(key);
     const video = (await client.query(
       `INSERT INTO videos (title, description, video_url, cover_url) VALUES ($1, $2, $3, '') RETURNING id, video_url`,
@@ -819,8 +836,8 @@ knowledgeRouter.patch('/:id/parts/:partId', requireSuperAdmin, async (req, res, 
       return;
     }
     await client.query('BEGIN');
-    // 锁父（知识点）后保存并刷新派生可见性。
-    await lockCourse(client, 'knowledge_point', pointId);
+    // 阶段B：事务首条即锁 knowledge 全局可见性家族（共享 helper）。
+    await lockVisibilityFamilies(client, ['knowledge']);
     const previousVisibility = (await client.query('SELECT visibility FROM knowledge_points WHERE id = $1 FOR UPDATE', [pointId])).rows[0]?.visibility;
     const currentPart = await client.query('SELECT visibility FROM knowledge_parts WHERE id = $1 AND knowledge_point_id = $2 FOR UPDATE', [partId, pointId]);
     if (!currentPart.rowCount) {
@@ -828,27 +845,10 @@ knowledgeRouter.patch('/:id/parts/:partId', requireSuperAdmin, async (req, res, 
       res.status(404).json({ message: '知识点 P 不存在' });
       return;
     }
-    // 缺省保留旧值；显式改私密（之前非 private）受开关保护。
+    // 缺省保留旧值；私密写入为常规业务，不再受模式门禁或前置引用冲突阻断。
+    // 可见性仅为业务展示：改为私密不再记录待撤销直链（recordVisibilityRevocations 调用已移除），
+    // 视频原 COS+CDN 地址照常保留，前端无需走授权端点即可播放。
     const partVisibility = resolveVisibilityInput(req.body.visibility, currentPart.rows[0].visibility);
-    const partBecamePrivate = partVisibility === PRIVATE && normalizeStoredVisibility(currentPart.rows[0].visibility) !== PRIVATE;
-    if (partBecamePrivate) {
-      assertPrivateWriteAllowed(PRIVATE, currentPart.rows[0].visibility);
-      // P 改私密会令其失公开，若该 P 正被其它内容作为前置项引用，须阻止并回滚。
-      const conflicts = await findPrivatePartPrerequisiteConflicts(client, 'knowledge_point', partId);
-      if (conflicts.length > 0) {
-        throw new PrerequisiteConflictError('该知识点 P 正被其它内容作为前置项引用，无法转为私密，请先移除相关前置项');
-      }
-      // 记录需撤销的旧公开直链（视频原画 + 转码 + 封面），供云端 purge 与授权回收（E04）。
-      const videoIdResult = await client.query('SELECT video_id FROM knowledge_parts WHERE id = $1', [partId]);
-      const revokedVideoId = videoIdResult.rows[0]?.video_id;
-      if (revokedVideoId) {
-        const keys = await getVideoObjectKeys(client, revokedVideoId);
-        await recordVisibilityRevocations(client, {
-          objectType: 'knowledge_part', objectId: partId, keys,
-          reason: '知识点 P 改为私密，撤销旧公开直链', adminId: req.admin.adminId
-        });
-      }
-    }
     const result = await client.query(
       `UPDATE knowledge_parts SET part_no = $1, title = $2, duration = $3, visibility = $4, updated_at = CURRENT_TIMESTAMP
        WHERE id = $5 AND knowledge_point_id = $6 RETURNING id, knowledge_point_id, part_no, video_id, title, duration, visibility, created_at, updated_at`,
@@ -894,8 +894,8 @@ knowledgeRouter.delete('/:id/parts/:partId', requireSuperAdmin, async (req, res,
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      // 锁父（知识点）后删除 P 并刷新派生可见性。
-      await lockCourse(client, 'knowledge_point', pointId);
+      // 阶段B：事务首条即锁 knowledge 全局可见性家族（共享 helper）。
+      await lockVisibilityFamilies(client, ['knowledge']);
       const previousVisibility = (await client.query('SELECT visibility FROM knowledge_points WHERE id = $1 FOR UPDATE', [pointId])).rows[0]?.visibility;
       // 删除 P 前：若该 P 正被其它内容作为前置项引用，删除会使前置关系失效，须阻止。
       const partPrereqConflicts = await findPrivatePartPrerequisiteConflicts(client, 'knowledge_point', partId);

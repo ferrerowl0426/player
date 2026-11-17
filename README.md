@@ -72,13 +72,9 @@ README 只记录当前代码状态、启动方式、已完成阶段和接手注�
 
 ### 2.3 数据迁移规则
 
-开发环境不做旧测试数据迁移。
+M0早期曾采用废弃测试数据后重新建表和seed的方式，此规则仅属历史，不适用于当前存量业务库或生产桶。
 
-M0 的约定是：
-
-- 删除旧测试数据。
-- 清空 MinIO / COS 存储桶。
-- 按新模型重新建表和 seed。
+当前涉及字段变更，应先备份、在隔离副本演练、再显式执行对应版本迁移；禁止因升级而清空数据库、MinIO/COS桶或Docker数据卷。确需重建测试数据时，必须另行确认范围并使用精确清理流程。
 
 ---
 
@@ -165,7 +161,9 @@ CI_CALLBACK_SECRET=<数据万象回调密钥，见第 17 节>
 
 - [debug复盘/2026-09-20-服务器部署问题复盘.md](file:///c:/Users/user/Desktop/播放器/debug复盘/2026-09-20-服务器部署问题复盘.md)
 
-### 3.2 服务器更新代码的标准流程
+### 3.2 服务器更新代码的历史流程与当前门禁
+
+> **以下命令记录历史部署方式，当前不得直接照抄用于发布。** `docker-compose.local.yml`仍强制development；生产需先制定/核对不含该覆盖的Compose配置，同时保留确实需要的服务、卷和网络，不能简单删掉覆盖文件后假定部署等价。本轮只更新文档，未修复Compose或核验服务器。含schema变更时必须先备份，用包含新版迁移脚本的镜像/受控迁移环境演练并迁移，最后才启动新后端。
 
 ```bash
 cd /root/player
@@ -186,7 +184,7 @@ docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml
 >
 > - 生产容器名是全下划线（`video_player_backend` / `video_player_postgres`），先 `docker ps --format "{{.Names}}"` 确认。
 > - 迁移前先 `pg_dump` 备份。
-> - 迁移幂等可重复：`docker exec video_player_backend node scripts/migrate-content-visibility.js --apply`；若后端正崩溃循环进不去，改在 postgres 容器内用 psql 执行等价 SQL（见复盘文档）。
+> - 迁移脚本可重复执行，但须确认运行环境包含**本次八表版本**；旧运行容器的六表脚本不会补齐合集字段。可用新版镜像的一次性迁移任务，或在postgres执行已审阅的本次等价SQL；不依赖崩溃中的后端容器。历史复盘SQL需与当前脚本比对，不能照抄旧版。
 
 ---
 
@@ -339,23 +337,23 @@ $env:PORT='3001'; npm run dev
 
 测试数据账号以 [test-data/TEST_ACCOUNTS.md](file:///c:/Users/user/Desktop/播放器/test-data/TEST_ACCOUNTS.md) 为准；登录页左侧也有一个临时“测试账号”提示卡片，代码里已标注后续上线 / 交付前可整块删除。
 
-当前所有演示账号密码统一为：
+当前所有演示账号密码统一为（测试环境统一演示密码，详见 [test-data/TEST_ACCOUNTS.md](file:///c:/Users/user/Desktop/播放器/test-data/TEST_ACCOUNTS.md)）：
 
 ```txt
-demo123
+<测试环境统一演示密码>
 ```
 
 常用账号：
 
 | 身份 | 登录账号 | 内部测试标识 | 昵称 | 来源 | 密码 |
 |---|---|---|---|---|---|
-| 初始超级管理员 | `admin` | `admin` | admin | 系统初始化 `ensureAppSchema` 仅在无超管时创建 | `demo123` |
-| 普通教导主任 / 普通管理员 | `13900000002` | `dean_yuhan` | 教务雨涵老师 | `test-data/seed.mjs` 注入 | `demo123` |
-| 老师 | `13900000011` | `teacher_luxiang` | 鲁祥老师 | `test-data/seed.mjs` 注入 | `demo123` |
-| 老师 | `13900000012` | `teacher_yuanyuan` | 缘缘老师 | `test-data/seed.mjs` 注入 | `demo123` |
-| 老师 | `13900000013` | `teacher_zhangning` | 张宁老师 | `test-data/seed.mjs` 注入 | `demo123` |
-| 内部测试学员 | `13776186160` / `13013811119` / `18362776877` / `13382800426` | `internal_student_yuhan` / `internal_student_luxiang` / `internal_student_zhangning` / `internal_student_yuanyuan` | 学生雨涵 / 学生鲁详 / 学生张宁 / 学生缘缘 | `test-data/seed.mjs` 注入（能学慧内部测试班，账号表置顶） | `demo123` |
-| 学员 | `13800001001` ~ `13800001016` | `test_student_01` ~ `test_student_16` | 见账号表 | `test-data/seed.mjs` 注入 | `demo123` |
+| 初始超级管理员 | `admin` | `admin` | admin | 系统初始化 `ensureAppSchema` 仅在无超管时创建 | `<测试环境统一演示密码>` |
+| 普通教导主任 / 普通管理员 | `13900000002` | `dean_yuhan` | 教务雨涵老师 | `test-data/seed.mjs` 注入 | `<测试环境统一演示密码>` |
+| 老师 | `13900000011` | `teacher_luxiang` | 鲁祥老师 | `test-data/seed.mjs` 注入 | `<测试环境统一演示密码>` |
+| 老师 | `13900000012` | `teacher_yuanyuan` | 缘缘老师 | `test-data/seed.mjs` 注入 | `<测试环境统一演示密码>` |
+| 老师 | `13900000013` | `teacher_zhangning` | 张宁老师 | `test-data/seed.mjs` 注入 | `<测试环境统一演示密码>` |
+| 内部测试学员 | `13776186160` / `13013811119` / `18362776877` / `13382800426` | `internal_student_yuhan` / `internal_student_luxiang` / `internal_student_zhangning` / `internal_student_yuanyuan` | 学生雨涵 / 学生鲁详 / 学生张宁 / 学生缘缘 | `test-data/seed.mjs` 注入（能学慧内部测试班，账号表置顶） | `<测试环境统一演示密码>` |
+| 学员 | `13800001001` ~ `13800001016` | `test_student_01` ~ `test_student_16` | 见账号表 | `test-data/seed.mjs` 注入 | `<测试环境统一演示密码>` |
 
 口径说明：
 
@@ -364,6 +362,8 @@ demo123
 - `username = admin` 且 `role = super_admin` 的默认超管账号**禁止删除**，接口会返回「默认教导主任账号不可删除」。
 - `seed.mjs` 只负责注入普通教导主任、老师、学员和业务测试数据；`clean.mjs` 按 `manifest.json` 精确清理 seed 数据，不清理初始超级管理员。
 - 当前处于内部试用阶段：请重点验证老师布置作业、学生历史记录、学生学习首页、作业提交与查看；不要一次上传太多正式文件，正式上线前会清空测试数据重建。
+
+密码策略已接入：Web头像菜单与小程序“我的”支持本人凭旧密码改密；班级管理仅 root/教导主任可替权限范围内的其他账号重置为固定 `Nxh123456`，唯一 `admin` 禁改。密码变更原子递增 `auth_version`，旧 Cookie/Bearer 会话失效。首次部署必须备份并执行 `backend/scripts/migrate-auth-version.js`，再重建服务；不含版本字段的旧Token需要重新登录。隔离数据库真实HTTP集成25项检查通过；双端交互由用户验收，不能视为已完成真机验收。后端回归测试使用Node 22时须加 `--experimental-test-module-mocks`（测试使用 `mock.module`），不能只执行 `node --test`。详见 [实施计划与交接记录](docx/用户自助改密与固定密码重置实施计划.md)。
 
 登录页：
 
@@ -486,7 +486,7 @@ M0–M9 均已完成，当前进入整体回归修 bug 阶段。
 
 - 登录主卡片右侧展示，测试账号提示卡片在左侧独立展示，并带框内滚动。
 - 测试账号卡片由 `TEMP_TEST_ACCOUNTS` 维护，代码注释已注明“上线或交付前删除”。
-- 超管账号：`admin / demo123`；其余演示账号由 `test-data/seed.mjs` 注入。
+- 超管账号：`admin` / `<测试环境统一演示密码>`；其余演示账号由 `test-data/seed.mjs` 注入。
 - 登录表单文案使用“用户名 / 账号”，避免把初始超管误认为必须用手机号登录。
 - 密码可见性按钮使用内联 SVG。
 
@@ -639,7 +639,7 @@ M5 已完成，后续修 bug 时不要破坏这些规则：
 8. 跨页面复用样式才放 [design-system.css](file:///c:/Users/user/Desktop/播放器/frontend/app/design-system.css)。
 9. 不要重写分片上传，调用 [uploadVideo.js](file:///c:/Users/user/Desktop/播放器/frontend/components/uploadVideo.js) 现有能力。
 10. 不要修改 [storage.js](file:///c:/Users/user/Desktop/播放器/backend/src/storage.js) 的核心对象存储流程，除非 PRD 明确要求。
-11. 不要做旧数据迁移，测试环境清空重建。
+11. 保留存量数据；字段升级先备份及隔离演练再迁移，不沿用M0清空重建约定。
 12. 写接口必须后端鉴权，前端隐藏入口不算安全。
 13. 后续启动端口固定：后端 `3000`，前端 `3001`。
 14. 涉及服务器部署、生产 COS、生产环境变量、线上端口和反向代理配置时，不要凭猜测改 README 或配置；必须以当前部署文档 / 运维确认信息为准。
@@ -829,77 +829,98 @@ psql -U postgres -d video_player -c "SELECT video_id, quality, status, video_url
 | 2026-10-04 | 数据万象转码产物改为输出到源目录同级（`${InputPath}` + `${InputName}-720p/-1080p.${ext}`），修复工作流完成回调真实结构 `WorkflowExecution.Tasks[].ResultInfo.ObjectInfo[]` 解析，解决 COS 已生成转码文件但前端只显示原画的问题 |
 | 2026-10-28 | 分 P 公开/私密权限（后端 A–E 阶段）：`visibility` 字段与 `CONTENT_PRIVACY_MODE` 开关、课程公开性派生、前置/作业的私密资格校验、视频短期签名授权、`visibility_revocations` 撤销审计表。详见第 19 节 |
 | 2026-10-29 | 分 P 公开/私密权限（前端 F 阶段）：管理端曲目/知识点编辑页新增「公开/私密」切换按钮（分 P + 附件），报错提示带内容标题，修复合集封面叠层装饰误叠加、开关双重线框与高饱和配色问题 |
+| 2026-10-30 | 业务可见性细化：已布置/已有前置目标允许改私密（取消引用阻断）；学生前置隐藏、失效作业点击不跳转并 Toast「此课程已被老师更改」约 1600ms；附件独立私密、图书馆无私密；交付整改方案 MD（未实施代码） |
+| 2026-10-31 | 轻量实现阶段 A：新增合集 `visibility` 列 + 八表迁移 + schema 门禁，课程→合集派生刷新 helper；私密写入不再依赖 `CONTENT_PRIVACY_MODE`，前置维护允许私密目标 |
+| 2026-11-03 | 阶段 C 双端收尾：媒体改为有权限 P 正常 COS 源 + CDN，移除 TypeA 签名与 db 启动强校验，停止改私密撤销调用；新增 `assignment-navigation.js` 与两端 `/navigation` 实时资格端点；Web 今日页重复提示 1600ms、小程序历史私密 Toast |
+| 2026-11-09 | 密码流程计划：自助改密 + 固定 `Nxh123456` 重置、仅 root/教导主任在班级管理替他人重置、`admin` 禁改、重置即撤销全部 session —— 均仅计划（`docx/用户自助改密与固定密码重置实施计划.md`），未实施代码 |
+
+> 说明：2026-10-28 / 10-29 两条记录的是**最初「模式门禁」版本**的实现（当时 `CONTENT_PRIVACY_MODE` 仍作为开关、改私密会触发撤销）。2026-10-31 起已收敛为轻量业务可见性：`CONTENT_PRIVACY_MODE` 仅保留兼容、不再门禁，详见第 19 节。
 
 ---
 
-## 19. 分 P 公开 / 私密权限
+## 19. 分 P 公开 / 私密权限（轻量业务可见性）
 
-这是 M0–M9 之后新增的一套权限能力，围绕「单个 P（曲目 P / 知识点 P）可设为公开或私密」展开。核心口径：
+> 本节约 2026-10-28/29 最初的「模式门禁」设计做了大幅收敛：公开/私密已是常规业务能力，
+> `CONTENT_PRIVACY_MODE` 仅保留为兼容/诊断变量、不再门禁；有权限内容统一走正常
+> CDN/COS 源，不再强制私密短签 / TypeA / 改私密即撤销。变更时间线见第 18 节。
+> 下列说明区分可信度：① **本地代码已实现**（单测 / 本地 Docker 验证通过）；
+> ② **本地逻辑/方向约定**（代码已落地但仅本地验证）；③ **线上未独立核验**
+> （COS/CDN/生产库），不能据本地试用声称线上验收通过。
 
-- **公开 / 私密作用于 P 级**，课程（单曲目 / 单知识点）的可见性由「是否存在公开 P」派生，不单独存储课程开关。
-- 合集（曲谱集 / 知识点集）本身无 `visibility` 字段，其可见性由「是否包含至少一个公开子项」派生。
-- 游客、学员只能看到公开内容；老师、教导主任可查看私密内容，但**不能把私密内容布置为作业或设为前置项**。
+当前本地代码的轻量业务可见性口径：
+
+- **P 决定课程**：单曲目/单知识点的可见性由「是否存在至少一个公开 P」派生，写入课程 `visibility` **派生列**（非独立手动开关；每次 P 增删改后在事务内刷新）。
+- **课程决定合集**：曲谱集/知识点集的可见性由「是否包含至少一个公开课程（且含公开 P）」派生，写入合集 `visibility` 列（迁移脚本新增，刷新逻辑见 `content-visibility.js` 的 `refreshCollectionVisibility` / `refreshCollectionsForCourse`）。
+- **附件独立**：附件（曲目/知识点/视频附件）有独立 `visibility`，不参与课程/合集派生；私密附件仅有效老师/教导主任可授权下载。
+- **图书馆无私密**：`library_resources` 无 `visibility`，不受公开/私密体系约束。
+- **游客/学员只看公开**；老师/教导主任可看私密，但私密内容**不可作为作业布置目标**。
 
 ### 19.1 数据模型与字段
 
 | 表 | 字段 | 说明 |
 |---|---|---|
-| `track_parts` / `knowledge_parts` | `visibility` | `public` / `private`，P 级开关 |
-| `track_points` / `knowledge_points` | `visibility` | 派生可见性（由公开 P 刷新），非独立开关 |
-| `attachments` | `visibility` | 附件级公开/私密 |
-| `visibility_revocations` | — | 审计表，记录某内容改私密时需撤销的对象存储 key 清单 |
+| `track_parts` / `knowledge_parts` | `visibility` | `public` / `private`，P 级开关（源头） |
+| `track_points` / `knowledge_points` | `visibility` | **派生列**，由公开 P 刷新（有公开 P 即 `public`，否则 `private`） |
+| `track_collections` / `knowledge_collections` | `visibility` | **派生列**（迁移新增），由成员课程的派生可见性刷新 |
+| `content_attachments` / `video_attachments` | `visibility` | 附件级独立公开/私密，不参与课程/合集派生 |
+| `library_resources` | — | 无私密字段 |
+| `visibility_revocations` | — | **历史审计表保留**，但「改私密即记录待撤销直链」的调用已移除，不再据其声称已删除/撤回已签短链或已下载内容 |
 
-合集、前置关系、作业不新增独立 `visibility`，沿用派生口径。
+合集有落库的派生 `visibility` 字段；前置关系、作业不新增独立 `visibility`，读取时按目标当前可见性判断。
 
-### 19.2 部署模式开关
+### 19.2 部署模式开关（已收敛为兼容变量）
 
-环境变量 `CONTENT_PRIVACY_MODE` 控制「新的私密写入」是否放行：
+环境变量 `CONTENT_PRIVACY_MODE` **已不再作为任何门禁**。`content-privacy-config.js` 的
+`assertPrivateWriteAllowed` 只做可见性取值合法性校验、不再拦截 `private`；`validatePrivacyConfiguration`
+固定返回 `'business'`。该变量仅保留作诊断/兼容用途，生产部署**无需**设置它来「开启」私密。
 
-| 值 | 行为 |
-|---|---|
-| `off`（默认） | 拒绝新的私密写入；作为显式关闭开关 |
-| `business` | 允许生产环境保存私密 P 和附件；应用接口按角色过滤，不承诺旧 COS/CDN 直链保密 |
-| `local-preview` | 仅非生产环境允许私密写入，用于本地联调 |
-| `enforced` | 文件级强制模式，暂未开放，不可用于启动 |
+> 历史遗留值（`off` / `business` / `local-preview` / `enforced`）在代码里已无意义，不再区分行为。
+> 若旧部署文档仍要求设置 `CONTENT_PRIVACY_MODE=business`，可保留但属多余。
 
-业务私密：上传流程不变，仅保存 `visibility` 属性；有效老师/管理员可读取私密，学生/游客不可读取。前置引用冲突和作业资格限制继续生效，不能只在前端隐藏。
+业务私密：上传/编辑流程不变，仅保存 `visibility`；有效老师/管理员可读取私密，学生/游客不可读取，
+由后端角色/权限校验负责。前置维护允许私密目标引用；「改私密」不再被前置引用阻断（旧 409 引用阻断已取消）。
 
-生产启用业务私密时，编辑 `/root/player/.env` 的已有配置（不要重复追加），设置 `CONTENT_PRIVACY_MODE=business`、`NODE_ENV=production`。不要在生产使用 `local-preview` 或 `NODE_ENV=development`。数据库 visibility 迁移已完成时无需重跑。
+### 19.3 关键后端实现（当前）
 
-代码更新到包含 business 模式的版本后执行（必须先构建成功再重建容器）：
+| 文件 | 职责 | 状态 |
+|---|---|---|
+| `content-visibility.js` | `deriveCourseVisibility` / `refreshCourseVisibility`（P→课程派生并落库）、`refreshCollectionVisibility` / `refreshCollectionsForCourse`（课程→合集派生并落库） | ① 已实现 |
+| `content-object-access.js` | `canReadContentObject`（访客视角判定公开可读性）、`canAssignContentObject`（作业资格：私密不可布置）、`canMaintainPrerequisite`（前置维护：允许私密目标，不 bypass 角色） | ① 已实现 |
+| `content-privacy-config.js` | `assertPrivateWriteAllowed`（仅取值校验，不门禁）、`finalizeCourseVisibility` | ① 已实现（门禁已移除） |
+| `playback-access.js` / `playback.routes.js` | `GET /api/playback/videos/:id/play-url`：检查公开可读或老师/主任权限后返回正常 CDN/COS 播放地址；公开视频也可调用，不再签发私密短链 | ① 兼容端点保留 |
+| `visibility_revocations`（`db.js`）/ `revocation.js` | 历史撤销审计表与 `recordVisibilityRevocations` | **表保留；改私密不再调用**，不据其声称内容已删除 |
+| `assignment-navigation.js` + 双端端点 | `Web /api/user/assignments/:id/navigation`、`小程序 /api/miniprogram/homework/:id/navigation`，实时返回 `status: available/private/missing`，仅 `available` 给 `url`/`target` | ① 已实现 |
 
-```bash
-cd /root/player &&
-git pull gitee main &&
-docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml build backend &&
-docker compose -p video_player -f docker-compose.yml -f docker-compose.local.yml up -d --no-deps --force-recreate backend
+**媒体分发（当前代码）**：有权限的内容统一走正常 CDN/COS 源，不再强制私密短签 / TypeA / 改私密即撤销。Web播放器主路径已使用普通播放源，旧授权死分支仍待清理，不能把死分支误述成当前强制短签流程。附件已有独立下载能力，Web优先使用返回的文件地址，缺少地址时兼容下载接口；小程序保留文件签名接口。新增“下载当前分p”按钮及其是否走CDN仍待确认、尚未实施；不要与已有附件下载混淆。早期媒体讨论文档是历史材料，不能代替本节当前口径。
 
-# 重建后验证；输出正常后再测试私密上传和角色隔离
-docker logs --tail 30 video_player_backend
-curl -f http://localhost:3000/api/health
-```
+### 19.4 前端管理端入口与学生端行为
 
-仅更改 `.env` 时也必须重建后端容器，`restart` 不会重新注入环境变量。`business` 模式下已有公开直链仍可能直接访问，云端桶/CDN 鉴权是独立工作，不要把业务隐藏描述为文件加密或文件级保密。
+- 曲目编辑页 `/admin/tracks`、知识点编辑页 `/admin/knowledge`：每个分 P 行、每个附件行右侧有
+  「公开/私密」切换按钮（通用组件 `frontend/components/VisibilityToggle.js`）；分 P 顶部有
+  「全部公开 / 全部私密」批量操作，并实时提示课程派生状态。已实现（阶段 F）。
+- **已布置 / 已有前置目标允许改私密**：不再因引用关系 409 阻断（参考 19.2）。
+- **学生端前置隐藏**：私密或失效的前置/作业目标对学生脱敏（标题「教学内容已调整，请联系老师」，不下发封面/导航/可播放 target）。
+- **失效作业处理（双端）**：学生点击失效作业不跳转，原地 Toast「此课程已被老师更改」约 1600ms 自动消失；
+  今日页保留失效占位并点击时实时复核 `navigation` 端点。
+- 老师端保留真实标题 + `target_private` 标记，提示重新布置。
 
-### 19.3 关键后端实现
+### 19.5 边界、待办与部署风险（如实提示）
 
-| 文件 | 职责 |
-|---|---|
-| `content-visibility.js` | `normalizeStoredVisibility` / `refreshCourseVisibility`（派生刷新）、`lockCourse`（课程行锁） |
-| `content-object-access.js` | `canReadContentObject` / `canAssignContentObject`（后者用访客视角判定目标是否可布置/可作前置） |
-| `content-privacy-config.js` | `validatePrivacyConfiguration` / `assertPrivateWriteAllowed` / `findPrivatePartPrerequisiteConflicts` |
-| `playback-access.js` / `playback.routes.js` | `GET /api/playback/videos/:id/play-url`，私密视频签发 300s 短期签名 URL，fail-closed |
-| `revocation.js` | `recordVisibilityRevocations` 记录改私密需撤销的对象 key |
-| `prerequisites.routes.js` / `admin.routes.js` | 前置 / 作业布置的私密资格校验（409 回滚，报错带内容标题） |
-
-### 19.4 前端管理端入口
-
-- 曲目编辑页 `/admin/tracks`、知识点编辑页 `/admin/knowledge`：每个分 P 行、每个附件行右侧有「公开/私密」切换按钮；分 P 顶部有「全部公开 / 全部私密」批量操作，并实时提示课程派生状态。
-- 通用开关组件：`frontend/components/VisibilityToggle.js`。
-
-### 19.5 边界与待办
-
-- 云端桶（COS）目前仍是公开读，真正的匿名不可读需账号所有者在腾讯云控制台执行桶策略 / CDN 鉴权，见 `outputs/阶段E-云端访问控制落地方案.md`。
-- 已签发的短期 URL 在其 300s 有效期内、以及已下载到客户端的内容无法追回。
+- **本地 MinIO 不能证明线上 CDN**：本地 Docker 试用使用 MinIO 本地源、且 `NODE_ENV=development`、
+  CDN 环境变量未注入，端到端通过只代表本地逻辑，**不能据以声称真实 COS/CDN 验收通过**。
+- **`docker-compose.local.yml` 仍写死 `NODE_ENV: development`（第 38 行），会覆盖根 `.env` 的生产设置。**
+  该文件只适合本地开发，**绝不能用于声称「生产模式」已生效**；生产需核对基础Compose及必要的生产覆盖配置，
+  确保最终 `NODE_ENV=production`。不能仅删除local文件而忽略现有服务、存储卷及网络依赖。这是已知待整改项，不是已解决的问题
+  （第 3.2 / 16 节的服务器命令若仍带 `-f docker-compose.local.yml`，在服务器上等同于以 development 运行，
+  导致生产/开发环境语义不一致，使用前须修掉该覆盖；当前业务可见性不应依赖development放行）。
+- **八表含两合集迁移先于启动 schema 门禁**：`backend/scripts/migrate-content-visibility.js --apply`
+  现在锁定并回填 **8 张表**（含 `track_collections` / `knowledge_collections` 两合集的 `visibility` 列）。
+  启动新后端前**必须先跑迁移**，否则后端 `assertVisibilitySchema`（`VISIBILITY_SCHEMA_REQUIRED`）
+  fail-fast 导致线上 502（详见 3.2 节与 [复盘文档](file:///c:/Users/user/Desktop/播放器/docs/debug复盘/2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md)）。
+- 按用户确认的边界，本项目只做业务角色可见性，不要求COS/CDN文件级保密；不把桶私有化、CDN鉴权或旧直链撤销作为本功能验收前提。本轮未核实线上桶策略。
+  已知公开直链 / 已转发内容仍可能直接访问，**不要把业务隐藏描述为文件加密或文件级保密**。
+- 已签发的短期 URL 在其有效期内、以及已下载到客户端的内容**无法追回**；`visibility_revocations`
+  表保留为历史审计，但不据其声称已删除/撤回。
 - 无归属独立旧视频的布置策略尚未收紧（沿用「无宿主按公开」），正式发布前需审计。
-- **部署前必须先跑数据库迁移**（`backend/scripts/migrate-content-visibility.js --apply`），否则后端 `assertVisibilitySchema` fail-fast 导致线上 502；见 3.2 节与 [复盘文档](file:///c:/Users/user/Desktop/播放器/docs/debug复盘/2026-10-29-生产部署502-VISIBILITY_SCHEMA_REQUIRED复盘.md)。
+- **登录保持时间（当前实现，线上未独立核验）**：Web JWT 有效期 7 天、Cookie `maxAge` 同步；
+  小程序 token 15 天。已新增 `auth_version` 回查：改密/管理重置后，携带旧版本或缺少版本的 Cookie/Bearer 在鉴权时被拒绝，须重新登录；账号停用及角色变更仍有数据库回查。该变更在生产环境需先迁移两个账号表的版本字段再更新服务，本地验证不代表服务器已部署。

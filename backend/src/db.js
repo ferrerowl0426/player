@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { assertVisibilitySchema } from './visibility-schema.js';
+import { assertAuthVersionSchema } from './auth-version-schema.js';
 import { validatePrivacyConfiguration } from './content-privacy-config.js';
-import { validateCdnAuthConfiguration } from './playback-url.js';
 import { config } from './config.js';
 
 const DEFAULT_PASSWORD_HASH = '$2b$10$Wg6YkgUtnWlAtaQrv/q55eYBXt8RR8HxO3iYxFbJW8hG7eAzITGwu';
@@ -33,7 +33,6 @@ async function seedInitialAdmin() {
 
 export async function ensureAppSchema() {
   validatePrivacyConfiguration();
-  validateCdnAuthConfiguration();
   await assertVisibilitySchema(pool, { allowEmpty: true });
   await pool.query(`
     CREATE TABLE IF NOT EXISTS videos (
@@ -73,6 +72,7 @@ export async function ensureAppSchema() {
       password_hash TEXT NOT NULL,
       role VARCHAR(20) NOT NULL DEFAULT 'teacher',
       status VARCHAR(20) NOT NULL DEFAULT 'active',
+      auth_version INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -113,6 +113,7 @@ export async function ensureAppSchema() {
       status VARCHAR(20) NOT NULL DEFAULT 'active',
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       is_marked BOOLEAN NOT NULL DEFAULT FALSE,
+      auth_version INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -196,6 +197,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS track_collections (
       id SERIAL PRIMARY KEY,
+      visibility TEXT NOT NULL DEFAULT 'private' CONSTRAINT track_collections_visibility_check CHECK (visibility IN ('public', 'private')),
       name VARCHAR(120) NOT NULL,
       cover TEXT NOT NULL DEFAULT '',
       description TEXT NOT NULL DEFAULT '',
@@ -265,6 +267,7 @@ export async function ensureAppSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS knowledge_collections (
       id SERIAL PRIMARY KEY,
+      visibility TEXT NOT NULL DEFAULT 'private' CONSTRAINT knowledge_collections_visibility_check CHECK (visibility IN ('public', 'private')),
       name VARCHAR(120) NOT NULL,
       cover TEXT NOT NULL DEFAULT '',
       description TEXT NOT NULL DEFAULT '',
@@ -441,5 +444,8 @@ export async function ensureAppSchema() {
   await pool.query('CREATE INDEX IF NOT EXISTS idx_video_prerequisites_prerequisite_id ON video_prerequisites (prerequisite_video_id)');
 
   await assertVisibilitySchema(pool);
+  // auth_version 列由显式迁移脚本添加（scripts/migrate-auth-version.js --apply），
+  // 启动只做存在性门禁、绝不自动 ALTER 现有生产库。
+  await assertAuthVersionSchema(pool);
   await seedInitialAdmin();
 }

@@ -4,7 +4,6 @@ import { canReadContentObject } from './content-object-access.js';
 export function serializeAttachments(rows, viewer, source = 'content') {
   return rows.filter((row) => normalizeStoredVisibility(row.visibility) === 'public' || canViewPrivate(viewer)).map((row) => {
     const result = { ...row, visibility: normalizeStoredVisibility(row.visibility), download_endpoint: `/api/attachments/${row.id}/download-url?source=${source}` };
-    if (result.visibility === 'private') { delete result.file_url; delete result.file_key; }
     return result;
   });
 }

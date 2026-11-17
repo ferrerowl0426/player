@@ -4,6 +4,25 @@ import { pool } from './db.js';
 import { config } from './config.js';
 import { clearAdminCookie, getAdminCookieOptions, requireAdmin, requireAdminSession, requireSuperAdmin, signAdminToken } from './auth.js';
 import { canAssignContentObject } from './content-object-access.js';
+import { lockVisibilityFamilies } from './content-visibility.js';
+import {
+  assignmentTargetPrivateExpr as sharedAssignmentTargetPrivateExpr,
+  assignmentTargetJoins,
+  assignmentTargetStatusExpr,
+  ASSIGNMENT_TARGET_STATUS,
+  assignmentCurrentTitleExpr,
+  assignmentCurrentCoverExpr,
+  assignmentPartNoExpr,
+  assignmentParentIdExpr,
+  assignmentNormalizedObjectIdExpr,
+  objectTypeExpr
+} from './assignment-targets.js';
+import {
+  changeOwnPassword,
+  resetPasswordAsAdmin,
+  changePasswordRateLimiter,
+  changePasswordRateLimitKey
+} from './password-service.js';
 
 const USERNAME_PATTERN = /^\d+$/;
 const ADMIN_USERNAME_PATTERN = /^[A-Za-z0-9_]+$/;
@@ -20,23 +39,23 @@ const ASSIGNMENT_OBJECT_TYPES = new Set(['video', 'track_point', 'track_collecti
 const INVALID_TEXT_VALUES = ['null', 'undefined', 'nan'];
 
 // 作业目标当前是否“私密不可见”。供老师端读取作业列表标记 target_private，
-// 便于提示“已布置内容被设为私密，需重新布置”。语义与 content-object-access.js 一致。
+// 便于提示“已布置内容被设为私密，需重新布置”。
+// 语义统一委托给 assignment-targets.js（与 content-object-access.js 公开判定同源），
+// 避免回填标记与提交校验/学生首页各写一套漂移的 video CASE。
+// 保留原位置参数签名，兼容既有 activeVideos 调用点。
 function assignmentTargetPrivateExpr(ua, v, t, c, kp, kpc, tp, pt, kpp, pkp) {
-  const coursePublic = (table, parts, parent) =>
-    `(COALESCE(NULLIF(${table}.visibility, ''), 'public') = 'public' AND EXISTS (SELECT 1 FROM ${parts} WHERE ${parts}.${parent} = ${table}.id AND COALESCE(NULLIF(${parts}.visibility, ''), 'public') = 'public'))`;
-  return `CASE COALESCE(${ua}.object_type, 'video')
-    WHEN 'message' THEN FALSE
-    WHEN 'video' THEN NOT (${v}.id IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM track_parts x JOIN track_points xc ON xc.id = x.track_id WHERE x.video_id = ${v}.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')
-        UNION ALL SELECT 1 FROM knowledge_parts x JOIN knowledge_points xc ON xc.id = x.knowledge_point_id WHERE x.video_id = ${v}.id AND (COALESCE(NULLIF(x.visibility, ''), 'public') <> 'public' OR COALESCE(NULLIF(xc.visibility, ''), 'public') <> 'public')))
-    WHEN 'track_point' THEN NOT (${t}.id IS NOT NULL AND ${coursePublic(t, 'track_parts', 'track_id')})
-    WHEN 'knowledge_point' THEN NOT (${kp}.id IS NOT NULL AND ${coursePublic(kp, 'knowledge_parts', 'knowledge_point_id')})
-    WHEN 'track_collection' THEN NOT (${c}.id IS NOT NULL AND EXISTS (SELECT 1 FROM track_collection_items ci JOIN track_points cc ON cc.id = ci.track_id WHERE ci.collection_id = ${c}.id AND ${coursePublic('cc', 'track_parts', 'track_id')}))
-    WHEN 'knowledge_collection' THEN NOT (${kpc}.id IS NOT NULL AND EXISTS (SELECT 1 FROM knowledge_collection_items ci JOIN knowledge_points cc ON cc.id = ci.knowledge_point_id WHERE ci.collection_id = ${kpc}.id AND ${coursePublic('cc', 'knowledge_parts', 'knowledge_point_id')}))
-    WHEN 'track_part' THEN NOT (${tp}.id IS NOT NULL AND COALESCE(NULLIF(${tp}.visibility, ''), 'public') = 'public' AND ${coursePublic(pt, 'track_parts', 'track_id')})
-    WHEN 'knowledge_part' THEN NOT (${kpp}.id IS NOT NULL AND COALESCE(NULLIF(${kpp}.visibility, ''), 'public') = 'public' AND ${coursePublic(pkp, 'knowledge_parts', 'knowledge_point_id')})
-    ELSE TRUE
-  END`;
+  return sharedAssignmentTargetPrivateExpr({
+    ua: ua.replace(/\.$/, ''),
+    v: v.replace(/\.$/, ''),
+    t: t.replace(/\.$/, ''),
+    c: c.replace(/\.$/, ''),
+    kp: kp.replace(/\.$/, ''),
+    kpc: kpc.replace(/\.$/, ''),
+    tp: tp.replace(/\.$/, ''),
+    parentT: pt.replace(/\.$/, ''),
+    kpp: kpp.replace(/\.$/, ''),
+    parentKp: pkp.replace(/\.$/, '')
+  });
 }
 
 function normalizeLoginText(value) {
@@ -312,7 +331,7 @@ adminRouter.post('/login', async (req, res, next) => {
     }
 
     const result = await pool.query(
-      `SELECT id, username, account, nickname, password_hash, role, status
+      `SELECT id, username, account, nickname, password_hash, role, status, auth_version
        FROM admins
        WHERE account = $1 OR username = $1`,
       [username]
@@ -336,6 +355,42 @@ adminRouter.post('/login', async (req, res, next) => {
     const token = signAdminToken(admin);
     res.cookie(config.auth.adminCookieName, token, getAdminCookieOptions());
     res.json({ data: { id: admin.id, username: admin.username, account: admin.account, nickname: admin.nickname, role: admin.role, status: admin.status || 'active', isActive: admin.status !== 'disabled' } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/admin/change-password
+// 管理员本人改密（老师 / 教导主任）。root（username='admin' && role='super_admin'）禁止。
+// 成功后清空登录 Cookie，旧 token 因 auth_version 递增也立即失效。
+adminRouter.post('/change-password', requireAdmin, async (req, res, next) => {
+  try {
+    if (typeof req.body?.oldPassword !== 'string' || typeof req.body?.newPassword !== 'string') {
+      return res.status(400).json({ code: 'INVALID_PASSWORD_INPUT', message: '旧密码和新密码必须为文本' });
+    }
+    const { oldPassword, newPassword } = req.body;
+
+    const limitKey = changePasswordRateLimitKey('admin', req.ip, req.admin.username);
+    if (!changePasswordRateLimiter.allow(limitKey)) {
+      res.status(429).json({ message: '操作过于频繁，请稍后再试' });
+      return;
+    }
+
+    const result = await changeOwnPassword({
+      pool,
+      table: 'admins',
+      id: req.admin.adminId,
+      oldPassword,
+      newPassword
+    });
+
+    if (!result.ok) {
+      res.status(result.status).json({ message: result.message, code: result.code });
+      return;
+    }
+
+    clearAdminCookie(res);
+    res.json({ message: '密码修改成功，请重新登录' });
   } catch (error) {
     next(error);
   }
@@ -390,7 +445,8 @@ adminRouter.get('/users', requireAdmin, async (req, res, next) => {
 adminRouter.post('/users', requireAdmin, async (req, res, next) => {
   try {
     const username = normalizeLoginText(req.body.username);
-    const password = String(req.body.password ?? '');
+    // 学员初始密码由服务端固定，不接受客户端自选或随机密码。
+    const password = 'Nxh123456';
     const usernameError = validateUsername(username);
     const passwordError = validatePassword(password);
 
@@ -407,19 +463,22 @@ adminRouter.post('/users', requireAdmin, async (req, res, next) => {
     let classId = normalizeId(req.body.classId);
 
     if (isSuperAdmin(req)) {
-      if (!classId) {
-        sendValidationError(res, '请选择班级');
+      const unassigned = req.body.classId === undefined || req.body.classId === null || req.body.classId === '';
+      if (!unassigned && !classId) {
+        sendValidationError(res, '班级 id 无效');
         return;
       }
-
-      const classResult = await pool.query(
-        `SELECT id FROM teaching_classes WHERE id = $1 AND is_active = TRUE`,
-        [classId]
-      );
-
-      if (classResult.rowCount === 0) {
-        sendValidationError(res, '班级不存在或已停用');
-        return;
+      if (unassigned) {
+        classId = null;
+      } else {
+        const classResult = await pool.query(
+          `SELECT id FROM teaching_classes WHERE id = $1 AND is_active = TRUE`,
+          [classId]
+        );
+        if (classResult.rowCount === 0) {
+          sendValidationError(res, '班级不存在或已停用');
+          return;
+        }
       }
     } else {
       const classIds = await findAdminClassIds(req.admin.adminId);
@@ -500,37 +559,26 @@ adminRouter.patch('/users/:id', requireSuperAdmin, async (req, res, next) => {
 });
 
 // POST /api/admin/users/:id/reset-password
-adminRouter.post('/users/:id/reset-password', requireAdmin, async (req, res, next) => {
+// 仅教导主任（super_admin）可替学员重置密码；固定初始密码，不信任客户端传入的 password。
+// 重置会递增该学员的 auth_version，使其所有旧 token 立即失效。
+adminRouter.post('/users/:id/reset-password', requireSuperAdmin, async (req, res, next) => {
   try {
     const userId = normalizeId(req.params.id);
-    const password = String(req.body.password ?? '');
-    const passwordError = validatePassword(password);
+    if (!userId) return sendValidationError(res, '学员 id 无效');
 
-    if (passwordError) {
-      sendValidationError(res, passwordError);
+    const result = await resetPasswordAsAdmin({
+      pool,
+      table: 'users',
+      id: userId,
+      operatorId: req.admin.adminId
+    });
+
+    if (!result.ok) {
+      res.status(result.status).json({ message: result.message, code: result.code });
       return;
     }
 
-    if (!(await ensureAdminCanManageUser(req, userId))) {
-      res.status(403).json({ message: '无权管理该学员' });
-      return;
-    }
-
-    const passwordHash = await hashPassword(password);
-    const result = await pool.query(
-      `UPDATE users
-       SET password_hash = $1
-       WHERE id = $2
-       RETURNING id, username, class_id, is_active, created_at`,
-      [passwordHash, userId]
-    );
-
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: '学员不存在' });
-      return;
-    }
-
-    res.json({ data: result.rows[0] });
+    res.json({ data: { id: userId }, message: '密码已重置为初始密码' });
   } catch (error) {
     next(error);
   }
@@ -837,38 +885,35 @@ adminRouter.patch('/admins/:id/status', requireSuperAdmin, async (req, res, next
 });
 
 // POST /api/admin/admins/:id/reset-password
+// 仅教导主任可替老师重置密码；固定初始密码，不信任客户端传入的 password。
+// 禁止重置 root（默认教导主任账号），禁止重置当前登录账号自己。
+// 重置会递增目标 auth_version，使其旧 token 立即失效。
 adminRouter.post('/admins/:id/reset-password', requireSuperAdmin, async (req, res, next) => {
   try {
-    const password = String(req.body.password ?? '');
-    const passwordError = validatePassword(password);
-
-    if (passwordError) {
-      sendValidationError(res, passwordError);
-      return;
-    }
-
     const adminId = normalizeId(req.params.id);
     if (!adminId) return sendValidationError(res, '账号 id 无效');
 
-    const target = await pool.query('SELECT role FROM admins WHERE id = $1', [adminId]);
+    const target = await pool.query('SELECT id, username, role FROM admins WHERE id = $1', [adminId]);
     if (target.rowCount === 0) return res.status(404).json({ message: '账号不存在' });
-    if (target.rows[0].role === 'super_admin' && requireRootAdmin(req, res)) return;
+    if (target.rows[0].username === 'admin' && target.rows[0].role === 'super_admin') {
+      return res.status(403).json({ message: '不能重置唯一超级管理员密码' });
+    }
+    if (target.rows[0].role === 'super_admin' && !isRootAdmin(req)) {
+      return res.status(403).json({ message: '只有超级管理员可以操作教导主任账号' });
+    }
+    const result = await resetPasswordAsAdmin({
+      pool,
+      table: 'admins',
+      id: adminId,
+      operatorId: req.admin.adminId
+    });
 
-    const passwordHash = await hashPassword(password);
-    const result = await pool.query(
-      `UPDATE admins
-       SET password_hash = $1
-       WHERE id = $2
-       RETURNING id, username, role, created_at`,
-      [passwordHash, adminId]
-    );
-
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: '老师不存在' });
+    if (!result.ok) {
+      res.status(result.status).json({ message: result.message, code: result.code });
       return;
     }
 
-    res.json({ data: result.rows[0] });
+    res.json({ data: { id: adminId }, message: '密码已重置为初始密码' });
   } catch (error) {
     next(error);
   }
@@ -1167,6 +1212,96 @@ adminRouter.delete('/classes/:id', requireSuperAdmin, async (req, res, next) => 
   }
 });
 
+// GET /api/admin/users/:userId/assignments/latest
+// 老师回填上次作业：只读接口，复用学员归属 / 教师班级管理权限。
+// 取最新未撤销批次；在 SQL 中下推“当前学生公开可达”筛选（私密 / 删除目标不返回），
+// 即便该批全部不可达也不回退旧批次。历史 operations 快照语义不受影响。
+// 输出规范前端对象形状：P 的 objectId 为实时父课程 ID、partId 为稳定 P ID；
+// 同时给出 stableObjectId / parentId / partNo / 当前标题封面，便于后续 Web 接入。
+adminRouter.get('/users/:userId/assignments/latest', requireAdmin, async (req, res, next) => {
+  try {
+    const userId = normalizeId(req.params.userId);
+    if (!userId) return sendValidationError(res, '学员 id 无效');
+    if (!(await ensureAdminCanManageUser(req, userId))) return res.status(403).json({ message: '无权查看该学员' });
+    const user = await findUserById(userId);
+    if (!user) return res.status(404).json({ message: '学员不存在' });
+
+    const latestResult = await pool.query(
+      `WITH latest_op AS (
+         SELECT operation_id, MAX(created_at) AS created_at
+         FROM user_assignments
+         WHERE user_id = $1 AND is_deleted = FALSE
+         GROUP BY operation_id
+         ORDER BY MAX(created_at) DESC, operation_id DESC
+         LIMIT 1
+       ), requirements AS (
+         SELECT COALESCE(NULLIF(MAX(ua.practice_requirement), ''), MAX(ua.message) FILTER (WHERE ua.object_type = 'message'), '') AS practice_requirement,
+                COALESCE(NULLIF(MAX(ua.submit_requirement), ''), '') AS submit_requirement
+         FROM user_assignments ua
+         WHERE ua.user_id = $1
+           AND ua.operation_id = (SELECT operation_id FROM latest_op)
+           AND ua.is_deleted = FALSE
+       )
+       SELECT latest_op.operation_id, latest_op.created_at,
+              requirements.practice_requirement, requirements.submit_requirement
+       FROM latest_op CROSS JOIN requirements`,
+      [userId]
+    );
+
+    const latest = latestResult.rows[0];
+    if (!latest) {
+      return res.json({
+        data: { operationId: null, assignmentDate: null, objects: [], practiceRequirement: '', submitRequirement: '' }
+      });
+    }
+
+    const targetsResult = await pool.query(
+      `SELECT ua.id AS assignment_id,
+              ${objectTypeExpr()} AS object_type,
+              ${assignmentNormalizedObjectIdExpr()} AS stable_object_id,
+              ${assignmentParentIdExpr()} AS parent_id,
+              ${assignmentPartNoExpr()} AS part_no,
+              ${assignmentCurrentTitleExpr()} AS current_title,
+              ${assignmentCurrentCoverExpr()} AS current_cover
+         FROM user_assignments ua
+         ${assignmentTargetJoins()}
+        WHERE ua.user_id = $1
+          AND ua.operation_id = $2
+          AND ua.is_deleted = FALSE
+          AND ${objectTypeExpr()} <> 'message'
+          AND ${assignmentTargetStatusExpr()} = '${ASSIGNMENT_TARGET_STATUS.AVAILABLE}'
+        ORDER BY ua.created_at ASC, ua.id ASC`,
+      [userId, latest.operation_id]
+    );
+
+    const objects = targetsResult.rows.map((row) => {
+      const isPart = row.object_type === 'track_part' || row.object_type === 'knowledge_part';
+      return {
+        id: row.assignment_id,
+        objectType: row.object_type,
+        // 与前端 objectKey / POST 入参一致：P 用父课程 ID 作 objectId，稳定 P ID 放 partId。
+        objectId: isPart ? row.parent_id : row.stable_object_id,
+        partId: isPart ? row.stable_object_id : null,
+        parentId: isPart ? row.parent_id : null,
+        stableObjectId: row.stable_object_id,
+        partNo: row.part_no,
+        title: row.current_title,
+        coverUrl: row.current_cover
+      };
+    });
+
+    res.json({
+      data: {
+        operationId: latest.operation_id,
+        assignmentDate: latest.created_at,
+        objects,
+        practiceRequirement: latest.practice_requirement || '',
+        submitRequirement: latest.submit_requirement || ''
+      }
+    });
+  } catch (error) { next(error); }
+});
+
 // GET /api/admin/users/:userId/assignments
 adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, next) => {
   try {
@@ -1253,7 +1388,7 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
          ua.object_type, ua.part_id,
          COALESCE(NULLIF(ua.assigned_object_title, ''), NULLIF(ua.assigned_video_title, ''), v.title, t.name, c.name, kp.name, kpc.name, '已删除内容') AS title,
          COALESCE(v.description, t.description, c.description, kp.description, kpc.description, '') AS description,
-         COALESCE(v.cover_url, t.cover, c.cover, kp.cover, kpc.cover, '') AS cover_url,
+         COALESCE(v.cover_url, t.cover, c.cover, kp.cover, kpc.cover, pt.cover, pkp.cover, '') AS cover_url,
          ${assignmentTargetPrivateExpr('ua', 'v', 't', 'c', 'kp', 'kpc', 'tp', 'pt', 'kpp', 'pkp')} AS target_private
        FROM user_assignments ua
        LEFT JOIN videos v ON v.id = COALESCE(ua.object_id, ua.video_id) AND COALESCE(ua.object_type, 'video') = 'video'
@@ -1261,9 +1396,9 @@ adminRouter.get('/users/:userId/assignments', requireAdmin, async (req, res, nex
        LEFT JOIN track_collections c ON c.id = ua.object_id AND ua.object_type = 'track_collection'
        LEFT JOIN knowledge_points kp ON kp.id = ua.object_id AND ua.object_type = 'knowledge_point'
        LEFT JOIN knowledge_collections kpc ON kpc.id = ua.object_id AND ua.object_type = 'knowledge_collection'
-       LEFT JOIN track_parts tp ON tp.id = ua.part_id AND ua.object_type = 'track_part'
+       LEFT JOIN track_parts tp ON tp.id = COALESCE(ua.part_id, ua.object_id) AND ua.object_type = 'track_part'
        LEFT JOIN track_points pt ON pt.id = tp.track_id
-       LEFT JOIN knowledge_parts kpp ON kpp.id = ua.part_id AND ua.object_type = 'knowledge_part'
+       LEFT JOIN knowledge_parts kpp ON kpp.id = COALESCE(ua.part_id, ua.object_id) AND ua.object_type = 'knowledge_part'
        LEFT JOIN knowledge_points pkp ON pkp.id = kpp.knowledge_point_id
        WHERE ua.user_id = $1 AND (ua.object_id IS NOT NULL OR ua.video_id IS NOT NULL) AND ua.is_deleted = FALSE
        ORDER BY ua.created_at DESC`,
@@ -1304,68 +1439,102 @@ adminRouter.post('/users/:userId/assignments', requireAdmin, async (req, res, ne
     if (!userId) return sendValidationError(res, '学员 id 无效');
     if (objects.length === 0 && !practiceRequirement && !submitRequirement && !legacyMessage) return sendValidationError(res, '请至少填写一项作业内容（视频作业、练习要求或提交要求）');
     if (practiceError || submitError || legacyError) return sendValidationError(res, practiceError || submitError || legacyError);
+    // 参数校验：不支持的推送对象类型（纯参数检查，保持在事务外）。
+    for (const object of objects) {
+      if (!ASSIGNMENT_OBJECT_TYPES.has(object.objectType)) return res.status(400).json({ message: `不支持的推送对象类型：${object.objectType}` });
+    }
     if (!(await ensureAdminCanManageUser(req, userId))) return res.status(403).json({ message: '无权管理该学员' });
     const user = await findUserById(userId);
     if (!user) return res.status(404).json({ message: '学员不存在' });
     if (!user.is_active) return res.status(400).json({ message: '停用学员不可布置新作业' });
-
-    const validated = [];
-    for (const object of objects) {
-      if (!ASSIGNMENT_OBJECT_TYPES.has(object.objectType)) return res.status(400).json({ message: `不支持的推送对象类型：${object.objectType}` });
-      let query;
-      let params;
-      if (object.objectType === 'video') {
-        query = 'SELECT id, title, NULL::int AS part_id, id AS video_id FROM videos WHERE id = $1'; params = [object.objectId];
-      } else if (object.objectType === 'track_point') {
-        query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM track_points WHERE id = $1'; params = [object.objectId];
-      } else if (object.objectType === 'track_collection') {
-        query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM track_collections WHERE id = $1'; params = [object.objectId];
-      } else if (object.objectType === 'knowledge_point') {
-        query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM knowledge_points WHERE id = $1'; params = [object.objectId];
-      } else if (object.objectType === 'knowledge_collection') {
-        query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM knowledge_collections WHERE id = $1'; params = [object.objectId];
-      } else if (object.objectType === 'track_part') {
-        query = `SELECT tp.id, CONCAT(t.name, '-', tp.title) AS title, tp.id AS part_id, tp.video_id
-                 FROM track_parts tp JOIN track_points t ON t.id = tp.track_id
-                 WHERE tp.id = $1 AND tp.track_id = COALESCE($2, tp.track_id)`;
-        params = [object.partId || object.objectId, object.partId ? object.objectId : null];
-      } else {
-        query = `SELECT kp.id, CONCAT(kpt.name, '-', kp.title) AS title, kp.id AS part_id, kp.video_id
-                 FROM knowledge_parts kp JOIN knowledge_points kpt ON kpt.id = kp.knowledge_point_id
-                 WHERE kp.id = $1 AND kp.knowledge_point_id = COALESCE($2, kp.knowledge_point_id)`;
-        params = [object.partId || object.objectId, object.partId ? object.objectId : null];
-      }
-      const result = await pool.query(query, params);
-      if (!result.rows[0]) return res.status(404).json({ message: `推送对象不存在：${object.objectType} ${object.objectId}` });
-      // 私密目标不可布置（课程/P/合集/video 同口径）。video 反查所有宿主，任一私密即拒绝。
-      // 教师/教导主任也不得把私密内容布置给学员。
-      // part 目标的真实 P id 是 result.rows[0].part_id（而非 object.objectId）。
-      const assignTargetId = object.objectType.endsWith('_part') ? result.rows[0].part_id : object.objectId;
-      if (!(await canAssignContentObject(pool, object.objectType, assignTargetId))) {
-        // 带上私密内容标题（多个私密对象时命中第一个即返回，只提示第一个）。
-        return res.status(409).json({ message: `该内容为私密，无法布置给学员：\n${result.rows[0].title || `${object.objectType} ${assignTargetId}`}` });
-      }
-      validated.push({ ...object, ...result.rows[0], objectId: object.objectType.endsWith('_part') ? result.rows[0].part_id : object.objectId });
-    }
-
-    const newObjects = validated;
-    if (newObjects.length > MAX_ACTIVE_VIDEO_ASSIGNMENTS) return sendValidationError(res, `本次最多选择 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个作业对象`);
+    if (objects.length > MAX_ACTIVE_VIDEO_ASSIGNMENTS) return sendValidationError(res, `本次最多选择 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个作业对象`);
 
     // PRD：一次推送必须原子生效。取 operation_id 与全部 INSERT 放进同一个事务，
     // 中途任何一步失败就整体回滚，避免留下“半批作业”。
-    // 校验逻辑（上面）保持在事务外，事务内只做数据库操作，不混入 COS 等外部 IO。
+    // 目标存在性与私密性校验也必须在同一事务 client 内、且在家族锁之后执行，
+    // 以消除“pool 校验通过后才 BEGIN”的竞态（校验与写入之间可见性被并发改写）。
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
+      // 阶段B：事务首条为家族锁，避免与可见性写入口之间的竞态；
+      // 作业推送可能触及 track / knowledge 两家族，需同时锁定。
+      await lockVisibilityFamilies(client, ['track', 'knowledge']);
+
+      // 在事务内、锁之后，按清单顺序校验每个推送对象：存在性 + 私密性。
+      // 命中首个不合法即回滚整批并提示其标题；全部合法才进入写入阶段。
+      const validated = [];
+      for (const object of objects) {
+        let query;
+        let params;
+        if (object.objectType === 'video') {
+          query = 'SELECT id, title, NULL::int AS part_id, id AS video_id FROM videos WHERE id = $1'; params = [object.objectId];
+        } else if (object.objectType === 'track_point') {
+          query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM track_points WHERE id = $1'; params = [object.objectId];
+        } else if (object.objectType === 'track_collection') {
+          query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM track_collections WHERE id = $1'; params = [object.objectId];
+        } else if (object.objectType === 'knowledge_point') {
+          query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM knowledge_points WHERE id = $1'; params = [object.objectId];
+        } else if (object.objectType === 'knowledge_collection') {
+          query = 'SELECT id, name AS title, NULL::int AS part_id, NULL::int AS video_id FROM knowledge_collections WHERE id = $1'; params = [object.objectId];
+        } else if (object.objectType === 'track_part') {
+          query = `SELECT tp.id, CONCAT(t.name, '-', tp.title) AS title, tp.id AS part_id, tp.video_id
+                   FROM track_parts tp JOIN track_points t ON t.id = tp.track_id
+                   WHERE tp.id = $1 AND tp.track_id = COALESCE($2, tp.track_id)`;
+          params = [object.partId || object.objectId, object.partId ? object.objectId : null];
+        } else {
+          query = `SELECT kp.id, CONCAT(kpt.name, '-', kp.title) AS title, kp.id AS part_id, kp.video_id
+                   FROM knowledge_parts kp JOIN knowledge_points kpt ON kpt.id = kp.knowledge_point_id
+                   WHERE kp.id = $1 AND kp.knowledge_point_id = COALESCE($2, kp.knowledge_point_id)`;
+          params = [object.partId || object.objectId, object.partId ? object.objectId : null];
+        }
+        const result = await client.query(query, params);
+        if (!result.rows[0]) {
+          // 目标不存在：回滚整批，不写入任何记录。
+          await client.query('ROLLBACK').catch(() => {});
+          return res.status(404).json({ message: `推送对象不存在：${object.objectType} ${object.objectId}` });
+        }
+        // 私密目标不可布置（课程/P/合集/video 同口径）。video 反查所有宿主，任一私密即拒绝。
+        // 教师/教导主任也不得把私密内容布置给学员。
+        // part 目标的真实 P id 是 result.rows[0].part_id（而非 object.objectId）。
+        const assignTargetId = object.objectType.endsWith('_part') ? result.rows[0].part_id : object.objectId;
+        if (!(await canAssignContentObject(client, object.objectType, assignTargetId))) {
+          // 带上私密内容标题（多个私密对象时命中第一个即返回，只提示第一个）。
+          await client.query('ROLLBACK').catch(() => {});
+          return res.status(409).json({ message: `该内容为私密，无法布置给学员：\n${result.rows[0].title || `${object.objectType} ${assignTargetId}`}` });
+        }
+        // 分 P 规范化：验证查询返回的 part_id 才是稳定身份，两种输入（objectId=P / 父ID+partId=P）
+        // 都必须同时写 object_id 与 part_id；非 P 不写 part_id。
+        const isPart = object.objectType === 'track_part' || object.objectType === 'knowledge_part';
+        const stablePartId = result.rows[0].part_id;
+        validated.push({
+          ...object,
+          ...result.rows[0],
+          objectId: isPart ? stablePartId : object.objectId,
+          partId: isPart ? stablePartId : null
+        });
+      }
+
+      // 规范化后按 type + 稳定 ID 去重：两种 P 输入落到同一条，只写一次；
+      // 有效对象数也以此为准（不借兼容形态绕过最多 5 个限制）。
+      const deduped = [...new Map(validated.map((item) => [
+        `${item.objectType}:${item.objectId}`,
+        item
+      ])).values()];
+      if (deduped.length > MAX_ACTIVE_VIDEO_ASSIGNMENTS) {
+        await client.query('ROLLBACK').catch(() => {});
+        return sendValidationError(res, `本次最多选择 ${MAX_ACTIVE_VIDEO_ASSIGNMENTS} 个作业对象`);
+      }
+
+      // 全部合法才写入：取 operation_id 与全部 INSERT 放进同一事务，中途失败整体回滚。
       const operationResult = await client.query(`SELECT nextval('user_assignments_operation_id_seq') AS operation_id`);
       const operationId = operationResult.rows[0].operation_id;
       const insertedRows = [];
-      for (const item of newObjects) {
+      for (const item of deduped) {
         const result = await client.query(`INSERT INTO user_assignments (operation_id, user_id, video_id, object_type, object_id, part_id, message, practice_requirement, submit_requirement, assigned_by_admin_id, assigned_video_title, assigned_object_title) VALUES ($1, $2, $3, $4, $5, $6, '', $7, $8, $9, $10, $10) RETURNING id, operation_id, user_id, video_id, object_type, object_id, part_id, message, practice_requirement, submit_requirement, is_deleted, delete_reason, deleted_at, created_at`, [operationId, userId, item.video_id || null, item.objectType, item.objectId, item.partId || null, practiceRequirement || legacyMessage, submitRequirement, req.admin.adminId, item.title]);
         insertedRows.push(result.rows[0]);
       }
-      if (newObjects.length === 0 || (legacyMessage && !practiceRequirement && !submitRequirement)) {
+      if (deduped.length === 0 || (legacyMessage && !practiceRequirement && !submitRequirement)) {
         const result = await client.query(`INSERT INTO user_assignments (operation_id, user_id, video_id, object_type, object_id, message, practice_requirement, submit_requirement, assigned_by_admin_id) VALUES ($1, $2, NULL, 'message', NULL, $3, $4, $5, $6) RETURNING id, operation_id, user_id, video_id, object_type, object_id, message, practice_requirement, submit_requirement, is_deleted, delete_reason, deleted_at, created_at`, [operationId, userId, legacyMessage, practiceRequirement || legacyMessage, submitRequirement, req.admin.adminId]);
         insertedRows.push(result.rows[0]);
       }

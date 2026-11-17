@@ -31,6 +31,7 @@ function RequirementLine({ label, text }) {
   return <div className="hw-msg-line"><span className="hw-msg-label">{label}</span><span className="hw-msg-text">{value}</span></div>;
 }
 
+// 历史只读布置时的标题快照：不因 target_private 生成可点击按钮，也不弹提示。
 function HomeworkItem({ item }) {
   const title = item.title || '已删除内容';
   return <span className="it off">{title}</span>;
@@ -93,7 +94,7 @@ export default function MyHomeworkPage() {
 
   return (
     <>
-      <AppNav role="user" accountName={user.nickname || user.username || '学员'} />
+      <AppNav role="user" accountName={user.nickname || user.username || '学员'} username={user.username} />
       <main className={styles.home}>
         <div className="toolrow rise">
           <h1>我的历史作业</h1>

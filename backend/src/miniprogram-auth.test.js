@@ -1,9 +1,7 @@
 // 针对 miniprogram.auth.js 的测试：学生登录保留，但停用学生必须被拒绝；并校验 studentToViewer。
-// 不连接真实数据库，mock db.js 的 pool。
+// 不连接真实数据库，mock db.js 的 pool。mock 行真实携带 auth_version，覆盖版本校验分支。
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import jwt from 'jsonwebtoken';
 
 const SRC_DB = new URL('./db.js', import.meta.url).href;
@@ -38,12 +36,13 @@ function makeRes() {
   };
 }
 
-function tokenFor(userId = 1) {
-  return jwt.sign({ type: 'user', userId, role: 'user', status: 'active' }, 'test-secret');
+// token 携带 authVersion，与 mock 行的 auth_version 对应。
+function tokenFor(userId = 1, authVersion = 0) {
+  return jwt.sign({ type: 'user', userId, role: 'user', status: 'active', authVersion }, 'test-secret');
 }
 
 test('requireMiniStudent：无 token 返回 401', async () => {
-  studentRow = { id: 1, status: 'active', is_active: true };
+  studentRow = { id: 1, status: 'active', is_active: true, auth_version: 0 };
   let called = false;
   const res = makeRes();
   await mod.requireMiniStudent({ headers: {}, cookies: {} }, res, () => { called = true; });
@@ -52,7 +51,7 @@ test('requireMiniStudent：无 token 返回 401', async () => {
 });
 
 test('requireMiniStudent：停用学生返回 403 且拒绝放行', async () => {
-  studentRow = { id: 1, status: 'disabled', is_active: false };
+  studentRow = { id: 1, status: 'disabled', is_active: false, auth_version: 0 };
   let called = false;
   const res = makeRes();
   await mod.requireMiniStudent({ headers: { authorization: `Bearer ${tokenFor()}` }, cookies: {} }, res, () => { called = true; });
@@ -62,7 +61,7 @@ test('requireMiniStudent：停用学生返回 403 且拒绝放行', async () => 
 });
 
 test('requireMiniStudent：is_active=false 但无 status 字段也视为停用', async () => {
-  studentRow = { id: 1, is_active: false };
+  studentRow = { id: 1, is_active: false, auth_version: 0 };
   let called = false;
   const res = makeRes();
   await mod.requireMiniStudent({ headers: { authorization: `Bearer ${tokenFor()}` }, cookies: {} }, res, () => { called = true; });
@@ -71,7 +70,7 @@ test('requireMiniStudent：is_active=false 但无 status 字段也视为停用',
 });
 
 test('requireMiniStudent：有效学生放行并设置 req.student', async () => {
-  studentRow = { id: 1, status: 'active', is_active: true, username: 's1', account: 's1', nickname: '学生1', class_id: 7 };
+  studentRow = { id: 1, status: 'active', is_active: true, username: 's1', account: 's1', nickname: '学生1', class_id: 7, auth_version: 0 };
   let called = false;
   const req = { headers: { authorization: `Bearer ${tokenFor()}` }, cookies: {} };
   const res = makeRes();
@@ -86,6 +85,25 @@ test('requireMiniStudent：学生不存在返回 401', async () => {
   let called = false;
   const res = makeRes();
   await mod.requireMiniStudent({ headers: { authorization: `Bearer ${tokenFor()}` }, cookies: {} }, res, () => { called = true; });
+  assert.equal(res.statusCode, 401);
+  assert.equal(called, false);
+});
+
+test('requireMiniStudent：token 缺 authVersion（迁移前旧 token）被拒绝', async () => {
+  studentRow = { id: 1, status: 'active', is_active: true, auth_version: 0 };
+  let called = false;
+  const res = makeRes();
+  const oldToken = jwt.sign({ type: 'user', userId: 1, role: 'user', status: 'active' }, 'test-secret');
+  await mod.requireMiniStudent({ headers: { authorization: `Bearer ${oldToken}` }, cookies: {} }, res, () => { called = true; });
+  assert.equal(res.statusCode, 401);
+  assert.equal(called, false);
+});
+
+test('requireMiniStudent：auth_version 不匹配（已改密）被拒绝', async () => {
+  studentRow = { id: 1, status: 'active', is_active: true, auth_version: 3 };
+  let called = false;
+  const res = makeRes();
+  await mod.requireMiniStudent({ headers: { authorization: `Bearer ${tokenFor(1, 0)}` }, cookies: {} }, res, () => { called = true; });
   assert.equal(res.statusCode, 401);
   assert.equal(called, false);
 });

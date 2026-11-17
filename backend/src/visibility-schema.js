@@ -1,5 +1,11 @@
 // Read-only startup gate. Existing databases must use the explicit migration.
-export const VISIBILITY_TABLES = Object.freeze(['track_points', 'knowledge_points', 'track_parts', 'knowledge_parts', 'content_attachments', 'video_attachments']);
+// Collections (track_collections, knowledge_collections) carry a derived visibility
+// column (default private) computed by the migration from their member points.
+export const VISIBILITY_TABLES = Object.freeze([
+  'track_points', 'knowledge_points', 'track_parts', 'knowledge_parts',
+  'content_attachments', 'video_attachments',
+  'track_collections', 'knowledge_collections'
+]);
 export async function assertVisibilitySchema(client, { allowEmpty = false } = {}) {
   const { rows } = await client.query(`SELECT t.table_name, c.is_nullable, c.column_default, c.data_type,
     EXISTS (SELECT 1 FROM pg_constraint k JOIN pg_class r ON r.oid=k.conrelid
@@ -23,7 +29,7 @@ export async function assertVisibilitySchema(client, { allowEmpty = false } = {}
   }
   const invalid = VISIBILITY_TABLES.filter((name) => {
     const row = rows.find((r) => r.table_name === name);
-    const expected = ['track_points', 'knowledge_points'].includes(name) ? 'private' : 'public';
+    const expected = ['track_points', 'knowledge_points', 'track_collections', 'knowledge_collections'].includes(name) ? 'private' : 'public';
     return !row || row.data_type !== 'text' || row.is_nullable !== 'NO' || !row.has_check || row.column_default !== `'${expected}'::text`;
   });
   if (invalid.length) {

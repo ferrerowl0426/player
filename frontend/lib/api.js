@@ -1,3 +1,5 @@
+import { buildChangePasswordPath } from './passwordResetLogic';
+
 export function getApiBaseUrl() {
   if (typeof window === 'undefined') {
     return process.env.SERVER_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
@@ -12,6 +14,10 @@ async function parseJsonResponse(response, fallbackMessage) {
   if (!response.ok) {
     const error = new Error(result.message || fallbackMessage);
     error.status = response.status;
+    // 透传后端业务错误码（如 OLD_PASSWORD_INCORRECT / INVALID_PASSWORD），供调用方做行内提示。
+    if (result && typeof result.code !== 'undefined') {
+      error.code = result.code;
+    }
     throw error;
   }
 
@@ -578,6 +584,13 @@ export async function logoutUser() {
   return parseJsonResponse(response, '退出登录失败');
 }
 
+export async function fetchAssignmentNavigation(id) {
+  const response = await fetch(`${getApiBaseUrl()}/user/assignments/${encodeURIComponent(id)}/navigation`, {
+    credentials: 'include', cache: 'no-store'
+  });
+  return parseJsonResponse(response, '暂时无法打开作业，请稍后重试');
+}
+
 // 获取学员自己的今日作业。
 export async function fetchTodayAssignments() {
   const response = await fetch(`${getApiBaseUrl()}/user/assignments/today`, {
@@ -651,6 +664,23 @@ export async function logoutAdmin() {
   return parseJsonResponse(response, '退出登录失败');
 }
 
+// 本人自助改密。学员走 /api/user/change-password，老师/管理员走 /api/admin/change-password。
+// 成功后后端会清掉当前会话 Cookie，调用方据此退出登录。
+export async function changeOwnPassword({ oldPassword, newPassword, role }) {
+  const path = buildChangePasswordPath(role);
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ oldPassword, newPassword }),
+    signal: AbortSignal.timeout(15000)
+  });
+
+  return parseJsonResponse(response, '修改密码失败');
+}
+
 // 老师查看学员列表。
 export async function fetchManagedUsers() {
   const response = await fetch(`${getApiBaseUrl()}/admin/users`, {
@@ -678,15 +708,14 @@ export async function createManagedUser({ username, password, classId, nickname 
   return parseJsonResponse(response, '创建学员失败');
 }
 
-// 老师重置学员密码。
-export async function resetManagedUserPassword({ id, password }) {
+// 老师重置学员密码。服务端固定将密码重置为 Nxh123456，前端不传新密码。
+export async function resetManagedUserPassword({ id }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/users/${id}/reset-password`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ password })
+    }
   });
 
   return parseJsonResponse(response, '重置学员密码失败');
@@ -795,15 +824,14 @@ export async function updateManagedAdminStatus({ id, status, isActive }) {
   return parseJsonResponse(response, '更新账号状态失败');
 }
 
-// 老师重置其他老师密码。
-export async function resetManagedAdminPassword({ id, password }) {
+// 老师重置其他老师密码。服务端固定将密码重置为 Nxh123456，前端不传新密码。
+export async function resetManagedAdminPassword({ id }) {
   const response = await fetch(`${getApiBaseUrl()}/admin/admins/${id}/reset-password`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ password })
+    }
   });
 
   return parseJsonResponse(response, '重置老师密码失败');
@@ -827,6 +855,17 @@ export async function fetchUserAssignments(userId) {
   });
 
   return parseJsonResponse(response, '获取推送记录失败');
+}
+
+// 老师回填指定学员上次作业：只读接口，服务端已排除学生当前不可访问的目标，
+// 但保留该批次练习/提交要求。必须 no-store，避免缓存旧的公开状态。
+export async function fetchLatestUserAssignment(userId) {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/${encodeURIComponent(userId)}/assignments/latest`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  return parseJsonResponse(response, '获取上次作业失败');
 }
 
 // 老师给指定学员保存一次推送操作，可以同时包含旧视频和新内容对象。

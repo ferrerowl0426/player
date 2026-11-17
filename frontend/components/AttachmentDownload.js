@@ -38,7 +38,7 @@ export default function AttachmentDownload({ resource }) {
     }
   }
 
-  if (!resource.download_endpoint) {
+  if (resource.file_url) {
     return <a className="fbtn solid" href={resource.file_url} download={resource.file_name || true}>下载</a>;
   }
   return <span>

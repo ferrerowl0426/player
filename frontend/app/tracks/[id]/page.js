@@ -93,7 +93,7 @@ export default function TrackDetailPage() {
   if (status) {
     return (
       <>
-        <AppNav role={viewer.role || 'guest'} accountName={accountName} />
+        <AppNav role={viewer.role || 'guest'} accountName={accountName} username={viewer?.username} />
         <main className="detail">
           <section className="main"><p className="empty-text">{status}</p></section>
         </main>
@@ -112,7 +112,7 @@ export default function TrackDetailPage() {
 
   return (
     <>
-      <AppNav role={viewer.role || 'guest'} accountName={accountName} />
+      <AppNav role={viewer.role || 'guest'} accountName={accountName} username={viewer?.username} />
       <main className="detail">
         <section className="main rise">
           <nav className="crumb" aria-label="面包屑">

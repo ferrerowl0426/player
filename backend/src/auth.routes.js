@@ -23,7 +23,7 @@ authRouter.post('/login', async (req, res, next) => {
     }
 
     const adminResult = await pool.query(
-      `SELECT id, username, account, nickname, password_hash, role, status
+      `SELECT id, username, account, nickname, password_hash, role, status, auth_version
        FROM admins
        WHERE account = $1 OR username = $1`,
       [username]
@@ -46,7 +46,7 @@ authRouter.post('/login', async (req, res, next) => {
     }
 
     const userResult = await pool.query(
-      `SELECT id, username, account, nickname, password_hash, status, is_active
+      `SELECT id, username, account, nickname, password_hash, status, is_active, auth_version
        FROM users
        WHERE account = $1 OR username = $1`,
       [username]

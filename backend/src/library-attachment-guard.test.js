@@ -67,7 +67,7 @@ test.after(async () => {
 
 const BASE_BODY = { title: '资料A', fileName: 'x.pdf', fileKey: 'library/test.pdf', cover: 'https://origin/cover.jpg', links: [] };
 
-test('新建：引用 private 附件的 key（key 形式）被拒绝 → 409 且不落库', async () => {
+test('新建：引用 private 附件的 key（key 形式）允许独立复用文件 且不落库', async () => {
   state.privateRows = [{ file_key: 'library/test.pdf', file_url: 'https://origin/library/test.pdf' }];
   state.insertCalled = false;
   const res = await fetch(`${base}/api/library`, {
@@ -75,11 +75,11 @@ test('新建：引用 private 附件的 key（key 形式）被拒绝 → 409 且
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(BASE_BODY)
   });
-  assert.equal(res.status, 409);
-  assert.equal(state.insertCalled, false, '不应写入图书馆资料');
+  assert.equal(res.status, 201);
+  assert.equal(state.insertCalled, true, '独立图书馆记录允许复用文件');
 });
 
-test('新建：引用 private 附件（同 URL 归一，URL 形式）被拒绝 → 409', async () => {
+test('新建：引用 private 附件（同 URL 归一，URL 形式）允许独立复用文件', async () => {
   // 同一物理文件，private 附件以完整 URL 记录，图书馆以 key 记录，归一后命中。
   state.privateRows = [{ file_key: 'attachments/unrelated.pdf', file_url: 'https://origin/library/test.pdf' }];
   state.insertCalled = false;
@@ -88,8 +88,8 @@ test('新建：引用 private 附件（同 URL 归一，URL 形式）被拒绝 �
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(BASE_BODY)
   });
-  assert.equal(res.status, 409);
-  assert.equal(state.insertCalled, false);
+  assert.equal(res.status, 201);
+  assert.equal(state.insertCalled, true);
 });
 
 test('新建：无冲突的私有引用时正常落库 → 201', async () => {
@@ -104,7 +104,7 @@ test('新建：无冲突的私有引用时正常落库 → 201', async () => {
   assert.equal(state.insertCalled, true);
 });
 
-test('更新/文件替换：携带 fileKey 引用 private 附件 key 同样被拒绝 → 409', async () => {
+test('更新/文件替换：携带 fileKey 引用 private 附件 key 同样允许独立复用文件', async () => {
   state.privateRows = [{ file_key: 'library/test.pdf', file_url: '' }];
   state.insertCalled = false;
   const res = await fetch(`${base}/api/library/1`, {
@@ -112,5 +112,5 @@ test('更新/文件替换：携带 fileKey 引用 private 附件 key 同样被�
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title: '资料A', cover: 'https://origin/cover.jpg', fileKey: 'library/test.pdf' })
   });
-  assert.equal(res.status, 409);
+  assert.equal(res.status, 404); // fixture has no existing library row; not a privacy conflict
 });

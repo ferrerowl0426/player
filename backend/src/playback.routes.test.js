@@ -4,6 +4,7 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { DEFAULT_COS_ORIGIN, DEFAULT_CDN_ORIGIN } from './playback-url.js';
 
 const SRC_DB = new URL('./db.js', import.meta.url).href;
 const SRC_AUTH = new URL('./auth.js', import.meta.url).href;
@@ -55,11 +56,10 @@ mock.module(SRC_AUTH, {
 });
 mock.module(SRC_STORAGE, {
   namedExports: {
-    createDownloadUrl: async () => {
+    getPublicUrl: (key) => {
       if (storageState.fail) throw new Error('COS internal error');
-      return 'https://signed.example/videos/tracks/1/a.mp4?sig=abc';
+      return `${DEFAULT_COS_ORIGIN}/${key}`;
     },
-    getPublicUrl: (key) => `https://cos.example/${key}`,
     getKeyFromPublicUrl: (url) => String(url || '').split('public.example/')[1] || ''
   }
 });
@@ -100,15 +100,16 @@ test('匿名/学生访问私密视频被拒绝（404 fail-closed）', async () =
   }
 });
 
-test('teacher / super_admin 可获取私密视频短期签名 URL', async () => {
+test('teacher / super_admin 可获取私密视频的 CDN 播放地址', async () => {
   state.publiclyReadable = false;
   for (const role of ['teacher', 'super_admin']) {
     const res = await fetch(playUrl(1, 'video'), { headers: { 'x-test-role': role } });
     assert.equal(res.status, 200, `role=${role}`);
     const body = await res.json();
     assert.equal(body.data.id, 1);
-    assert.match(body.data.url, /signed\.example/);
-    assert.equal(body.data.expiresIn, 300);
+    // 可见性仅为业务展示：授权用户直接返回经 CDN 转换后的原 COS 公开地址，不再签发短链。
+    assert.match(body.data.url, new RegExp(`^${DEFAULT_CDN_ORIGIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`));
+    assert.ok(!new URL(body.data.url).searchParams.has('sign'), '不应附加任何签名参数');
   }
 });
 

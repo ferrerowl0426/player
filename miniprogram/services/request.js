@@ -57,6 +57,7 @@ function request({ url, method = 'GET', data, header = {} }) {
       method,
       data,
       header: finalHeader,
+      timeout: 15000,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data?.data ?? res.data);

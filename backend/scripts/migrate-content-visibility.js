@@ -5,13 +5,16 @@ import { pathToFileURL } from 'node:url';
 
 export const VISIBILITY_MIGRATION_SQL = `
 SELECT pg_advisory_xact_lock(73281028);
-LOCK TABLE track_points, knowledge_points, track_parts, knowledge_parts, content_attachments, video_attachments IN ACCESS EXCLUSIVE MODE;
+LOCK TABLE track_points, knowledge_points, track_parts, knowledge_parts, content_attachments, video_attachments, track_collections, knowledge_collections IN ACCESS EXCLUSIVE MODE;
+-- 补齐两合集列（迁移前先加列，再回填派生可见性）。
 ALTER TABLE content_attachments ADD COLUMN IF NOT EXISTS visibility TEXT;
 ALTER TABLE video_attachments ADD COLUMN IF NOT EXISTS visibility TEXT;
 ALTER TABLE track_parts ADD COLUMN IF NOT EXISTS visibility TEXT;
 ALTER TABLE knowledge_parts ADD COLUMN IF NOT EXISTS visibility TEXT;
 ALTER TABLE track_points ADD COLUMN IF NOT EXISTS visibility TEXT;
 ALTER TABLE knowledge_points ADD COLUMN IF NOT EXISTS visibility TEXT;
+ALTER TABLE track_collections ADD COLUMN IF NOT EXISTS visibility TEXT;
+ALTER TABLE knowledge_collections ADD COLUMN IF NOT EXISTS visibility TEXT;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM content_attachments WHERE visibility IS NOT NULL AND visibility NOT IN ('', 'public', 'private'))
@@ -19,7 +22,9 @@ BEGIN
      OR EXISTS (SELECT 1 FROM track_parts WHERE visibility IS NOT NULL AND visibility NOT IN ('', 'public', 'private'))
      OR EXISTS (SELECT 1 FROM knowledge_parts WHERE visibility IS NOT NULL AND visibility NOT IN ('', 'public', 'private'))
      OR EXISTS (SELECT 1 FROM track_points WHERE visibility IS NOT NULL AND visibility NOT IN ('', 'public', 'private'))
-     OR EXISTS (SELECT 1 FROM knowledge_points WHERE visibility IS NOT NULL AND visibility NOT IN ('', 'public', 'private')) THEN
+     OR EXISTS (SELECT 1 FROM knowledge_points WHERE visibility IS NOT NULL AND visibility NOT IN ('', 'public', 'private'))
+     OR EXISTS (SELECT 1 FROM track_collections WHERE visibility IS NOT NULL AND visibility NOT IN ('', 'public', 'private'))
+     OR EXISTS (SELECT 1 FROM knowledge_collections WHERE visibility IS NOT NULL AND visibility NOT IN ('', 'public', 'private')) THEN
     RAISE EXCEPTION 'Invalid existing visibility: review data before migration';
   END IF;
 END $$;
@@ -33,13 +38,24 @@ UPDATE track_points c SET visibility = CASE WHEN EXISTS (
 UPDATE knowledge_points c SET visibility = CASE WHEN EXISTS (
   SELECT 1 FROM knowledge_parts p WHERE p.knowledge_point_id = c.id AND p.visibility = 'public'
 ) THEN 'public' ELSE 'private' END;
+-- 合集（最外层）在 P 回填完成后，按 P→课程→合集 顺序派生：任一成员 P 公开则合集公开，否则私密。
+UPDATE track_collections c SET visibility = CASE WHEN EXISTS (
+  SELECT 1 FROM track_collection_items i JOIN track_points p ON p.id = i.track_id
+  WHERE i.collection_id = c.id AND p.visibility = 'public'
+  AND EXISTS (SELECT 1 FROM track_parts x WHERE x.track_id = p.id AND x.visibility = 'public')
+) THEN 'public' ELSE 'private' END;
+UPDATE knowledge_collections c SET visibility = CASE WHEN EXISTS (
+  SELECT 1 FROM knowledge_collection_items i JOIN knowledge_points p ON p.id = i.knowledge_point_id
+  WHERE i.collection_id = c.id AND p.visibility = 'public'
+  AND EXISTS (SELECT 1 FROM knowledge_parts x WHERE x.knowledge_point_id = p.id AND x.visibility = 'public')
+) THEN 'public' ELSE 'private' END;
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['track_parts', 'knowledge_parts', 'track_points', 'knowledge_points', 'content_attachments', 'video_attachments'] LOOP
+  FOREACH t IN ARRAY ARRAY['track_parts', 'knowledge_parts', 'track_points', 'knowledge_points', 'content_attachments', 'video_attachments', 'track_collections', 'knowledge_collections'] LOOP
     EXECUTE format('ALTER TABLE %I ALTER COLUMN visibility SET NOT NULL', t);
     EXECUTE format('ALTER TABLE %I ALTER COLUMN visibility SET DEFAULT %L', t,
-      CASE WHEN t IN ('track_points', 'knowledge_points') THEN 'private' ELSE 'public' END);
+      CASE WHEN t IN ('track_points', 'knowledge_points', 'track_collections', 'knowledge_collections') THEN 'private' ELSE 'public' END);
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = t::regclass AND conname = t || '_visibility_check') THEN
       EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I CHECK (visibility IN (''public'', ''private''))', t, t || '_visibility_check');
     END IF;

@@ -25,12 +25,26 @@ function formatWeekText(value) {
   return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
 }
 
-function normalizeAssignment(item = {}) {
+// 失效目标统一展示的精确标题，与后端 UNAVAILABLE_TITLE 保持一致。
+const UNAVAILABLE_TITLE = '此资料已经被老师更改';
+
+// 当前项是否不可打开：优先后端 target_status，兼容旧 target_private / target.status。
+function isTargetUnavailable(item = {}) {
   const target = item.target || {};
+  const status = String(item.targetStatus || item.target_status || target.status || '').toLowerCase();
+  if (status) return status !== 'available';
+  return Boolean(item.targetPrivate || item.target_private);
+}
+
+// snapshot=true：历史只读快照模式，不套失效标题、不因 private 改写布置时标题。
+function normalizeAssignment(item = {}, { snapshot = false } = {}) {
+  const target = item.target || {};
+  const unavailable = !snapshot && isTargetUnavailable(item);
   const objectType = item.objectType || item.object_type || item.type || target.type || '';
   const objectId = item.objectId || item.object_id || (target.id !== undefined ? target.id : '') || '';
   const partId = item.partId || item.part_id || (target.partId !== undefined ? target.partId : '') || '';
-  const partNo = item.partNo || item.part_no || item.no || item.partIndex || item.part_index || '';
+  const rawPartNo = item.partNo || item.part_no || item.no || item.partIndex || item.part_index || '';
+  const partNo = unavailable ? '' : rawPartNo;
   const typeLabel = OBJECT_TYPE_LABELS[objectType] || '内容';
   const partLabel = partNo ? `P${String(partNo).padStart(2, '0')}` : '';
   return {
@@ -40,14 +54,30 @@ function normalizeAssignment(item = {}) {
     objectId,
     partId,
     partNo,
-    title: item.title || item.assignedObjectTitle || item.assigned_object_title || '未命名内容',
-    coverUrl: item.coverUrl || item.cover_url || '',
+    title: unavailable ? UNAVAILABLE_TITLE : (item.title || item.assignedObjectTitle || item.assigned_object_title || '未命名内容'),
+    coverUrl: unavailable ? '' : (item.coverUrl || item.cover_url || ''),
+    targetStatus: unavailable ? 'private' : (item.targetStatus || item.target_status || 'available'),
+    unavailable,
     typeLabel,
     actionText: OBJECT_TYPE_ACTIONS[objectType] || '点击查看详情',
     partLabel,
-    materialMeta: item.materialMeta || item.material_meta || (partLabel ? `${typeLabel} · 自动定位到 ${partLabel}` : `${typeLabel} · 查看收录内容`),
-    materialAction: item.materialAction || item.material_action || (objectType === 'track_part' || objectType === 'knowledge_part' ? '进入详情并播放' : '进入详情')
+    // 失效项不显示图片角标、M标签和"进入详情"诱导文案，保持原列表位置。
+    materialMeta: unavailable ? '' : (item.materialMeta || item.material_meta || (partLabel ? `${typeLabel} · 自动定位到 ${partLabel}` : `${typeLabel} · 查看收录内容`)),
+    materialAction: unavailable ? '' : (item.materialAction || item.material_action || (objectType === 'track_part' || objectType === 'knowledge_part' ? '进入详情并播放' : '进入详情')),
+    target: unavailable ? null : (item.target || null)
   };
+}
+
+// 竞态失效：把某个可用项原位改写成灰框（精确标题、空封面、无 target）。
+function toUnavailableAssignment(item = {}) {
+  return normalizeAssignment({
+    ...item,
+    targetStatus: 'private',
+    targetPrivate: true,
+    coverUrl: '',
+    partNo: '',
+    target: null
+  });
 }
 
 function isDeletedAssignment(item = {}) {
@@ -74,7 +104,11 @@ function isDeletedAssignment(item = {}) {
 function normalizeHomeworkGroup(data) {
   const payload = data || {};
   const source = payload.latestHomework || payload.homework || payload;
-  const assignments = (source.assignments || source.items || []).filter((item) => !isDeletedAssignment(item)).map(normalizeAssignment);
+  const assignments = (source.assignments || source.items || [])
+    .filter((item) => !isDeletedAssignment(item))
+    // message 只承载练习/提交要求，不当资源卡展示；要求已由 group 独立保留。
+    .filter((item) => (item.objectType || item.object_type || item.type || (item.target && item.target.type)) !== 'message')
+    .map((item) => normalizeAssignment(item));
   const first = assignments[0] || {};
   const assignmentTime = source.assignmentDate || source.assignment_date || source.createdAt || source.created_at;
   return {
@@ -159,7 +193,7 @@ function normalizeHomeworkHistory(data) {
   const items = Array.isArray(data) ? data : data?.items || data?.records || [];
   return items.map((item) => {
     const time = item.assignmentDate || item.assignment_date || item.createdAt || item.created_at;
-    const assignments = (item.assignments || item.items || []).map(normalizeAssignment);
+    const assignments = (item.assignments || item.items || []).map((a) => normalizeAssignment(a, { snapshot: true }));
     const first = assignments[0] || {};
     return {
       ...item,
@@ -180,6 +214,9 @@ function normalizeHomeworkHistory(data) {
 }
 
 module.exports = {
+  UNAVAILABLE_TITLE,
+  isTargetUnavailable,
+  toUnavailableAssignment,
   formatDateText,
   formatTimeText,
   formatWeekText,

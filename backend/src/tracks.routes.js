@@ -11,10 +11,11 @@ import {
   PRIVATE,
   resolveVisibilityInput,
   lockCourse,
-  refreshCourseVisibility
+  refreshCourseVisibility,
+  refreshCollectionVisibility,
+  lockVisibilityFamilies
 } from './content-visibility.js';
 import {
-  assertPrivateWriteAllowed,
   finalizeCourseVisibility,
   findPrivatePartPrerequisiteConflicts,
   PrerequisiteConflictError
@@ -32,9 +33,7 @@ import {
 } from './storage.js';
 import { createInitialRenditions, deleteVideoObjects } from './transcode.js';
 import { toPlaybackUrl } from './playback-url.js';
-import { filterPubliclyReadableVideos } from './playback-access.js';
 import { deleteWithReferences } from './deletion.js';
-import { recordVisibilityRevocations, getVideoObjectKeys } from './revocation.js';
 
 function normalizeKeyword(value) {
   return String(value ?? '').trim();
@@ -171,36 +170,13 @@ async function getTrackParts(trackId, canView = true) {
     }
   }
 
-  // 共享视频：任一宿主私密即视为私密（fail-closed）。非授权查看者需据此抹掉永久播放地址。
-  // 授权查看者（教师/主任）本就能看私密内容，无需额外拦截。
-  const publiclyReadableVideos = (videoIds.length > 0)
-    ? await filterPubliclyReadableVideos(pool, videoIds)
-    : null;
-
+  // 可见性仅为业务展示（阶段 A/B 已是实际文件）：所有返回的 P 均返回经 CDN 转换后的
+  // 原 COS 公开播放地址，不再按可见性剥离永久 URL。学生等未授权查看者已在上面的
+  // SQL visibilityFilter 中过滤掉私密 P，不会拿到私密记录。
   return rows.map((row) => {
     const renditions = (renditionsByVideoId.get(row.video_id) || []).map((rendition) => ({ ...rendition }));
-    if (isPartPlaybackCleared(row, canView, publiclyReadableVideos)) {
-      // 私密 P / 共享私密宿主：返回 video_id 与 visibility，但清空永久 video_url / play_url
-      // 与转码 URL，交由前端经授权端点（/playback/videos/:id/play-url）播放。
-      return {
-        ...mapPart(row),
-        video_url: '',
-        play_url: '',
-        visibility: PRIVATE,
-        renditions: renditions.map((rendition) => ({ ...rendition, video_url: '', play_url: '' }))
-      };
-    }
     return { ...mapPart(row), renditions };
   });
-}
-
-// 是否应抹掉该 P 的永久播放地址（fail-closed）：
-//   - 私密 P：一律抹掉（教师/主任也走授权端点，由 /playback 端点按角色放行）。
-//   - 公开 P 但所属视频存在任意私密宿主：非授权查看者抹掉（共享视频 fail-closed）。
-function isPartPlaybackCleared(row, canView, publiclyReadableVideos) {
-  if (normalizeStoredVisibility(row.visibility) === PRIVATE) return true;
-  if (publiclyReadableVideos && !publiclyReadableVideos.has(row.video_id)) return true;
-  return false;
 }
 
 async function getContentAttachments(objectType, objectId, viewer) {
@@ -496,6 +472,29 @@ tracksRouter.get('/collections/:id', optionalContentViewer, async (req, res, nex
     }
 
     const canView = viewerCanSeePrivate(req);
+
+    // 游客/学生：合集无任何“公开曲目(且含公开 P)”时整体隐藏（与列表一致的隐藏策略）。
+    // 过滤下推 SQL；管理身份（teacher / super_admin）仍可读空合集。
+    if (!canView) {
+      const publicMember = await pool.query(
+        `SELECT 1
+         FROM track_collection_items ci
+         JOIN track_points tp ON tp.id = ci.track_id
+         WHERE ci.collection_id = $1
+           AND COALESCE(NULLIF(tp.visibility, ''), 'public') = 'public'
+           AND EXISTS (
+             SELECT 1 FROM track_parts pp WHERE pp.track_id = tp.id
+             AND COALESCE(NULLIF(pp.visibility, ''), 'public') = 'public'
+           )
+         LIMIT 1`,
+        [collectionId]
+      );
+      if (publicMember.rowCount === 0) {
+        res.status(404).json({ message: '曲谱集不存在' });
+        return;
+      }
+    }
+
     const { sql, params } = buildTrackCollectionTracksQuery({ canView, collectionId });
 
     const [tracksResult, libraryResources] = await Promise.all([
@@ -559,6 +558,8 @@ tracksRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
     }
 
     await client.query('BEGIN');
+    // 事务级 advisory 锁：序列化 track 族可见性写入，须在行锁/业务重读前。
+    await lockVisibilityFamilies(client, ['track']);
     // 锁父（曲目）后保存再刷新派生可见性。
     await lockCourse(client, 'track_point', trackId);
     const previousVisibility = (await client.query('SELECT visibility FROM track_points WHERE id = $1 FOR UPDATE', [trackId])).rows[0]?.visibility;
@@ -570,9 +571,9 @@ tracksRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
       [name, cover, description, trackId]
     );
     // 刷新派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
-    await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
+    const refreshed = await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
     await client.query('COMMIT');
-    res.json({ data: mapTrack(result.rows[0]) });
+    res.json({ data: { ...mapTrack(result.rows[0]), visibility: refreshed.visibility } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     if (respondVisibilityError(res, error)) return;
@@ -613,10 +614,20 @@ tracksRouter.delete('/:id', requireSuperAdmin, async (req, res, next) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // 事务级 advisory 锁：序列化 track 族可见性写入，须在行锁/业务重读前。
+      await lockVisibilityFamilies(client, ['track']);
+      const collectionRefs = await client.query(
+        'SELECT DISTINCT collection_id FROM track_collection_items WHERE track_id = $1 ORDER BY collection_id', [trackId]
+      );
+      const collectionIds = collectionRefs.rows.map((row) => row.collection_id).filter(Boolean);
       await deleteWithReferences(client, { objectType: 'track_point', objectId: trackId, objectTitle: track.name, adminId: req.admin.adminId });
       const result = await client.query('DELETE FROM track_points WHERE id = $1 RETURNING id', [trackId]);
       for (const video of partsResult.rows) {
         await client.query('DELETE FROM videos WHERE id = $1', [video.id]);
+      }
+      // 曲目已删（含级联的合集成员关系），刷新曾引用它的合集派生可见性。
+      for (const collectionId of collectionIds) {
+        await refreshCollectionVisibility(client, 'track_collection', collectionId);
       }
       await client.query('COMMIT');
       if (result.rowCount === 0) {
@@ -795,13 +806,11 @@ tracksRouter.post('/:id/parts', requireSuperAdmin, async (req, res, next) => {
     const partVisibility = resolveVisibilityInput(req.body.visibility, undefined);
 
     await client.query('BEGIN');
+    // 事务级 advisory 锁：序列化 track 族可见性写入，须在行锁/业务重读前。
+    await lockVisibilityFamilies(client, ['track']);
     // 锁父（曲目）后保存并刷新派生可见性。
     await lockCourse(client, 'track_point', trackId);
     const previousVisibility = (await client.query('SELECT visibility FROM track_points WHERE id = $1 FOR UPDATE', [trackId])).rows[0]?.visibility;
-    // 新私密写入（之前不存在该 P）需经开关保护。
-    if (partVisibility === PRIVATE) {
-      assertPrivateWriteAllowed(PRIVATE, undefined);
-    }
     const videoHead = await ensureObjectExists(videoKey);
     const videoUrl = getPublicUrl(videoKey);
     const videoResult = await client.query(
@@ -823,9 +832,9 @@ tracksRouter.post('/:id/parts', requireSuperAdmin, async (req, res, next) => {
       [trackId, partNo, video.id, title, duration, partVisibility]
     );
     // 刷新父课程派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
-    await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
+    const refreshed = await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
     await client.query('COMMIT');
-    res.status(201).json({ data: { ...partResult.rows[0], video_url: videoUrl, video_size: Number(videoHead.ContentLength || 0) } });
+    res.status(201).json({ data: { ...partResult.rows[0], video_url: videoUrl, video_size: Number(videoHead.ContentLength || 0), course_visibility: refreshed.visibility } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     // 政策拦截（私密写入开关 / 前置引用冲突）不删除已上传文件，便于管理员修正后重试。
@@ -860,6 +869,8 @@ tracksRouter.patch('/:id/parts/:partId', requireSuperAdmin, async (req, res, nex
     }
 
     await client.query('BEGIN');
+    // 事务级 advisory 锁：序列化 track 族可见性写入，须在行锁/业务重读前。
+    await lockVisibilityFamilies(client, ['track']);
     // 锁父（曲目）后保存并刷新派生可见性。
     await lockCourse(client, 'track_point', trackId);
     const previousVisibility = (await client.query('SELECT visibility FROM track_points WHERE id = $1 FOR UPDATE', [trackId])).rows[0]?.visibility;
@@ -869,27 +880,10 @@ tracksRouter.patch('/:id/parts/:partId', requireSuperAdmin, async (req, res, nex
       res.status(404).json({ message: 'P 分段不存在' });
       return;
     }
-    // 缺省保留旧值；显式改私密（之前非 private）受开关保护。
+    // 缺省保留旧值；私密写入为常规业务，不再受模式门禁或前置引用冲突阻断。
+    // 可见性仅为业务展示：改为私密不再记录待撤销直链（recordVisibilityRevocations 调用已移除），
+    // 视频原 COS+CDN 地址照常保留，前端无需走授权端点即可播放。
     const partVisibility = resolveVisibilityInput(req.body.visibility, currentPart.rows[0].visibility);
-    const partBecamePrivate = partVisibility === PRIVATE && normalizeStoredVisibility(currentPart.rows[0].visibility) !== PRIVATE;
-    if (partBecamePrivate) {
-      assertPrivateWriteAllowed(PRIVATE, currentPart.rows[0].visibility);
-      // P 改私密会令其失公开，若该 P 正被其它内容作为前置项引用，须阻止并回滚。
-      const conflicts = await findPrivatePartPrerequisiteConflicts(client, 'track_point', partId);
-      if (conflicts.length > 0) {
-        throw new PrerequisiteConflictError('该分 P 正被其它内容作为前置项引用，无法转为私密，请先移除相关前置项');
-      }
-      // 记录需撤销的旧公开直链（视频原画 + 转码 + 封面），供云端 purge 与授权回收（E04）。
-      const videoIdResult = await client.query('SELECT video_id FROM track_parts WHERE id = $1', [partId]);
-      const revokedVideoId = videoIdResult.rows[0]?.video_id;
-      if (revokedVideoId) {
-        const keys = await getVideoObjectKeys(client, revokedVideoId);
-        await recordVisibilityRevocations(client, {
-          objectType: 'track_part', objectId: partId, keys,
-          reason: '分 P 改为私密，撤销旧公开直链', adminId: req.admin.adminId
-        });
-      }
-    }
     const result = await client.query(
       `UPDATE track_parts
        SET part_no = $1, title = $2, duration = $3, visibility = $4, updated_at = CURRENT_TIMESTAMP
@@ -898,9 +892,9 @@ tracksRouter.patch('/:id/parts/:partId', requireSuperAdmin, async (req, res, nex
       [partNo, title, duration, partVisibility, partId, trackId]
     );
     // 刷新父课程派生可见性；若因此“新变私密”则经私密写入开关与前置引用检查保护。
-    await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
+    const refreshed = await finalizeCourseVisibility(client, 'track_point', trackId, previousVisibility);
     await client.query('COMMIT');
-    res.json({ data: result.rows[0] });
+    res.json({ data: { ...result.rows[0], course_visibility: refreshed.visibility } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     if (respondVisibilityError(res, error)) return;
@@ -947,6 +941,8 @@ tracksRouter.delete('/:id/parts/:partId', requireSuperAdmin, async (req, res, ne
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // 事务级 advisory 锁：序列化 track 族可见性写入，须在行锁/业务重读前。
+      await lockVisibilityFamilies(client, ['track']);
       // 锁父（曲目）后删除 P 并刷新派生可见性。
       await lockCourse(client, 'track_point', trackId);
       const previousVisibility = (await client.query('SELECT visibility FROM track_points WHERE id = $1 FOR UPDATE', [trackId])).rows[0]?.visibility;
@@ -985,6 +981,7 @@ tracksRouter.delete('/:id/parts/:partId', requireSuperAdmin, async (req, res, ne
 });
 
 tracksRouter.post('/collections', requireSuperAdmin, async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const name = normalizeText(req.body.name);
     const description = normalizeText(req.body.description);
@@ -995,21 +992,30 @@ tracksRouter.post('/collections', requireSuperAdmin, async (req, res, next) => {
       return;
     }
 
-    const result = await pool.query(
+    await client.query('BEGIN');
+    // 事务级 advisory 锁：序列化 track 族可见性写入。
+    await lockVisibilityFamilies(client, ['track']);
+    const result = await client.query(
       `INSERT INTO track_collections (name, cover, description)
        VALUES ($1, $2, $3)
        RETURNING id, name, cover, description, created_at, updated_at`,
       [name, cover, description]
     );
-
+    // 空合集默认 private：刷新自身派生可见性（无公开曲目即 private）。
+    await refreshCollectionVisibility(client, 'track_collection', result.rows[0].id);
+    await client.query('COMMIT');
     res.status(201).json({ data: mapTrack(result.rows[0]) });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     next(error);
+  } finally {
+    client.release();
   }
 });
 
 // PATCH /api/tracks/collections/:id
 tracksRouter.patch('/collections/:id', requireSuperAdmin, async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const collectionId = normalizeId(req.params.id);
     const name = normalizeText(req.body.name);
@@ -1021,7 +1027,10 @@ tracksRouter.patch('/collections/:id', requireSuperAdmin, async (req, res, next)
       return;
     }
 
-    const result = await pool.query(
+    await client.query('BEGIN');
+    // 事务级 advisory 锁：序列化 track 族可见性写入。
+    await lockVisibilityFamilies(client, ['track']);
+    const result = await client.query(
       `UPDATE track_collections
        SET name = $1, cover = $2, description = $3, updated_at = CURRENT_TIMESTAMP
        WHERE id = $4
@@ -1030,13 +1039,20 @@ tracksRouter.patch('/collections/:id', requireSuperAdmin, async (req, res, next)
     );
 
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ message: '曲谱集不存在' });
       return;
     }
 
+    // 编辑后刷新自身派生可见性（成员未变，仍重算以保持一致）。
+    await refreshCollectionVisibility(client, 'track_collection', collectionId);
+    await client.query('COMMIT');
     res.json({ data: mapTrack(result.rows[0]) });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     next(error);
+  } finally {
+    client.release();
   }
 });
 
@@ -1059,6 +1075,8 @@ tracksRouter.delete('/collections/:id', requireSuperAdmin, async (req, res, next
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // 事务级 advisory 锁：序列化 track 族可见性写入。
+      await lockVisibilityFamilies(client, ['track']);
       await deleteWithReferences(client, { objectType: 'track_collection', objectId: collectionId, objectTitle: existing.rows[0].name, adminId: req.admin.adminId });
       await client.query('DELETE FROM track_collections WHERE id = $1', [collectionId]);
       await client.query('COMMIT');
@@ -1089,6 +1107,8 @@ tracksRouter.patch('/collections/:id/tracks', requireSuperAdmin, async (req, res
     }
 
     await client.query('BEGIN');
+    // 事务级 advisory 锁：序列化 track 族可见性写入，须在行锁/业务重读前。
+    await lockVisibilityFamilies(client, ['track']);
 
     const collectionResult = await client.query('SELECT id FROM track_collections WHERE id = $1', [collectionId]);
     if (collectionResult.rowCount === 0) {
@@ -1116,6 +1136,8 @@ tracksRouter.patch('/collections/:id/tracks', requireSuperAdmin, async (req, res
       );
     }
     await client.query('UPDATE track_collections SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [collectionId]);
+    // 成员替换后刷新自身派生可见性。
+    await refreshCollectionVisibility(client, 'track_collection', collectionId);
     await client.query('COMMIT');
 
     res.json({ data: { collectionId, trackIds } });

@@ -1,5 +1,5 @@
 // videos.routes.js 视频附件可见性集成测试：写入时 visibility 默认 public、编辑遗漏保留 private、
-// 显式 private 受私密写入开关拦截（403）、GET /:id 用 serializeAttachments 不泄 private 字段。
+// 显式 private 作为常规业务允许写入（不再受模式拦截）、GET /:id 用 serializeAttachments 不泄 private 字段。
 // 不连接真实数据库/云：db/storage/transcode 用 mock.module 注入 fake，content-privacy-config 控制私密开关。
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,15 +20,6 @@ const state = {
   rolledBack: false,
   updatedVisibilities: []
 };
-
-class FakePrivateWriteDisabledError extends Error {
-  constructor(message = '私密内容功能暂未开放') {
-    super(message);
-    this.name = 'PrivateWriteDisabledError';
-    this.code = 'PRIVATE_WRITE_DISABLED';
-    this.status = 403;
-  }
-}
 
 function makeFakePool() {
   const handler = (sql, params) => {
@@ -110,13 +101,15 @@ test.before(async () => {
       verifyCiCallbackRequest: () => ({ ok: true, via: 'token' })
     }
   });
-  // 默认 off：新的 private 写入被拦截（403）。
+  // 私密为常规业务：新 private 写入不再被拦截（仅校验可见性取值）。
   mock.module(PRIVACY, {
     namedExports: {
-      CONTENT_PRIVACY_MODE: 'off',
+      CONTENT_PRIVACY_MODE: 'business',
       assertPrivateWriteAllowed(nextVisibility, previousVisibility) {
-        if (nextVisibility === 'private' && previousVisibility === 'private') return;
-        if (nextVisibility === 'private') throw new FakePrivateWriteDisabledError();
+        // 新语义：私密为常规业务，仅校验可见性取值，不再拦截 private。
+        const legal = (v) => v === 'public' || v === 'private' || v === undefined || v === null || v === '';
+        if (!legal(nextVisibility)) throw new Error('可见性取值非法');
+        if (previousVisibility !== undefined && previousVisibility !== null && previousVisibility !== '' && !legal(previousVisibility)) throw new Error('可见性取值非法');
       }
     }
   });
@@ -176,7 +169,7 @@ test('POST /complete 默认 visibility=public 并写入', async () => {
   assert.equal(state.insertedAttachments[0][6], 'public');
 });
 
-test('POST /complete 显式 private 在 off 模式被拦截 → 403', async () => {
+test('POST /complete 显式 private 作为常规业务成功写入（201）', async () => {
   const handler = extractHandler(mod.videoRouter, '/complete', 'post');
   const res = makeRes();
   await handler({
@@ -188,8 +181,9 @@ test('POST /complete 显式 private 在 off 模式被拦截 → 403', async () =
       attachments: [{ key: 'attachments/a.pdf', fileName: 'a.pdf', fileType: 'application/pdf', visibility: 'private' }]
     }
   }, res, nextThrows());
-  assert.equal(res.statusCode, 403);
-  assert.equal(state.insertedAttachments.length, 0);
+  assert.equal(res.statusCode, 201);
+  assert.equal(state.insertedAttachments.length, 1);
+  assert.equal(state.insertedAttachments[0][6], 'private');
 });
 
 // ---------- PATCH /:id：编辑视频附件 ----------
@@ -214,7 +208,7 @@ test('PATCH /:id 替换时遗漏 visibility → 保留旧 private', async () => 
   assert.equal(state.insertedAttachments[0][6], 'private');
 });
 
-test('PATCH /:id 新增显式 private → off 模式 403', async () => {
+test('PATCH /:id 新增显式 private → 作为常规业务成功（200）', async () => {
   state.currentAttachments = [];
   const handler = extractHandler(mod.videoRouter, '/:id', 'patch');
   const res = makeRes();
@@ -230,8 +224,9 @@ test('PATCH /:id 新增显式 private → off 模式 403', async () => {
       }
     }
   }, res, nextThrows());
-  assert.equal(res.statusCode, 403);
-  assert.equal(state.insertedAttachments.length, 0);
+  assert.equal(res.statusCode, 200);
+  assert.equal(state.insertedAttachments.length, 1);
+  assert.equal(state.insertedAttachments[0][6], 'private');
 });
 
 test('PATCH /:id keep 旧附件不触碰其 visibility（保持稳定 id）', async () => {
@@ -273,7 +268,7 @@ test('GET /:id 学生看不到 private 附件', async () => {
   assert.deepEqual(ids, [1]);
 });
 
-test('GET /:id 教师可见 private 附件但无永久 URL/key', async () => {
+test('GET /:id 教师可见 private 附件并取得正常源地址', async () => {
   state.detailAttachments = [
     { id: 1, file_name: 'pub.pdf', file_url: 'https://o/pub', file_key: 'attachments/pub', file_type: 'application/pdf', file_size: 10, visibility: 'public', created_at: new Date() },
     { id: 2, file_name: 'sec.pdf', file_url: 'https://o/sec', file_key: 'attachments/sec', file_type: 'application/pdf', file_size: 10, visibility: 'private', created_at: new Date() }
@@ -284,16 +279,16 @@ test('GET /:id 教师可见 private 附件但无永久 URL/key', async () => {
   assert.equal(res.statusCode, 200);
   const secret = res.body.data.attachments.find((a) => a.id === 2);
   assert.ok(secret, '教师应能看到 private 附件');
-  assert.equal(secret.file_url, undefined);
-  assert.equal(secret.file_key, undefined);
+  assert.equal(secret.file_url, 'https://o/sec');
+  assert.equal(secret.file_key, 'attachments/sec');
   assert.match(secret.download_endpoint, /\/api\/attachments\/2\/download-url\?source=video/);
 });
 
 // ---------- PATCH /:id：attachmentPlan.visibilityChanges 稳定 ID 改附件权限 ----------
 // 不替换文件：事务锁 video → 查附件归属 FOR UPDATE → assertVideoAttachmentWriteAllowed →
 // UPDATE video_attachments.visibility。以下仅测这一路径（visibilities 变更不与 keep/replace/add 混用）。
-test('PATCH /:id 公开→private 在 off 模式被拦截 → 403 且整体回滚', async () => {
-  // 当前课程附件 10 为 public；请求将其改为 private（off 模式应被私密写入开关拦截）。
+test('PATCH /:id 公开→private 作为常规业务成功（200）且整体提交', async () => {
+  // 当前课程附件 10 为 public；请求将其改为 private（私密为常规业务，不再被拦截）。
   state.currentAttachments = [{ id: 10, file_key: 'attachments/a10.pdf', visibility: 'public' }];
   const handler = extractHandler(mod.videoRouter, '/:id', 'patch');
   const res = makeRes();
@@ -306,11 +301,12 @@ test('PATCH /:id 公开→private 在 off 模式被拦截 → 403 且整体回�
       attachmentPlan: { visibilityChanges: [{ id: 10, visibility: 'private' }] }
     }
   }, res, nextThrows());
-  assert.equal(res.statusCode, 403);
-  // 拦截发生在事务内：整体回滚，不提交；且没有任何附件可见性被实际 UPDATE。
-  assert.equal(state.committed, false);
-  assert.equal(state.rolledBack, true);
-  assert.equal(state.updatedVisibilities.length, 0);
+  assert.equal(res.statusCode, 200);
+  // 私密写入成功：事务提交，附件可见性被更新为 private。
+  assert.equal(state.committed, true);
+  assert.equal(state.rolledBack, false);
+  assert.equal(state.updatedVisibilities.length, 1);
+  assert.deepEqual(state.updatedVisibilities[0], ['private', 10, 1]);
   assert.equal(state.insertedAttachments.length, 0);
 });
 

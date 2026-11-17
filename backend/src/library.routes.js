@@ -297,7 +297,7 @@ libraryRouter.post('/', requireSuperAdmin, async (req, res, next) => {
     const uploader = await findUploader(req.admin);
     await client.query('BEGIN');
     // 反向共享 key 防护：拒绝引用已私密附件文件（同 URL 归一）。
-    await rejectPrivateAttachmentReference(client, fileKey);
+    // File reuse does not change independent library visibility.
     const result = await client.query(
       `INSERT INTO library_resources (title, description, cover, file_name, file_url, file_key, file_type, file_size, uploader_id, uploader_name)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -339,7 +339,7 @@ libraryRouter.patch('/:id', requireSuperAdmin, async (req, res, next) => {
 
     await client.query('BEGIN');
     // 文件替换场景：同样拒绝引用已私密附件文件（同 URL 归一）。
-    if (fileKey) await rejectPrivateAttachmentReference(client, fileKey);
+    // Attachment privacy does not prohibit reusing a file in the library.
     const result = await client.query(
       `UPDATE library_resources SET title = $1, description = $2, cover = $3, updated_at = CURRENT_TIMESTAMP
        WHERE id = $4

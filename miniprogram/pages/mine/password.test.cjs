@@ -20,6 +20,26 @@ test('cancel clears secrets and eye toggles are independent', () => {
   assert.equal(page.data.showOld, true); assert.equal(page.data.showNew, false);
   page.closePasswordForm(); assert.equal(page.data.oldPassword, ''); assert.equal(page.data.showOld, false);
 });
+test('continuous password input only updates values without changing focus or remounting form', () => {
+  const { page } = setup();
+  page.openPasswordForm();
+  const patches = [];
+  const originalSetData = page.setData;
+  page.setData = function (patch) { patches.push(patch); originalSetData.call(this, patch); };
+  for (const value of ['a', 'ab', 'abc', 'abcd']) {
+    page.inputOldPassword({ detail: { value } });
+    assert.equal(page.data.oldFocus, true);
+    assert.equal(page.data.showPasswordForm, true);
+    assert.deepEqual(Object.keys(patches.at(-1)), ['oldPassword']);
+  }
+  for (const value of ['n', 'ne', 'new']) {
+    page.inputNewPassword({ detail: { value } });
+    assert.deepEqual(Object.keys(patches.at(-1)), ['newPassword']);
+  }
+  assert.equal(page.data.oldPassword, 'abcd');
+  assert.equal(page.data.newPassword, 'new');
+});
+
 test('old password error keeps login and new password', async () => {
   const env = setup(async () => { throw Object.assign(new Error(), { code: 'OLD_PASSWORD_INCORRECT', statusCode: 400 }); });
   env.page.setData({ oldPassword: 'wrong', newPassword: 'newpass' }); await env.page.submitPassword();

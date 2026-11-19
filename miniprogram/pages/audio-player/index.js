@@ -122,7 +122,6 @@ Page({
     this.setData({ audioReady: false, audioWaiting: true, audioErrorText: '' });
     const audio = wx.createInnerAudioContext();
     this.audio = audio;
-    audio.src = url;
     audio.loop = this.data.loop;
     this.setPlaybackRate();
 
@@ -139,6 +138,7 @@ Page({
       const currentTime = Number(audio.currentTime || 0);
       if (duration > 0) this.updateDuration(duration);
       this.updateCurrentTime(currentTime, duration || this.data.duration);
+      if (this.data.audioWaiting) this.setData({ audioWaiting: false });
     });
 
     audio.onPlay(() => {
@@ -171,6 +171,8 @@ Page({
       this.setData({ playing: false, audioWaiting: false, audioErrorText: errorText });
       wx.showToast({ title: errorText, icon: 'none' });
     });
+    // 先注册原生事件再设置源地址，避免快速缓存命中时漏接就绪事件。
+    audio.src = url;
   },
 
   clearSpeedTimers() {
@@ -363,11 +365,13 @@ Page({
     const safeDuration = Math.max(0, Number(duration) || 0);
     const safeCurrent = Math.min(safeDuration || currentTime, Math.max(0, Number(currentTime) || 0));
     const progress = safeDuration ? Math.round((safeCurrent / safeDuration) * 100) : 0;
-    this.setData({
-      currentTime: safeCurrent,
-      progress,
-      currentTimeText: formatTime(safeCurrent)
-    });
+    const currentTimeText = formatTime(safeCurrent);
+    // 原生事件频率高；仅把变化的时间/进度传给视图，不更新卡片容器。
+    this.data.currentTime = safeCurrent;
+    const patch = {};
+    if (progress !== this.data.progress) patch.progress = progress;
+    if (currentTimeText !== this.data.currentTimeText) patch.currentTimeText = currentTimeText;
+    if (Object.keys(patch).length) this.setData(patch);
   },
 
   toggleLoop() {

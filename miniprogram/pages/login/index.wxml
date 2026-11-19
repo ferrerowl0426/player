@@ -18,7 +18,7 @@
 
     <view class="field">
       <text class="field-label">密码</text>
-      <input class="input" value="{{password}}" placeholder="请输入密码" placeholder-class="input-placeholder" password confirm-type="done" cursor-spacing="16" bindinput="onPasswordInput" />
+      <input class="input password-input" value="{{password}}" placeholder="请输入密码" placeholder-class="input-placeholder" password confirm-type="done" cursor-spacing="16" bindinput="onPasswordInput" />
     </view>
 
     <view wx:if="{{error}}" class="error-text">{{error}}</view>

@@ -129,7 +129,21 @@
   font-weight: 700;
 }
 
+.audio-state-slot {
+  height: 78rpx;
+  overflow: hidden;
+}
+
+.audio-state-idle {
+  visibility: hidden;
+}
+
 .audio-state {
+  height: 60rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   margin-bottom: 18rpx;
   padding: 14rpx 18rpx;
   border-radius: 12rpx;

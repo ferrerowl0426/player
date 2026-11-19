@@ -93,6 +93,13 @@
   margin-bottom: 12rpx;
 }
 
+.login-card .password-input {
+  font-size: 24rpx;
+  font-weight: 400;
+  letter-spacing: 0;
+  font-family: Arial, sans-serif;
+}
+
 .login-btn {
   width: 360rpx;
   margin: 28rpx auto 0;

@@ -41,8 +41,13 @@ Component({
     controlsVisible: true,
     isPlaying: false,
     isFullscreen: false,
-    // 窗口铺满去黑边；全屏 contain 保完整画面。
-    objectFit: 'cover',
+    // iOS 原生全屏层会遮挡/吞掉 cover-view 自定义控件的渲染与触摸，
+    // 导致全屏后看不到进度条也无法退出。全屏改用 video 原生控件兜底
+    // （进度条 + 退出按钮）；窗口态仍用同层 view 自定义控件。
+    useNativeFullscreenControls: true,
+    // 竖屏窗口与全屏完整显示，横屏窗口保留原布局。
+    portraitVideo: false,
+    objectFit: 'contain',
     fullscreenTransition: '',
     switchingSource: false,
     menu: '',
@@ -263,6 +268,8 @@ Component({
       this._metadataReady = Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0;
       this._loadingSource = false;
       this.setData({
+        portraitVideo: this._metadataReady ? height > width : this.data.portraitVideo,
+        objectFit: this.data.isFullscreen || height > width ? 'contain' : 'cover',
         videoDirection: width > height ? 90 : 0,
         metadataReady: this._metadataReady,
         durationText: formatTime(this._duration),
@@ -526,7 +533,7 @@ Component({
       const pendingMedia = this._pendingMedia || null;
       this.setData({
         isFullscreen: full,
-        objectFit: full ? 'contain' : 'cover',
+        objectFit: full || this.data.portraitVideo ? 'contain' : 'cover',
         fullscreenTransition: '',
         fullscreenDirection: full ? (this._horizontal ? 'horizontal' : 'portrait') : 'none',
         controlsVisible: true,

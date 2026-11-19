@@ -27,7 +27,7 @@ Page({
   },
 
   stopPropagation() {},
-  inputOldPassword(event) { this.setData({ oldPassword: event.detail.value, oldFocus: false }); },
+  inputOldPassword(event) { this.setData({ oldPassword: event.detail.value }); },
   inputNewPassword(event) { this.setData({ newPassword: event.detail.value }); },
   toggleOldPassword() { this.setData({ showOld: !this.data.showOld }); },
   toggleNewPassword() { this.setData({ showNew: !this.data.showNew }); },

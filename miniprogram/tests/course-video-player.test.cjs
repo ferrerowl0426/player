@@ -89,6 +89,22 @@ function player({ measure = false } = {}) {
   return { instance, definition, calls, events, patches, queries, info, load, metadata, fullscreen, nativeEvent, advance };
 }
 
+test('portrait video stays contained on fullscreen exit and resets after landscape metadata', () => {
+  const p = player();
+  p.load('portrait');
+  p.metadata(1080, 1920);
+  assert.equal(p.instance.data.portraitVideo, true);
+  assert.equal(p.instance.data.objectFit, 'contain');
+  p.fullscreen(true, 'vertical');
+  p.fullscreen(false);
+  assert.equal(p.instance.data.objectFit, 'contain');
+  assert.equal(p.instance.data.portraitVideo, true);
+  p.load('landscape');
+  p.metadata(1920, 1080);
+  assert.equal(p.instance.data.portraitVideo, false);
+  assert.equal(p.instance.data.objectFit, 'cover');
+});
+
 test('metadata is required before requesting fullscreen, including zero dimensions', () => {
   const p = player();
   p.load('first');

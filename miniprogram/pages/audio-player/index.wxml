@@ -21,9 +21,10 @@
     <view class="source">来源：<text>{{source || '天空之城 · 主歌段落慢速跟练'}}</text></view>
   </view>
 
-  <view class="player-card {{playing ? 'playing' : ''}}">
-    <view wx:if="{{audioWaiting}}" class="audio-state">音频加载中…</view>
-    <view wx:if="{{audioErrorText}}" class="audio-state error">{{audioErrorText}}</view>
+  <view class="player-card">
+    <view class="audio-state-slot" aria-live="polite">
+      <view class="audio-state {{audioErrorText ? 'error' : ''}} {{!loading && !audioWaiting && !audioErrorText ? 'audio-state-idle' : ''}}">{{audioErrorText || (loading ? '正在获取音频…' : (audioWaiting ? '音频缓冲中…' : '音频已就绪'))}}</view>
+    </view>
     <view class="time-row"><text>{{currentTimeText}}</text><text>{{audioFormat}}</text><text>{{durationText}}</text></view>
     <view class="progress-wrap">
       <view wx:if="{{seeking}}" class="seek-bubble" style="left: {{progress}}%;">{{currentTimeText}}</view>

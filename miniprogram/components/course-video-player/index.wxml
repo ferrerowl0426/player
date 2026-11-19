@@ -8,13 +8,14 @@
     src="{{videoSrc}}"
     poster="{{poster}}"
     initial-time="{{initialTime}}"
-    controls="{{false}}"
+    controls="{{useNativeFullscreenControls && isFullscreen}}"
     enable-progress-gesture="{{isFullscreen}}"
     enable-play-gesture="{{false}}"
-    show-fullscreen-btn="{{false}}"
-    show-play-btn="{{false}}"
+    show-fullscreen-btn="{{useNativeFullscreenControls && isFullscreen}}"
+    show-play-btn="{{useNativeFullscreenControls && isFullscreen}}"
     show-center-play-btn="{{false}}"
     show-casting-button="{{false}}"
+    show-progress="{{useNativeFullscreenControls && isFullscreen}}"
     object-fit="{{objectFit}}"
     direction="{{videoDirection}}"
     playback-rate="{{speed}}"
@@ -33,7 +34,7 @@
          receive enable-progress-gesture and bindtap. A full-screen cover-view
          would swallow those native touches on iOS. -->
     <cover-view
-      wx:if="{{videoSrc && isFullscreen && controlsVisible}}"
+      wx:if="{{videoSrc && isFullscreen && !useNativeFullscreenControls && controlsVisible}}"
       class="control-layer control-dock fullscreen {{fullscreenDirection === 'horizontal' ? 'landscape' : 'portrait'}}"
       style="{{insetStyle}}"
       catchtap="closeMenu"
